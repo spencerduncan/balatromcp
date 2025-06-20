@@ -216,6 +216,24 @@ class BalatroMCPServer(IMCPServer):
     ) -> Dict[str, Any]:
         """Handle an MCP tool call."""
         try:
+            # Special handling for get_game_state tool
+            if tool_name == "get_game_state":
+                state = await self.state_manager.get_current_state()
+                if state is None:
+                    return {
+                        "success": False,
+                        "error_message": "No game state available",
+                        "tool": tool_name,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    }
+                else:
+                    return {
+                        "success": True,
+                        "game_state": state.model_dump(),
+                        "tool": tool_name,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    }
+
             # Map tool names to action creation
             action = await self._create_action_from_tool(tool_name, arguments)
             if action is None:

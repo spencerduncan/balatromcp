@@ -148,24 +148,29 @@ class TestMCPResourceHandlers:
     @pytest.mark.asyncio
     async def test_read_game_state_resource(self, server, sample_game_state):
         """Test reading game state resource through tool call."""
-        server.state_manager.get_current_state.return_value = sample_game_state
+        server.state_manager.get_current_state = AsyncMock(return_value=sample_game_state)
         
         # Test the get_game_state functionality
         result = await server.handle_tool_call("get_game_state", {})
         
-        # Should return error for unknown tool since get_game_state isn't handled as action
-        assert "error" in result
-        assert "Unknown tool" in result["error"]
+        # Should return success with game state data
+        assert result["success"] is True
+        assert "game_state" in result
+        assert result["tool"] == "get_game_state"
+        assert "timestamp" in result
+        assert result["game_state"]["session_id"] == "test_session"
 
     @pytest.mark.asyncio
     async def test_read_game_state_resource_no_state(self, server):
         """Test reading game state resource when no state available."""
-        server.state_manager.get_current_state.return_value = None
+        server.state_manager.get_current_state = AsyncMock(return_value=None)
         
         # Test through handle_tool_call
         result = await server.handle_tool_call("get_game_state", {})
-        assert "error" in result
-        assert "Unknown tool" in result["error"]
+        assert result["success"] is False
+        assert result["error_message"] == "No game state available"
+        assert result["tool"] == "get_game_state"
+        assert "timestamp" in result
 
     @pytest.mark.asyncio
     async def test_read_available_actions_resource(self, server, sample_game_state):
@@ -344,6 +349,70 @@ class TestToolCallHandling:
         
         assert result["success"] is False
         assert result["error_message"] == "Action failed"
+
+    @pytest.mark.asyncio
+    async def test_handle_get_game_state_with_state(self, server, sample_game_state):
+        """Test handling get_game_state tool call with available state."""
+        server.state_manager.get_current_state = AsyncMock(return_value=sample_game_state)
+        
+        result = await server.handle_tool_call("get_game_state", {})
+        
+        assert result["success"] is True
+        assert "game_state" in result
+        assert result["tool"] == "get_game_state"
+        assert "timestamp" in result
+        # Verify state data is properly serialized
+        assert result["game_state"]["session_id"] == "test_session"
+        assert result["game_state"]["ante"] == 1
+        assert result["game_state"]["money"] == 100
+
+    @pytest.mark.asyncio
+    async def test_handle_get_game_state_no_state(self, server):
+        """Test handling get_game_state tool call with no available state."""
+        server.state_manager.get_current_state = AsyncMock(return_value=None)
+        
+        result = await server.handle_tool_call("get_game_state", {})
+        
+        assert result["success"] is False
+        assert result["error_message"] == "No game state available"
+        assert result["tool"] == "get_game_state"
+        assert "timestamp" in result
+        assert "game_state" not in result
+
+    @pytest.mark.asyncio
+    async def test_handle_get_game_state_exception(self, server):
+        """Test handling get_game_state tool call when state manager throws exception."""
+        server.state_manager.get_current_state = AsyncMock(side_effect=Exception("State error"))
+        
+        result = await server.handle_tool_call("get_game_state", {})
+        
+        assert "error" in result
+        assert "Internal error" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_get_game_state_timestamp_format(self, server, sample_game_state):
+        """Test that get_game_state returns properly formatted timestamp."""
+        server.state_manager.get_current_state = AsyncMock(return_value=sample_game_state)
+        
+        result = await server.handle_tool_call("get_game_state", {})
+        
+        assert result["success"] is True
+        timestamp = result["timestamp"]
+        # Should be ISO format with timezone
+        assert "T" in timestamp
+        assert timestamp.endswith("+00:00") or timestamp.endswith("Z")
+
+    @pytest.mark.asyncio
+    async def test_get_game_state_no_action_execution(self, server, sample_game_state):
+        """Test that get_game_state doesn't trigger action execution."""
+        server.state_manager.get_current_state = AsyncMock(return_value=sample_game_state)
+        server.action_handler.execute_action = AsyncMock()
+        
+        result = await server.handle_tool_call("get_game_state", {})
+        
+        assert result["success"] is True
+        # Action handler should not be called for get_game_state
+        server.action_handler.execute_action.assert_not_called()
 
 
 class TestActionCreation:

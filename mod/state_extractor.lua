@@ -243,70 +243,93 @@ function StateExtractor:get_session_id()
 end
 
 function StateExtractor:get_current_phase()
-    -- Determine current game phase
-    -- This needs to be implemented based on Balatro's game state
-    if G and G.STATE then
-        if G.STATE == G.STATES.SELECTING_HAND then
-            return "hand_selection"
-        elseif G.STATE == G.STATES.SHOP then
-            return "shop"
-        elseif G.STATE == G.STATES.BLIND_SELECT then
-            return "blind_selection"
-        elseif G.STATE == G.STATES.DRAW_TO_HAND then
-            return "hand_selection"
-        else
-            return "hand_selection" -- Default
-        end
+    -- Determine current game phase with safe access
+    if not self:safe_check_path(G, {"STATE"}) then
+        self:log("WARNING: G.STATE not accessible, returning default phase")
+        return "hand_selection"
     end
-    return "hand_selection"
+    
+    if not self:safe_check_path(G, {"STATES"}) then
+        self:log("WARNING: G.STATES not accessible, returning default phase")
+        return "hand_selection"
+    end
+    
+    local current_state = G.STATE
+    local states = G.STATES
+    
+    -- Safe state comparison with fallback
+    if current_state == self:safe_get_value(states, "SELECTING_HAND", nil) then
+        return "hand_selection"
+    elseif current_state == self:safe_get_value(states, "SHOP", nil) then
+        return "shop"
+    elseif current_state == self:safe_get_value(states, "BLIND_SELECT", nil) then
+        return "blind_selection"
+    elseif current_state == self:safe_get_value(states, "DRAW_TO_HAND", nil) then
+        return "hand_selection"
+    else
+        self:log("WARNING: Unknown game state: " .. tostring(current_state) .. ", using default")
+        return "hand_selection" -- Default
+    end
 end
 
 function StateExtractor:get_ante()
-    -- Get current ante level
-    if G and G.GAME and G.GAME.round_resets then
-        return G.GAME.round_resets.ante or 1
+    -- Get current ante level with safe access
+    local ante = self:safe_get_nested_value(G, {"GAME", "round_resets", "ante"}, 1)
+    if ante == 1 and not self:safe_check_path(G, {"GAME", "round_resets", "ante"}) then
+        self:log("WARNING: Unable to access G.GAME.round_resets.ante, returning default 1")
     end
-    return 1
+    return ante
 end
 
 function StateExtractor:get_money()
-    -- Get current money
-    if G and G.GAME then
-        return G.GAME.dollars or 0
+    -- Get current money with safe access
+    local money = self:safe_get_nested_value(G, {"GAME", "dollars"}, 0)
+    if money == 0 and not self:safe_check_path(G, {"GAME", "dollars"}) then
+        self:log("WARNING: Unable to access G.GAME.dollars, returning default 0")
     end
-    return 0
+    return money
 end
 
 function StateExtractor:get_hands_remaining()
-    -- Get remaining hands for current round
-    if G and G.GAME then
-        return G.GAME.current_round.hands_left or 0
+    -- Get remaining hands for current round with safe access
+    if G and G.GAME and G.GAME.current_round and type(G.GAME.current_round.hands_left) == "number" then
+        return G.GAME.current_round.hands_left
     end
+    self:log("WARNING: Unable to access G.GAME.current_round.hands_left, returning default 0")
     return 0
 end
 
 function StateExtractor:get_discards_remaining()
-    -- Get remaining discards for current round
-    if G and G.GAME then
-        return G.GAME.current_round.discards_left or 0
+    -- Get remaining discards for current round with safe access
+    if G and G.GAME and G.GAME.current_round and type(G.GAME.current_round.discards_left) == "number" then
+        return G.GAME.current_round.discards_left
     end
+    self:log("WARNING: Unable to access G.GAME.current_round.discards_left, returning default 0")
     return 0
 end
 
 function StateExtractor:extract_hand_cards()
-    -- Extract current hand cards
+    -- Extract current hand cards with safe structure access
     local hand_cards = {}
     
-    if G and G.hand and G.hand.cards then
-        for i, card in ipairs(G.hand.cards) do
-            table.insert(hand_cards, {
-                id = card.unique_val or ("card_" .. i),
-                rank = card.base.value or "A",
-                suit = card.base.suit or "Spades",
+    if not self:safe_check_path(G, {"hand", "cards"}) then
+        self:log("WARNING: G.hand.cards not accessible, returning empty hand")
+        return hand_cards
+    end
+    
+    for i, card in ipairs(G.hand.cards) do
+        if card then
+            local safe_card = {
+                id = self:safe_get_value(card, "unique_val", "card_" .. i),
+                rank = self:safe_get_nested_value(card, {"base", "value"}, "A"),
+                suit = self:safe_get_nested_value(card, {"base", "suit"}, "Spades"),
                 enhancement = self:get_card_enhancement(card),
                 edition = self:get_card_edition(card),
                 seal = self:get_card_seal(card)
-            })
+            }
+            table.insert(hand_cards, safe_card)
+        else
+            self:log("WARNING: Null card found at hand position " .. i)
         end
     end
     
@@ -314,8 +337,13 @@ function StateExtractor:extract_hand_cards()
 end
 
 function StateExtractor:get_card_enhancement(card)
-    -- Determine card enhancement
-    if card.ability and card.ability.name then
+    -- Determine card enhancement with safe access
+    if not card then
+        return "none"
+    end
+    
+    local ability_name = self:safe_get_nested_value(card, {"ability", "name"}, nil)
+    if ability_name then
         local enhancement_map = {
             m_bonus = "bonus",
             m_mult = "mult",
@@ -325,13 +353,17 @@ function StateExtractor:get_card_enhancement(card)
             m_stone = "stone",
             m_gold = "gold"
         }
-        return enhancement_map[card.ability.name] or "none"
+        return enhancement_map[ability_name] or "none"
     end
     return "none"
 end
 
 function StateExtractor:get_card_edition(card)
-    -- Determine card edition
+    -- Determine card edition with safe access
+    if not card then
+        return "none"
+    end
+    
     if card.edition then
         if card.edition.foil then
             return "foil"
@@ -355,17 +387,25 @@ function StateExtractor:get_card_seal(card)
 end
 
 function StateExtractor:extract_jokers()
-    -- Extract current jokers
+    -- Extract current jokers with safe structure access
     local jokers = {}
     
-    if G and G.jokers and G.jokers.cards then
-        for i, joker in ipairs(G.jokers.cards) do
-            table.insert(jokers, {
-                id = joker.unique_val or ("joker_" .. i),
-                name = joker.ability.name or "Unknown",
+    if not self:safe_check_path(G, {"jokers", "cards"}) then
+        self:log("WARNING: G.jokers.cards not accessible, returning empty jokers")
+        return jokers
+    end
+    
+    for i, joker in ipairs(G.jokers.cards) do
+        if joker then
+            local safe_joker = {
+                id = self:safe_get_value(joker, "unique_val", "joker_" .. i),
+                name = self:safe_get_nested_value(joker, {"ability", "name"}, "Unknown"),
                 position = i - 1, -- 0-based indexing
                 properties = self:extract_joker_properties(joker)
-            })
+            }
+            table.insert(jokers, safe_joker)
+        else
+            self:log("WARNING: Null joker found at position " .. i)
         end
     end
     
@@ -373,30 +413,40 @@ function StateExtractor:extract_jokers()
 end
 
 function StateExtractor:extract_joker_properties(joker)
-    -- Extract joker-specific properties
+    -- Extract joker-specific properties with safe access
     local properties = {}
     
-    if joker.ability then
-        properties.extra = joker.ability.extra or {}
-        properties.mult = joker.ability.mult or 0
-        properties.chips = joker.ability.t_chips or 0
+    if not joker then
+        return properties
     end
+    
+    properties.extra = self:safe_get_nested_value(joker, {"ability", "extra"}, {})
+    properties.mult = self:safe_get_nested_value(joker, {"ability", "mult"}, 0)
+    properties.chips = self:safe_get_nested_value(joker, {"ability", "t_chips"}, 0)
     
     return properties
 end
 
 function StateExtractor:extract_consumables()
-    -- Extract consumable cards
+    -- Extract consumable cards with safe structure access
     local consumables = {}
     
-    if G and G.consumeables and G.consumeables.cards then
-        for i, consumable in ipairs(G.consumeables.cards) do
-            table.insert(consumables, {
-                id = consumable.unique_val or ("consumable_" .. i),
-                name = consumable.ability.name or "Unknown",
-                card_type = consumable.ability.set or "Tarot",
-                properties = consumable.ability.extra or {}
-            })
+    if not self:safe_check_path(G, {"consumeables", "cards"}) then
+        self:log("WARNING: G.consumeables.cards not accessible, returning empty consumables")
+        return consumables
+    end
+    
+    for i, consumable in ipairs(G.consumeables.cards) do
+        if consumable then
+            local safe_consumable = {
+                id = self:safe_get_value(consumable, "unique_val", "consumable_" .. i),
+                name = self:safe_get_nested_value(consumable, {"ability", "name"}, "Unknown"),
+                card_type = self:safe_get_nested_value(consumable, {"ability", "set"}, "Tarot"),
+                properties = self:safe_get_nested_value(consumable, {"ability", "extra"}, {})
+            }
+            table.insert(consumables, safe_consumable)
+        else
+            self:log("WARNING: Null consumable found at position " .. i)
         end
     end
     
@@ -404,45 +454,64 @@ function StateExtractor:extract_consumables()
 end
 
 function StateExtractor:extract_current_blind()
-    -- Extract current blind information
-    if G and G.GAME and G.GAME.blind then
-        local blind = G.GAME.blind
-        return {
-            name = blind.name or "Unknown",
-            blind_type = self:determine_blind_type(blind),
-            requirement = blind.chips or 0,
-            reward = blind.dollars or 0,
-            properties = blind.config or {}
-        }
+    -- Extract current blind information with safe access
+    if not self:safe_check_path(G, {"GAME", "blind"}) then
+        self:log("WARNING: G.GAME.blind not accessible, returning nil")
+        return nil
     end
     
-    return nil
+    local blind = G.GAME.blind
+    return {
+        name = self:safe_get_value(blind, "name", "Unknown"),
+        blind_type = self:determine_blind_type(blind),
+        requirement = self:safe_get_value(blind, "chips", 0),
+        reward = self:safe_get_value(blind, "dollars", 0),
+        properties = self:safe_get_value(blind, "config", {})
+    }
 end
 
 function StateExtractor:determine_blind_type(blind)
-    -- Determine the type of blind
-    if blind.boss then
-        return "boss"
-    elseif blind.name and string.find(blind.name, "Big") then
-        return "big"
-    else
+    -- Determine the type of blind with safe access
+    if not blind then
+        self:log("WARNING: Blind object is nil, returning default type")
         return "small"
     end
+    
+    -- Check if it's a boss blind
+    if self:safe_get_value(blind, "boss", false) then
+        return "boss"
+    end
+    
+    -- Check if it's a big blind by name
+    local blind_name = self:safe_get_value(blind, "name", "")
+    if type(blind_name) == "string" and string.find(blind_name, "Big") then
+        return "big"
+    end
+    
+    return "small"
 end
 
 function StateExtractor:extract_shop_contents()
-    -- Extract shop contents
+    -- Extract shop contents with safe structure access
     local shop_contents = {}
     
-    if G and G.shop_jokers and G.shop_jokers.cards then
-        for i, item in ipairs(G.shop_jokers.cards) do
-            table.insert(shop_contents, {
+    if not self:safe_check_path(G, {"shop_jokers", "cards"}) then
+        self:log("WARNING: G.shop_jokers.cards not accessible, returning empty shop")
+        return shop_contents
+    end
+    
+    for i, item in ipairs(G.shop_jokers.cards) do
+        if item then
+            local safe_item = {
                 index = i - 1, -- 0-based indexing
                 item_type = "joker",
-                name = item.ability.name or "Unknown",
-                cost = item.cost or 0,
-                properties = item.ability.extra or {}
-            })
+                name = self:safe_get_nested_value(item, {"ability", "name"}, "Unknown"),
+                cost = self:safe_get_value(item, "cost", 0),
+                properties = self:safe_get_nested_value(item, {"ability", "extra"}, {})
+            }
+            table.insert(shop_contents, safe_item)
+        else
+            self:log("WARNING: Null shop item found at position " .. i)
         end
     end
     
@@ -495,6 +564,52 @@ function StateExtractor:is_joker_reorder_available()
     -- This would be true during the critical timing window after hand play
     -- Implementation depends on tracking game state timing
     return false -- Placeholder - needs implementation
+end
+
+-- Safe access utility functions
+function StateExtractor:safe_check_path(root, path)
+    -- Safely check if a nested path exists in a table
+    if not root then
+        return false
+    end
+    
+    local current = root
+    for _, key in ipairs(path) do
+        if type(current) ~= "table" or current[key] == nil then
+            return false
+        end
+        current = current[key]
+    end
+    return true
+end
+
+function StateExtractor:safe_get_value(table, key, default)
+    -- Safely get a value from a table with default fallback
+    if not table or type(table) ~= "table" then
+        return default
+    end
+    
+    if table[key] ~= nil then
+        return table[key]
+    end
+    
+    return default
+end
+
+function StateExtractor:safe_get_nested_value(root, path, default)
+    -- Safely get a nested value from a table structure
+    if not root then
+        return default
+    end
+    
+    local current = root
+    for _, key in ipairs(path) do
+        if type(current) ~= "table" or current[key] == nil then
+            return default
+        end
+        current = current[key]
+    end
+    return current
 end
 
 return StateExtractor

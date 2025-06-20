@@ -14,6 +14,7 @@
     "state_extractor.lua",
     "action_executor.lua",
     "joker_manager.lua",
-    "file_io.lua"
+    "file_io.lua",
+    "json.lua"
   ]
 }

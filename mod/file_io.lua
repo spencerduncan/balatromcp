@@ -13,30 +13,8 @@ function FileIO.new(base_path)
     -- Initialize debug logging for this component
     self.component_name = "FILE_IO"
     
-    -- Test and log JSON library availability
-    local json_success, json_result = pcall(require, "json")
-    if json_success then
-        self.json = json_result
-        self:log("JSON library loaded successfully")
-    else
-        self:log("ERROR: JSON library failed to load: " .. tostring(json_result))
-        -- Try alternative JSON loading methods
-        local alt_methods = {"cjson", "dkjson", "json.lua"}
-        for _, method in ipairs(alt_methods) do
-            local alt_success, alt_result = pcall(require, method)
-            if alt_success then
-                self.json = alt_result
-                self:log("Alternative JSON library loaded: " .. method)
-                break
-            else
-                self:log("Alternative JSON library failed: " .. method .. " - " .. tostring(alt_result))
-            end
-        end
-        
-        if not self.json then
-            self:log("CRITICAL: No JSON library available - communication will fail")
-        end
-    end
+    -- Initialize JSON handling with robust fallback
+    self:_initialize_json()
     
     -- Test and log filesystem availability
     if love and love.filesystem then
@@ -86,6 +64,18 @@ function FileIO:log(message)
         if not success then
             print("BalatroMCP [FILE_IO]: Failed to write debug log: " .. tostring(err))
         end
+    end
+end
+-- Initialize JSON handling
+function FileIO:_initialize_json()
+    -- Load the main JSON library
+    local json_success, json_result = pcall(require, "libs.json")
+    if json_success then
+        self.json = json_result
+        self:log("JSON library loaded successfully")
+    else
+        self:log("ERROR: JSON library failed to load: " .. tostring(json_result))
+        error("Failed to load required JSON library")
     end
 end
 
@@ -219,6 +209,24 @@ function FileIO:read_actions()
 end
 
 function FileIO:write_action_result(result_data)
+    self:log("Attempting to write action result")
+    
+    -- Validate inputs
+    if not result_data then
+        self:log("ERROR: No result data provided")
+        return false
+    end
+    
+    if not self.json then
+        self:log("ERROR: No JSON library available for encoding")
+        return false
+    end
+    
+    if not love or not love.filesystem then
+        self:log("ERROR: love.filesystem not available")
+        return false
+    end
+    
     local message = {
         timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
         sequence_id = self:get_next_sequence_id(),
@@ -226,14 +234,28 @@ function FileIO:write_action_result(result_data)
         data = result_data
     }
     
-    local filepath = self.base_path .. "/action_results.json"
-    local success = love.filesystem.write(filepath, json.encode(message))
+    self:log("Created action result message with sequence_id: " .. message.sequence_id)
     
-    if not success then
-        print("BalatroMCP: Failed to write action result")
+    -- Test JSON encoding with proper error handling
+    local encode_success, encoded_data = pcall(self.json.encode, message)
+    if not encode_success then
+        self:log("ERROR: JSON encoding failed: " .. tostring(encoded_data))
         return false
     end
     
+    self:log("JSON encoding successful, data length: " .. #encoded_data)
+    
+    local filepath = self.base_path .. "/action_results.json"
+    self:log("Writing to file: " .. filepath)
+    
+    local write_success = love.filesystem.write(filepath, encoded_data)
+    
+    if not write_success then
+        self:log("ERROR: Failed to write action result")
+        return false
+    end
+    
+    self:log("Action result written successfully")
     return true
 end
 
