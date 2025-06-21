@@ -419,6 +419,9 @@ test_framework:add_test("FileIO comprehensive dependency failure handling", func
     t:assert_false(success, "Should fail when JSON library can't be loaded via SMODS")
     t:assert_contains(tostring(err), "Failed to load required JSON library", "Should show appropriate error message")
     
+    -- Clean up the failing SMODS mock
+    cleanup_mock_smods()
+    
     -- Test 3: JSON encoding/decoding error handling
     setup_mock_love_filesystem()
     setup_mock_smods()
