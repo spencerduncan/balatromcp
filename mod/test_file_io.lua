@@ -203,7 +203,7 @@ test_framework:add_test("FileIO default path initialization", function(t)
     local fileio = FileIO_module.new()
     
     t:assert_not_nil(fileio, "FileIO should initialize with default path")
-    t:assert_equal("shared", fileio.base_path, "Default base path should be 'shared' (relative path)")
+    t:assert_equal("./", fileio.base_path, "Default base path should be 'shared' (relative path)")
     
     -- Test that the default creates the correct directory structure
     local expected_files = {
@@ -213,7 +213,7 @@ test_framework:add_test("FileIO default path initialization", function(t)
     }
     
     -- Verify directory was created
-    t:assert_true(love.filesystem.directories["shared"], "Should create 'shared' directory by default")
+    t:assert_true(love.filesystem.directories["./"], "Should create 'shared' directory by default")
     
     cleanup_mock_smods()
 end)

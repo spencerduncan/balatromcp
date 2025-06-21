@@ -190,12 +190,10 @@ function StateExtractor:extract_current_state()
     -- This function will extract the current game state
     -- Implementation will depend on Balatro's internal structure
     
-    self:log("=== EXTRACTING CURRENT GAME STATE ===")
-    
     local state = {}
     local extraction_errors = {}
     
-    -- Extract each component with error handling
+    -- Extract each component with error handling (SILENT MODE)
     local extractions = {
         {name = "session_id", func = function() return self:get_session_id() end},
         {name = "current_phase", func = function() return self:get_current_phase() end},
@@ -216,19 +214,21 @@ function StateExtractor:extract_current_state()
         local success, result = pcall(extraction.func)
         if success then
             state[extraction.name] = result
-            self:log("Extracted " .. extraction.name .. " successfully")
+            -- REMOVED: Individual success logging
         else
             table.insert(extraction_errors, extraction.name .. ": " .. tostring(result))
-            self:log("ERROR extracting " .. extraction.name .. ": " .. tostring(result))
+            -- Only log critical errors
+            if extraction.name == "current_phase" or extraction.name == "money" then
+                self:log("ERROR extracting " .. extraction.name .. ": " .. tostring(result))
+            end
             state[extraction.name] = nil -- Ensure it's explicitly nil
         end
     end
     
+    -- Only log if there are errors
     if #extraction_errors > 0 then
-        self:log("STATE EXTRACTION COMPLETED WITH " .. #extraction_errors .. " ERRORS")
+        self:log("STATE EXTRACTION: " .. #extraction_errors .. " errors")
         state.extraction_errors = extraction_errors
-    else
-        self:log("STATE EXTRACTION COMPLETED SUCCESSFULLY")
     end
     
     return state
@@ -254,17 +254,36 @@ function StateExtractor:get_current_phase()
         return "hand_selection"
     end
     
-    local current_state = G.STATE
-    local states = G.STATES
+    -- CRITICAL FIX: Force fresh access to global G object, don't cache reference
+    local current_state = _G.G.STATE  -- Direct global access
+    local states = _G.G.STATES       -- Direct global access
+    
+    -- DIAGNOSTIC: Log all state information for debugging
+    self:log("DEBUG - DIRECT _G.G.STATE VALUE: " .. tostring(current_state))
+    self:log("DEBUG - Regular G.STATE VALUE: " .. tostring(G.STATE))
+    self:log("DEBUG - Are they equal? " .. tostring(current_state == G.STATE))
+    self:log("DEBUG - G.STATES TABLE:")
+    if type(states) == "table" then
+        for key, value in pairs(states) do
+            local marker = (current_state == value) and " *** CURRENT ***" or ""
+            self:log("  " .. key .. " = " .. tostring(value) .. marker)
+        end
+    else
+        self:log("  G.STATES is not a table: " .. type(states))
+    end
     
     -- Safe state comparison with fallback
     if current_state == self:safe_get_value(states, "SELECTING_HAND", nil) then
+        self:log("DEBUG - Detected phase: hand_selection")
         return "hand_selection"
     elseif current_state == self:safe_get_value(states, "SHOP", nil) then
+        self:log("DEBUG - Detected phase: shop")
         return "shop"
     elseif current_state == self:safe_get_value(states, "BLIND_SELECT", nil) then
+        self:log("DEBUG - Detected phase: blind_selection")
         return "blind_selection"
     elseif current_state == self:safe_get_value(states, "DRAW_TO_HAND", nil) then
+        self:log("DEBUG - Detected phase: hand_selection (via DRAW_TO_HAND)")
         return "hand_selection"
     else
         self:log("WARNING: Unknown game state: " .. tostring(current_state) .. ", using default")
@@ -309,7 +328,7 @@ function StateExtractor:get_discards_remaining()
 end
 
 function StateExtractor:extract_hand_cards()
-    -- Extract current hand cards with safe structure access
+    -- Extract current hand cards with CIRCULAR REFERENCE SAFE access
     local hand_cards = {}
     
     if not self:safe_check_path(G, {"hand", "cards"}) then
@@ -319,13 +338,14 @@ function StateExtractor:extract_hand_cards()
     
     for i, card in ipairs(G.hand.cards) do
         if card then
+            -- SAFE EXTRACTION: Only extract primitive values, avoid object references
             local safe_card = {
-                id = self:safe_get_value(card, "unique_val", "card_" .. i),
-                rank = self:safe_get_nested_value(card, {"base", "value"}, "A"),
-                suit = self:safe_get_nested_value(card, {"base", "suit"}, "Spades"),
-                enhancement = self:get_card_enhancement(card),
-                edition = self:get_card_edition(card),
-                seal = self:get_card_seal(card)
+                id = self:safe_primitive_value(card, "unique_val", "card_" .. i),
+                rank = self:safe_primitive_nested_value(card, {"base", "value"}, "A"),
+                suit = self:safe_primitive_nested_value(card, {"base", "suit"}, "Spades"),
+                enhancement = self:get_card_enhancement_safe(card),
+                edition = self:get_card_edition_safe(card),
+                seal = self:get_card_seal_safe(card)
             }
             table.insert(hand_cards, safe_card)
         else
@@ -387,7 +407,7 @@ function StateExtractor:get_card_seal(card)
 end
 
 function StateExtractor:extract_jokers()
-    -- Extract current jokers with safe structure access
+    -- Extract current jokers with CIRCULAR REFERENCE SAFE access
     local jokers = {}
     
     if not self:safe_check_path(G, {"jokers", "cards"}) then
@@ -398,10 +418,10 @@ function StateExtractor:extract_jokers()
     for i, joker in ipairs(G.jokers.cards) do
         if joker then
             local safe_joker = {
-                id = self:safe_get_value(joker, "unique_val", "joker_" .. i),
-                name = self:safe_get_nested_value(joker, {"ability", "name"}, "Unknown"),
+                id = self:safe_primitive_value(joker, "unique_val", "joker_" .. i),
+                name = self:safe_primitive_nested_value(joker, {"ability", "name"}, "Unknown"),
                 position = i - 1, -- 0-based indexing
-                properties = self:extract_joker_properties(joker)
+                properties = self:extract_joker_properties_safe(joker)
             }
             table.insert(jokers, safe_joker)
         else
@@ -428,7 +448,7 @@ function StateExtractor:extract_joker_properties(joker)
 end
 
 function StateExtractor:extract_consumables()
-    -- Extract consumable cards with safe structure access
+    -- Extract consumable cards with CIRCULAR REFERENCE SAFE access
     local consumables = {}
     
     if not self:safe_check_path(G, {"consumeables", "cards"}) then
@@ -439,10 +459,11 @@ function StateExtractor:extract_consumables()
     for i, consumable in ipairs(G.consumeables.cards) do
         if consumable then
             local safe_consumable = {
-                id = self:safe_get_value(consumable, "unique_val", "consumable_" .. i),
-                name = self:safe_get_nested_value(consumable, {"ability", "name"}, "Unknown"),
-                card_type = self:safe_get_nested_value(consumable, {"ability", "set"}, "Tarot"),
-                properties = self:safe_get_nested_value(consumable, {"ability", "extra"}, {})
+                id = self:safe_primitive_value(consumable, "unique_val", "consumable_" .. i),
+                name = self:safe_primitive_nested_value(consumable, {"ability", "name"}, "Unknown"),
+                card_type = self:safe_primitive_nested_value(consumable, {"ability", "set"}, "Tarot"),
+                -- AVOID CIRCULAR REFERENCE: Don't extract complex properties object
+                properties = {}
             }
             table.insert(consumables, safe_consumable)
         else
@@ -454,7 +475,7 @@ function StateExtractor:extract_consumables()
 end
 
 function StateExtractor:extract_current_blind()
-    -- Extract current blind information with safe access
+    -- Extract current blind information with CIRCULAR REFERENCE SAFE access
     if not self:safe_check_path(G, {"GAME", "blind"}) then
         self:log("WARNING: G.GAME.blind not accessible, returning nil")
         return nil
@@ -462,11 +483,12 @@ function StateExtractor:extract_current_blind()
     
     local blind = G.GAME.blind
     return {
-        name = self:safe_get_value(blind, "name", "Unknown"),
-        blind_type = self:determine_blind_type(blind),
-        requirement = self:safe_get_value(blind, "chips", 0),
-        reward = self:safe_get_value(blind, "dollars", 0),
-        properties = self:safe_get_value(blind, "config", {})
+        name = self:safe_primitive_value(blind, "name", "Unknown"),
+        blind_type = self:determine_blind_type_safe(blind),
+        requirement = self:safe_primitive_value(blind, "chips", 0),
+        reward = self:safe_primitive_value(blind, "dollars", 0),
+        -- AVOID CIRCULAR REFERENCE: Don't extract complex config object
+        properties = {}
     }
 end
 
@@ -492,7 +514,7 @@ function StateExtractor:determine_blind_type(blind)
 end
 
 function StateExtractor:extract_shop_contents()
-    -- Extract shop contents with safe structure access
+    -- Extract shop contents with CIRCULAR REFERENCE SAFE access
     local shop_contents = {}
     
     if not self:safe_check_path(G, {"shop_jokers", "cards"}) then
@@ -505,9 +527,10 @@ function StateExtractor:extract_shop_contents()
             local safe_item = {
                 index = i - 1, -- 0-based indexing
                 item_type = "joker",
-                name = self:safe_get_nested_value(item, {"ability", "name"}, "Unknown"),
-                cost = self:safe_get_value(item, "cost", 0),
-                properties = self:safe_get_nested_value(item, {"ability", "extra"}, {})
+                name = self:safe_primitive_nested_value(item, {"ability", "name"}, "Unknown"),
+                cost = self:safe_primitive_value(item, "cost", 0),
+                -- AVOID CIRCULAR REFERENCE: Don't extract complex properties object
+                properties = {}
             }
             table.insert(shop_contents, safe_item)
         else
@@ -610,6 +633,145 @@ function StateExtractor:safe_get_nested_value(root, path, default)
         current = current[key]
     end
     return current
+end
+
+-- CIRCULAR REFERENCE SAFE utility functions
+function StateExtractor:safe_primitive_value(table, key, default)
+    -- Safely get a PRIMITIVE VALUE ONLY from a table with default fallback
+    -- This prevents circular references by only returning primitive types
+    if not table or type(table) ~= "table" then
+        return default
+    end
+    
+    local value = table[key]
+    if value ~= nil then
+        local value_type = type(value)
+        if value_type == "string" or value_type == "number" or value_type == "boolean" then
+            return value
+        else
+            -- Non-primitive type detected, return default to avoid circular reference
+            return default
+        end
+    end
+    
+    return default
+end
+
+function StateExtractor:safe_primitive_nested_value(root, path, default)
+    -- Safely get a nested PRIMITIVE VALUE ONLY from a table structure
+    -- This prevents circular references by only returning primitive types
+    if not root then
+        return default
+    end
+    
+    local current = root
+    for _, key in ipairs(path) do
+        if type(current) ~= "table" or current[key] == nil then
+            return default
+        end
+        current = current[key]
+    end
+    
+    -- Only return if it's a primitive type
+    local value_type = type(current)
+    if value_type == "string" or value_type == "number" or value_type == "boolean" then
+        return current
+    else
+        -- Non-primitive type detected, return default to avoid circular reference
+        return default
+    end
+end
+
+-- SAFE card property extraction methods
+function StateExtractor:get_card_enhancement_safe(card)
+    -- Determine card enhancement with CIRCULAR REFERENCE SAFE access
+    if not card then
+        return "none"
+    end
+    
+    local ability_name = self:safe_primitive_nested_value(card, {"ability", "name"}, nil)
+    if ability_name and type(ability_name) == "string" then
+        local enhancement_map = {
+            m_bonus = "bonus",
+            m_mult = "mult",
+            m_wild = "wild",
+            m_glass = "glass",
+            m_steel = "steel",
+            m_stone = "stone",
+            m_gold = "gold"
+        }
+        return enhancement_map[ability_name] or "none"
+    end
+    return "none"
+end
+
+function StateExtractor:get_card_edition_safe(card)
+    -- Determine card edition with CIRCULAR REFERENCE SAFE access
+    if not card then
+        return "none"
+    end
+    
+    if card.edition and type(card.edition) == "table" then
+        -- Check each edition type as primitive boolean
+        if self:safe_primitive_value(card.edition, "foil", false) then
+            return "foil"
+        elseif self:safe_primitive_value(card.edition, "holo", false) then
+            return "holographic"
+        elseif self:safe_primitive_value(card.edition, "polychrome", false) then
+            return "polychrome"
+        elseif self:safe_primitive_value(card.edition, "negative", false) then
+            return "negative"
+        end
+    end
+    return "none"
+end
+
+function StateExtractor:get_card_seal_safe(card)
+    -- Determine card seal with CIRCULAR REFERENCE SAFE access
+    if not card then
+        return "none"
+    end
+    
+    local seal = self:safe_primitive_value(card, "seal", "none")
+    return seal
+end
+
+function StateExtractor:extract_joker_properties_safe(joker)
+    -- Extract joker-specific properties with CIRCULAR REFERENCE SAFE access
+    local properties = {}
+    
+    if not joker then
+        return properties
+    end
+    
+    -- Only extract primitive values to avoid circular references
+    properties.mult = self:safe_primitive_nested_value(joker, {"ability", "mult"}, 0)
+    properties.chips = self:safe_primitive_nested_value(joker, {"ability", "t_chips"}, 0)
+    
+    -- AVOID extracting complex 'extra' object - too likely to have circular references
+    
+    return properties
+end
+
+function StateExtractor:determine_blind_type_safe(blind)
+    -- Determine the type of blind with CIRCULAR REFERENCE SAFE access
+    if not blind then
+        self:log("WARNING: Blind object is nil, returning default type")
+        return "small"
+    end
+    
+    -- Check if it's a boss blind (primitive boolean check)
+    if self:safe_primitive_value(blind, "boss", false) then
+        return "boss"
+    end
+    
+    -- Check if it's a big blind by name (primitive string check)
+    local blind_name = self:safe_primitive_value(blind, "name", "")
+    if type(blind_name) == "string" and string.find(blind_name, "Big") then
+        return "big"
+    end
+    
+    return "small"
 end
 
 return StateExtractor

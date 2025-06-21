@@ -85,6 +85,10 @@ function BalatroMCP.new()
     self.processing_action = false
     self.last_action_sequence = 0
     
+    -- Delayed state extraction fix
+    self.pending_state_extraction = false
+    self.pending_action_result = nil
+    
     -- Test file communication system
     if init_success then
         self.debug_logger:test_file_communication()
@@ -139,6 +143,11 @@ function BalatroMCP:update(dt)
     
     if self.update_timer >= self.update_interval then
         self.update_timer = 0
+        
+        -- Handle pending delayed state extraction first
+        if self.pending_state_extraction then
+            self:handle_delayed_state_extraction()
+        end
         
         -- Check for pending actions
         self:process_pending_actions()
@@ -254,28 +263,67 @@ function BalatroMCP:process_pending_actions()
     
     print("BalatroMCP: Processing action: " .. (action_data.action_type or "unknown"))
     
+    -- DIAGNOSTIC: Extract state BEFORE action execution
+    local state_before = self.state_extractor:extract_current_state()
+    local phase_before = state_before and state_before.current_phase or "unknown"
+    local money_before = state_before and state_before.money or "unknown"
+    print("BalatroMCP: DEBUG - State BEFORE action: phase=" .. phase_before .. ", money=" .. tostring(money_before))
+    
     -- Execute the action
     local result = self.action_executor:execute_action(action_data)
     
-    -- Send response back to MCP server
-    local response = {
+    -- DIAGNOSTIC: Extract state IMMEDIATELY after action execution
+    local state_after = self.state_extractor:extract_current_state()
+    local phase_after = state_after and state_after.current_phase or "unknown"
+    local money_after = state_after and state_after.money or "unknown"
+    print("BalatroMCP: DEBUG - State IMMEDIATELY after action: phase=" .. phase_after .. ", money=" .. tostring(money_after))
+    
+    -- CALLBACK FIX: Defer state extraction and response to next update cycle
+    print("BalatroMCP: Deferring state extraction to next update cycle")
+    self.pending_state_extraction = true
+    self.pending_action_result = {
         sequence = sequence,
         action_type = action_data.action_type,
         success = result.success,
         error_message = result.error_message,
-        timestamp = os.time(),
-        new_state = result.new_state
+        timestamp = os.time()
+        -- Note: new_state will be extracted on next update
     }
     
-    self.file_io:write_action_result(response)
-    
-    self.processing_action = false
+    -- Don't set processing_action = false yet - wait for delayed extraction
     
     if result.success then
         print("BalatroMCP: Action completed successfully")
     else
         print("BalatroMCP: Action failed: " .. (result.error_message or "Unknown error"))
     end
+end
+
+function BalatroMCP:handle_delayed_state_extraction()
+    -- Handle delayed state extraction on next update cycle
+    print("BalatroMCP: Processing delayed state extraction")
+    
+    -- Extract state after Balatro has had time to update
+    local current_state = self.state_extractor:extract_current_state()
+    local phase = current_state and current_state.current_phase or "unknown"
+    local money = current_state and current_state.money or "unknown"
+    print("BalatroMCP: DEBUG - State AFTER delay: phase=" .. phase .. ", money=" .. tostring(money))
+    
+    -- Complete the action result with fresh state
+    if self.pending_action_result then
+        self.pending_action_result.new_state = current_state
+        
+        -- Send response back to MCP server
+        self.file_io:write_action_result(self.pending_action_result)
+        print("BalatroMCP: Delayed action result sent with updated state")
+        
+        -- Clean up
+        self.pending_action_result = nil
+    end
+    
+    -- Reset processing flags
+    self.pending_state_extraction = false
+    self.processing_action = false
 end
 
 function BalatroMCP:check_and_send_state_update()
@@ -369,6 +417,13 @@ end
 function BalatroMCP:on_shop_entered()
     -- Called when entering the shop
     print("BalatroMCP: Shop entered event")
+    
+    -- DIAGNOSTIC: Check state when hook fires
+    local current_state = self.state_extractor:extract_current_state()
+    local phase = current_state and current_state.current_phase or "unknown"
+    local money = current_state and current_state.money or "unknown"
+    print("BalatroMCP: DEBUG - Hook fired with state: phase=" .. phase .. ", money=" .. tostring(money))
+    
     self:send_current_state()
 end
 
@@ -403,18 +458,41 @@ if SMODS then
     if mod_instance and love then
         -- Try to hook into Love2D's update callback
         local original_love_update = love.update
+        local last_known_state = nil
+        
         if original_love_update then
             love.update = function(dt)
+                -- DIAGNOSTIC: Log state BEFORE original Love2D update
+                local state_before = G and G.STATE or "NIL"
+                
                 -- Call original Love2D update first
                 original_love_update(dt)
+                
+                -- DIAGNOSTIC: Log state AFTER original Love2D update
+                local state_after = G and G.STATE or "NIL"
+                
+                -- Log state changes for timing analysis
+                if state_before ~= state_after then
+                    print("BalatroMCP: TIMING - STATE CHANGED in love.update - BEFORE: " .. tostring(state_before) .. " AFTER: " .. tostring(state_after))
+                    last_known_state = state_after
+                elseif last_known_state and last_known_state ~= state_after then
+                    print("BalatroMCP: TIMING - STATE MISMATCH - Expected: " .. tostring(last_known_state) .. " Actual: " .. tostring(state_after))
+                end
+                
                 -- Then call our mod update
                 if mod_instance and mod_instance.update then
+                    -- DIAGNOSTIC: Log state when our mod runs
+                    local state_at_mod_run = G and G.STATE or "NIL"
+                    if state_at_mod_run ~= state_after then
+                        print("BalatroMCP: TIMING - STATE CHANGED BETWEEN GAME UPDATE AND MOD UPDATE - Game: " .. tostring(state_after) .. " Mod: " .. tostring(state_at_mod_run))
+                    end
+                    
                     pcall(function()
                         mod_instance:update(dt)
                     end)
                 end
             end
-            print("BalatroMCP: Hooked into love.update")
+            print("BalatroMCP: Hooked into love.update with timing diagnostics")
         else
             print("BalatroMCP: WARNING - Could not hook into Love2D update, using timer fallback")
             -- Fallback: Use a timer-based approach

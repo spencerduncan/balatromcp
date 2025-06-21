@@ -6,7 +6,7 @@ DebugLogger.__index = DebugLogger
 
 function DebugLogger.new(log_file_path, base_path)
     local self = setmetatable({}, DebugLogger)
-    self.base_path = base_path or "shared"
+    self.base_path = base_path or "./"
     
     -- Handle log file path based on base path
     if not log_file_path then

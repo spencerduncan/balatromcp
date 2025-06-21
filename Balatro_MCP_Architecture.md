@@ -179,17 +179,17 @@ function write_game_state(state)
         type = "game_state",
         data = state
     }
-    love.filesystem.write("balatro_mcp/game_state.json", json.encode(data))
+    love.filesystem.write("./game_state.json", json.encode(data))
 end
 
 -- Poll for actions
 function poll_for_actions()
-    if love.filesystem.getInfo("balatro_mcp/actions.json") then
-        local content = love.filesystem.read("balatro_mcp/actions.json")
+    if love.filesystem.getInfo("./actions.json") then
+        local content = love.filesystem.read("./actions.json")
         local action_data = json.decode(content)
         if action_data.sequence_id > last_processed_action then
             execute_action(action_data.data)
-            love.filesystem.remove("balatro_mcp/actions.json")
+            love.filesystem.remove("./actions.json")
             last_processed_action = action_data.sequence_id
         end
     end

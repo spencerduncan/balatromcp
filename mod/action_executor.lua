@@ -144,8 +144,42 @@ end
 
 function ActionExecutor:execute_go_to_shop(action_data)
     -- Navigate to shop
+    print("ActionExecutor: DEBUG - Before go_to_shop call")
+    
+    -- CRITICAL: Use direct global access to ensure fresh state
+    local state_before_direct = _G.G and _G.G.STATE or "NIL"
+    local state_before_cached = G and G.STATE or "NIL"
+    
+    print("ActionExecutor: TIMING - Direct _G.G.STATE before = " .. tostring(state_before_direct))
+    print("ActionExecutor: TIMING - Cached G.STATE before = " .. tostring(state_before_cached))
+    print("ActionExecutor: TIMING - Are they equal? " .. tostring(state_before_direct == state_before_cached))
+    
+    if _G.G and _G.G.STATES then
+        for key, value in pairs(_G.G.STATES) do
+            local marker = (_G.G.STATE == value) and " *** CURRENT ***" or ""
+            print("ActionExecutor: DEBUG - " .. key .. " = " .. tostring(value) .. marker)
+        end
+    end
+    
     if G.FUNCS and G.FUNCS.go_to_shop then
+        print("ActionExecutor: DEBUG - Calling G.FUNCS.go_to_shop()")
         G.FUNCS.go_to_shop()
+        
+        -- DIAGNOSTIC: Check state after function call using both methods
+        local state_after_direct = _G.G and _G.G.STATE or "NIL"
+        local state_after_cached = G and G.STATE or "NIL"
+        
+        print("ActionExecutor: TIMING - Direct _G.G.STATE after = " .. tostring(state_after_direct))
+        print("ActionExecutor: TIMING - Cached G.STATE after = " .. tostring(state_after_cached))
+        print("ActionExecutor: TIMING - Are they equal? " .. tostring(state_after_direct == state_after_cached))
+        
+        -- Check if state actually changed using direct access
+        if _G.G and _G.G.STATES and _G.G.STATE == _G.G.STATES.SHOP then
+            print("ActionExecutor: DEBUG - SUCCESS: State changed to SHOP (direct access)")
+        else
+            print("ActionExecutor: DEBUG - WARNING: State did not change to SHOP (direct access)")
+        end
+        
         return true, nil
     else
         return false, "Shop navigation not available"

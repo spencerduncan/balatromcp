@@ -160,14 +160,14 @@ test_framework:add_test("DebugLogger initialization with subdirectory", function
     local DebugLogger = require("debug_logger")
     
     -- Test initialization with subdirectory
-    local logger = DebugLogger.new(nil, "shared")
+    local logger = DebugLogger.new(nil, "./")
     
     t:assert_not_nil(logger, "DebugLogger should initialize with subdirectory")
-    t:assert_equal("shared", logger.base_path, "Base path should be 'shared' for subdirectory")
+    t:assert_equal("./", logger.base_path, "Base path should be 'shared' for subdirectory")
     t:assert_equal("shared/debug.log", logger.log_file, "Log file should be 'shared/debug.log'")
     
     -- Verify directory creation was attempted for subdirectory
-    t:assert_true(love.filesystem.directories["shared"], "Should create 'shared' directory")
+    t:assert_true(love.filesystem.directories["./"], "Should create 'shared' directory")
 end)
 
 test_framework:add_test("DebugLogger default initialization", function(t)
@@ -179,11 +179,11 @@ test_framework:add_test("DebugLogger default initialization", function(t)
     local logger = DebugLogger.new()
     
     t:assert_not_nil(logger, "DebugLogger should initialize with defaults")
-    t:assert_equal("shared", logger.base_path, "Default base path should be 'shared'")
+    t:assert_equal("./", logger.base_path, "Default base path should be 'shared'")
     t:assert_equal("shared/debug.log", logger.log_file, "Default log file should be 'shared/debug.log'")
     
     -- Verify default directory creation
-    t:assert_true(love.filesystem.directories["shared"], "Should create default 'shared' directory")
+    t:assert_true(love.filesystem.directories["./"], "Should create default 'shared' directory")
 end)
 
 test_framework:add_test("DebugLogger custom log file path with current directory", function(t)
