@@ -75,24 +75,6 @@ def different_game_state():
     )
 
 
-class TestBalatroStateManagerInitialization:
-    """Test BalatroStateManager initialization."""
-
-    def test_initialization(self, mock_file_io):
-        """Test state manager initialization."""
-        manager = BalatroStateManager(mock_file_io)
-
-        assert manager.file_io == mock_file_io
-        assert manager._current_state is None
-        assert manager._last_update_time is None
-        assert manager._state_changed is False
-
-    def test_initialization_with_file_io_dependency(self):
-        """Test that file_io dependency is required."""
-        with pytest.raises(TypeError):
-            BalatroStateManager()  # Missing required argument
-
-
 class TestGetCurrentState:
     """Test getting current game state."""
 

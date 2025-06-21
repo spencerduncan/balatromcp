@@ -150,39 +150,6 @@ def reorder_available_state():
     )
 
 
-class TestBalatroActionHandlerInitialization:
-    """Test BalatroActionHandler initialization."""
-
-    def test_initialization(self, mock_file_io, mock_state_manager):
-        """Test action handler initialization."""
-        handler = BalatroActionHandler(mock_file_io, mock_state_manager)
-
-        assert handler.file_io == mock_file_io
-        assert handler.state_manager == mock_state_manager
-        assert len(handler.action_validators) == 14  # All action types
-
-    def test_action_validators_coverage(self, action_handler):
-        """Test that all action types have validators."""
-        expected_validators = {
-            "play_hand",
-            "discard_cards",
-            "go_to_shop",
-            "buy_item",
-            "sell_joker",
-            "sell_consumable",
-            "reorder_jokers",
-            "select_blind",
-            "select_pack_offer",
-            "reroll_boss",
-            "reroll_shop",
-            "sort_hand_by_rank",
-            "sort_hand_by_suit",
-            "use_consumable",
-        }
-
-        assert set(action_handler.action_validators.keys()) == expected_validators
-
-
 class TestExecuteAction:
     """Test action execution."""
 

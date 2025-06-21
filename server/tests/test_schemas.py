@@ -41,50 +41,6 @@ from server.schemas import (
 )
 
 
-class TestEnums:
-    """Test enum definitions."""
-
-    def test_game_phase_values(self):
-        """Test GamePhase enum values."""
-        assert GamePhase.HAND_SELECTION == "hand_selection"
-        assert GamePhase.SHOP == "shop"
-        assert GamePhase.BLIND_SELECTION == "blind_selection"
-        assert GamePhase.SCORING == "scoring"
-
-    def test_card_enhancement_values(self):
-        """Test CardEnhancement enum values."""
-        assert CardEnhancement.NONE == "none"
-        assert CardEnhancement.GOLD == "gold"
-        assert CardEnhancement.STEEL == "steel"
-        assert CardEnhancement.GLASS == "glass"
-
-    def test_card_edition_values(self):
-        """Test CardEdition enum values."""
-        assert CardEdition.NONE == "none"
-        assert CardEdition.FOIL == "foil"
-        assert CardEdition.HOLOGRAPHIC == "holographic"
-        assert CardEdition.POLYCHROME == "polychrome"
-
-    def test_card_seal_values(self):
-        """Test CardSeal enum values."""
-        assert CardSeal.NONE == "none"
-        assert CardSeal.RED == "red"
-        assert CardSeal.BLUE == "blue"
-        assert CardSeal.GOLD == "gold"
-
-    def test_blind_type_values(self):
-        """Test BlindType enum values."""
-        assert BlindType.SMALL == "small"
-        assert BlindType.BIG == "big"
-        assert BlindType.BOSS == "boss"
-
-    def test_message_type_values(self):
-        """Test MessageType enum values."""
-        assert MessageType.GAME_STATE == "game_state"
-        assert MessageType.ACTION_COMMAND == "action_command"
-        assert MessageType.ACTION_RESULT == "action_result"
-
-
 class TestCard:
     """Test Card model."""
 

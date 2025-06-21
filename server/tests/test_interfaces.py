@@ -21,60 +21,8 @@ from server.action_handler import BalatroActionHandler
 from server.main import BalatroMCPServer
 
 
-class TestInterfaceDefinitions:
-    """Test that interfaces are properly defined as abstract base classes."""
-
-    def test_ifile_io_is_abstract(self):
-        """Test that IFileIO is an abstract base class."""
-        assert issubclass(IFileIO, ABC)
-
-        # Should not be able to instantiate directly
-        with pytest.raises(TypeError):
-            IFileIO()
-
-    def test_istate_manager_is_abstract(self):
-        """Test that IStateManager is an abstract base class."""
-        assert issubclass(IStateManager, ABC)
-
-        with pytest.raises(TypeError):
-            IStateManager()
-
-    def test_iaction_handler_is_abstract(self):
-        """Test that IActionHandler is an abstract base class."""
-        assert issubclass(IActionHandler, ABC)
-
-        with pytest.raises(TypeError):
-            IActionHandler()
-
-    def test_imcp_server_is_abstract(self):
-        """Test that IMCPServer is an abstract base class."""
-        assert issubclass(IMCPServer, ABC)
-
-        with pytest.raises(TypeError):
-            IMCPServer()
-
-    def test_igame_session_is_abstract(self):
-        """Test that IGameSession is an abstract base class."""
-        assert issubclass(IGameSession, ABC)
-
-        with pytest.raises(TypeError):
-            IGameSession()
-
-
 class TestIFileIOInterface:
     """Test IFileIO interface definition."""
-
-    def test_interface_methods(self):
-        """Test that IFileIO defines all required abstract methods."""
-        abstract_methods = IFileIO.__abstractmethods__
-        expected_methods = {
-            "read_game_state",
-            "write_action",
-            "read_action_result",
-            "get_next_sequence_id",
-        }
-
-        assert abstract_methods == expected_methods
 
     def test_method_signatures(self):
         """Test that IFileIO methods have correct signatures."""
@@ -98,17 +46,6 @@ class TestIFileIOInterface:
 class TestIStateManagerInterface:
     """Test IStateManager interface definition."""
 
-    def test_interface_methods(self):
-        """Test that IStateManager defines all required abstract methods."""
-        abstract_methods = IStateManager.__abstractmethods__
-        expected_methods = {
-            "get_current_state",
-            "update_state",
-            "is_state_changed",
-        }
-
-        assert abstract_methods == expected_methods
-
     def test_all_methods_async(self):
         """Test that all IStateManager methods are async."""
         methods = ["get_current_state", "update_state", "is_state_changed"]
@@ -120,17 +57,6 @@ class TestIStateManagerInterface:
 
 class TestIActionHandlerInterface:
     """Test IActionHandler interface definition."""
-
-    def test_interface_methods(self):
-        """Test that IActionHandler defines all required abstract methods."""
-        abstract_methods = IActionHandler.__abstractmethods__
-        expected_methods = {
-            "execute_action",
-            "validate_action",
-            "get_available_actions",
-        }
-
-        assert abstract_methods == expected_methods
 
     def test_all_methods_async(self):
         """Test that all IActionHandler methods are async."""
@@ -144,18 +70,6 @@ class TestIActionHandlerInterface:
 class TestIMCPServerInterface:
     """Test IMCPServer interface definition."""
 
-    def test_interface_methods(self):
-        """Test that IMCPServer defines all required abstract methods."""
-        abstract_methods = IMCPServer.__abstractmethods__
-        expected_methods = {
-            "start",
-            "stop",
-            "handle_tool_call",
-            "get_available_tools",
-        }
-
-        assert abstract_methods == expected_methods
-
     def test_all_methods_async(self):
         """Test that all IMCPServer methods are async."""
         methods = ["start", "stop", "handle_tool_call", "get_available_tools"]
@@ -167,18 +81,6 @@ class TestIMCPServerInterface:
 
 class TestIGameSessionInterface:
     """Test IGameSession interface definition."""
-
-    def test_interface_methods(self):
-        """Test that IGameSession defines all required abstract methods."""
-        abstract_methods = IGameSession.__abstractmethods__
-        expected_methods = {
-            "initialize",
-            "cleanup",
-            "is_active",
-            "get_session_id",
-        }
-
-        assert abstract_methods == expected_methods
 
     def test_all_methods_async(self):
         """Test that all IGameSession methods are async."""

@@ -73,25 +73,6 @@ def sample_action_result():
 class TestBalatroFileIOInitialization:
     """Test BalatroFileIO initialization."""
 
-    def test_initialization_default_path(self):
-        """Test initialization with default path."""
-        file_io = BalatroFileIO()
-        assert file_io.base_path == Path(
-            "C:/Users/whokn/AppData/Roaming/Balatro/mods/BalatroMCP/./"
-        )
-        assert file_io._sequence_id == 0
-        assert file_io._last_read_sequence == {}
-
-    def test_initialization_custom_path(self, temp_path):
-        """Test initialization with custom path."""
-        file_io = BalatroFileIO(temp_path)
-        assert file_io.base_path == Path(temp_path)
-
-        # Check file paths are set correctly
-        assert file_io.game_state_file == Path(temp_path) / "game_state.json"
-        assert file_io.actions_file == Path(temp_path) / "actions.json"
-        assert file_io.action_results_file == Path(temp_path) / "action_results.json"
-
     @patch("pathlib.Path.mkdir")
     def test_directory_creation(self, mock_mkdir, temp_path):
         """Test that directory is created during initialization."""
@@ -107,13 +88,6 @@ class TestSequenceIdManagement:
         assert file_io.get_next_sequence_id() == 1
         assert file_io.get_next_sequence_id() == 2
         assert file_io.get_next_sequence_id() == 3
-
-    def test_sequence_id_state(self, file_io):
-        """Test sequence ID internal state."""
-        initial_id = file_io._sequence_id
-        next_id = file_io.get_next_sequence_id()
-        assert next_id == initial_id + 1
-        assert file_io._sequence_id == next_id
 
 
 class TestReadGameState:

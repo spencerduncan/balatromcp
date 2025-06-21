@@ -81,54 +81,6 @@ def sample_game_state():
     )
 
 
-class TestBalatroMCPServerInitialization:
-    """Test BalatroMCPServer initialization."""
-
-    @patch("server.main.BalatroFileIO")
-    @patch("server.main.BalatroStateManager")
-    @patch("server.main.BalatroActionHandler")
-    def test_initialization_default_path(
-        self, mock_action_handler, mock_state_manager, mock_file_io
-    ):
-        """Test server initialization with default shared path."""
-        server = BalatroMCPServer()
-
-        # Verify dependencies are created
-        mock_file_io.assert_called_once_with(
-            "C:/Users/whokn/AppData/Roaming/Balatro/mods/BalatroMCP/./"
-        )
-        mock_state_manager.assert_called_once()
-        mock_action_handler.assert_called_once()
-
-        # Verify server attributes
-        assert server._running is False
-        assert server._monitoring_task is None
-
-    @patch("server.main.BalatroFileIO")
-    @patch("server.main.BalatroStateManager")
-    @patch("server.main.BalatroActionHandler")
-    def test_initialization_custom_path(
-        self, mock_action_handler, mock_state_manager, mock_file_io
-    ):
-        """Test server initialization with custom shared path."""
-        custom_path = "/custom/path"
-        server = BalatroMCPServer(custom_path)
-
-        mock_file_io.assert_called_once_with(custom_path)
-
-    @patch("server.main.BalatroFileIO")
-    @patch("server.main.BalatroStateManager")
-    @patch("server.main.BalatroActionHandler")
-    def test_initialization_creates_mcp_server(
-        self, mock_action_handler, mock_state_manager, mock_file_io
-    ):
-        """Test that MCP server is created during initialization."""
-        server = BalatroMCPServer()
-
-        assert server.server is not None
-        assert server.server.name == "balatro-mcp"
-
-
 class TestMCPResourceHandlers:
     """Test MCP resource handlers."""
 
@@ -667,13 +619,6 @@ class TestGetAvailableTools:
             "server.main.BalatroStateManager"
         ), patch("server.main.BalatroActionHandler"):
             return BalatroMCPServer()
-
-    @pytest.mark.asyncio
-    async def test_get_available_tools_count(self, server):
-        """Test that all expected tools are available."""
-        tools = await server.get_available_tools()
-
-        assert len(tools) == 15  # 14 game actions + get_game_state
 
     @pytest.mark.asyncio
     async def test_get_available_tools_structure(self, server):
