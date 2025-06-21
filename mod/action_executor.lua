@@ -129,7 +129,7 @@ function ActionExecutor:execute_discard_cards(action_data)
     for _, index in ipairs(card_indices) do
         local card = G.hand.cards[index + 1] -- Lua 1-based indexing
         if card then
-            card.highlighted = true
+            G.hand:add_to_highlighted(card)
         end
     end
     
