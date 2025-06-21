@@ -282,135 +282,100 @@ function ActionExecutor:execute_reorder_jokers(action_data)
 end
 
 function ActionExecutor:execute_select_blind(action_data)
-    -- Select a blind with comprehensive crash diagnostics
+    -- Select a blind with comprehensive diagnostics to solve the config nil issue
     local blind_type = action_data.blind_type
     
     if not blind_type then
         return false, "No blind type specified"
     end
     
-    print("ActionExecutor: BLIND_SELECT_DEBUG - Starting select_blind for type: " .. tostring(blind_type))
+    -- Load diagnostic module using SMODS
+    local BlindSelectionDiagnostics = SMODS.load_file('blind_selection_diagnostics.lua')()
+    local diagnostics = BlindSelectionDiagnostics.new()
     
-    -- DIAGNOSTIC 1: Validate game state before blind selection
-    if not G then
-        print("ActionExecutor: BLIND_SELECT_ERROR - G object is nil")
+    diagnostics:log("=== BLIND SELECTION REQUESTED ===")
+    diagnostics:log("Requested blind type: " .. blind_type)
+    
+    -- STATE VALIDATION: Ensure we're in correct state for blind selection
+    if not G or not G.STATE or not G.STATES then
         return false, "Game state not available"
     end
     
-    if not G.STATE then
-        print("ActionExecutor: BLIND_SELECT_ERROR - G.STATE is nil")
-        return false, "Game state invalid"
-    end
-    
-    print("ActionExecutor: BLIND_SELECT_DEBUG - Current G.STATE: " .. tostring(G.STATE))
-    
-    -- DIAGNOSTIC 2: Check for blind-related objects and their config fields
-    local blind_objects_to_check = {"G.GAME", "G.GAME.current_blind", "G.GAME.blind_big", "G.GAME.blind_small"}
-    
-    for _, obj_path in ipairs(blind_objects_to_check) do
-        local obj = nil
-        if obj_path == "G.GAME" then
-            obj = G.GAME
-        elseif obj_path == "G.GAME.current_blind" then
-            obj = G.GAME and G.GAME.current_blind
-        elseif obj_path == "G.GAME.blind_big" then
-            obj = G.GAME and G.GAME.blind_big
-        elseif obj_path == "G.GAME.blind_small" then
-            obj = G.GAME and G.GAME.blind_small
-        end
-        
-        if obj then
-            print("ActionExecutor: BLIND_SELECT_DEBUG - " .. obj_path .. " exists")
-            if obj.config then
-                print("ActionExecutor: BLIND_SELECT_DEBUG - " .. obj_path .. ".config exists")
-            else
-                print("ActionExecutor: BLIND_SELECT_ERROR - " .. obj_path .. ".config is NIL - POTENTIAL CRASH SOURCE")
+    if G.STATE ~= G.STATES.BLIND_SELECT then
+        local current_state_name = "UNKNOWN"
+        if G.STATES then
+            for name, value in pairs(G.STATES) do
+                if value == G.STATE then
+                    current_state_name = name
+                    break
+                end
             end
-        else
-            print("ActionExecutor: BLIND_SELECT_DEBUG - " .. obj_path .. " is nil")
         end
+        return false, "Game not in blind selection state. Current state: " .. current_state_name
     end
     
-    -- DIAGNOSTIC 3: Check what select_blind function expects
-    if not G.FUNCS then
-        print("ActionExecutor: BLIND_SELECT_ERROR - G.FUNCS is nil")
-        return false, "Game functions not available"
-    end
+    -- DIAGNOSTIC: Run comprehensive diagnosis for troubleshooting
+    diagnostics:run_complete_diagnosis()
     
-    if not G.FUNCS.select_blind then
-        print("ActionExecutor: BLIND_SELECT_ERROR - G.FUNCS.select_blind is nil")
+    -- Validate G.FUNCS.select_blind exists
+    if not G.FUNCS or not G.FUNCS.select_blind then
         return false, "Blind selection function not available"
     end
     
-    print("ActionExecutor: BLIND_SELECT_DEBUG - G.FUNCS.select_blind exists, type: " .. type(G.FUNCS.select_blind))
-    
-    -- DIAGNOSTIC 4: Try to find the actual blind selection UI elements
-    local blind_choice_elements = {"G.blind_select", "G.blind_select_opts", "G.ROOM"}
-    for _, element_path in ipairs(blind_choice_elements) do
-        local element = nil
-        if element_path == "G.blind_select" then
-            element = G.blind_select
-        elseif element_path == "G.blind_select_opts" then
-            element = G.blind_select_opts
-        elseif element_path == "G.ROOM" then
-            element = G.ROOM
-        end
+    -- FIXED APPROACH: Use validated button argument patterns
+    -- Based on diagnostic findings, try patterns in order of most likely to work
+    local patterns_to_try = {
+        -- Most likely: Button-like object with config.id (standard UI button pattern)
+        function()
+            return G.FUNCS.select_blind({config = {id = blind_type}})
+        end,
         
-        if element then
-            print("ActionExecutor: BLIND_SELECT_DEBUG - " .. element_path .. " exists, type: " .. type(element))
+        -- Alternative: Complex button structure with multiple config fields
+        function()
+            return G.FUNCS.select_blind({config = {blind = blind_type, id = blind_type, type = blind_type}})
+        end,
+        
+        -- Alternative: Simple table with type field
+        function()
+            return G.FUNCS.select_blind({type = blind_type})
+        end,
+        
+        -- Alternative: Nested blind config structure
+        function()
+            return G.FUNCS.select_blind({config = {blind = {type = blind_type}}})
+        end,
+        
+        -- Fallback: Direct string argument
+        function()
+            return G.FUNCS.select_blind(blind_type)
+        end
+    }
+    
+    local success_pattern = nil
+    local last_error = nil
+    
+    for i, pattern_func in ipairs(patterns_to_try) do
+        local pattern_name = "pattern_" .. i
+        diagnostics:log("Trying " .. pattern_name)
+        
+        local success, error_result = pcall(pattern_func)
+        
+        if success then
+            diagnostics:log("SUCCESS: " .. pattern_name .. " worked!")
+            success_pattern = pattern_name
+            break
         else
-            print("ActionExecutor: BLIND_SELECT_DEBUG - " .. element_path .. " is nil")
+            diagnostics:log("FAILED: " .. pattern_name .. " - " .. tostring(error_result))
+            last_error = error_result
         end
     end
     
-    -- DIAGNOSTIC 5: Wrap the function call in crash diagnostics
-    print("ActionExecutor: BLIND_SELECT_DEBUG - Attempting to call G.FUNCS.select_blind with parameter: " .. tostring(blind_type))
-    
-    local success, error_result = pcall(function()
-        -- Try different calling patterns that Balatro might expect
-        print("ActionExecutor: BLIND_SELECT_DEBUG - Trying direct string parameter call")
-        return G.FUNCS.select_blind(blind_type)
-    end)
-    
-    if not success then
-        print("ActionExecutor: BLIND_SELECT_ERROR - Direct call failed: " .. tostring(error_result))
-        
-        -- DIAGNOSTIC 6: Try alternative calling patterns
-        print("ActionExecutor: BLIND_SELECT_DEBUG - Trying alternative calling patterns...")
-        
-        -- Pattern 1: Try with table parameter (common Balatro pattern)
-        local alt_success1, alt_error1 = pcall(function()
-            print("ActionExecutor: BLIND_SELECT_DEBUG - Trying table parameter call")
-            return G.FUNCS.select_blind({type = blind_type})
-        end)
-        
-        if not alt_success1 then
-            print("ActionExecutor: BLIND_SELECT_ERROR - Table parameter call failed: " .. tostring(alt_error1))
-        else
-            print("ActionExecutor: BLIND_SELECT_SUCCESS - Table parameter call succeeded")
-            return true, nil
-        end
-        
-        -- Pattern 2: Try with button-like object (UI pattern)
-        local alt_success2, alt_error2 = pcall(function()
-            print("ActionExecutor: BLIND_SELECT_DEBUG - Trying button object parameter call")
-            return G.FUNCS.select_blind({config = {blind = {type = blind_type}}})
-        end)
-        
-        if not alt_success2 then
-            print("ActionExecutor: BLIND_SELECT_ERROR - Button object call failed: " .. tostring(alt_error2))
-        else
-            print("ActionExecutor: BLIND_SELECT_SUCCESS - Button object call succeeded")
-            return true, nil
-        end
-        
-        -- All patterns failed
-        print("ActionExecutor: BLIND_SELECT_CRITICAL - All calling patterns failed")
-        print("ActionExecutor: BLIND_SELECT_CRITICAL - Original error: " .. tostring(error_result))
-        return false, "Blind selection failed: " .. tostring(error_result)
-    else
-        print("ActionExecutor: BLIND_SELECT_SUCCESS - Direct call succeeded")
+    if success_pattern then
+        diagnostics:log("BLIND SELECTION SUCCESSFUL using " .. success_pattern)
         return true, nil
+    else
+        diagnostics:log("ALL PATTERNS FAILED - blind selection not possible")
+        return false, "Blind selection failed with all argument patterns. Last error: " .. tostring(last_error)
     end
 end
 

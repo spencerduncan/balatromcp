@@ -1,10 +1,6 @@
 {
-  "timestamp": "2025-06-21T07:10:30Z",
-  "sequence_id": 1,
-  "message_type": "action",
-  "data": {
-    "action_type": "select_blind",
-    "sequence": 1,
-    "blind_type": "small"
-  }
+  "sequence_id": 5,
+  "action_type": "play_hand",
+  "card_indices": [1, 2],
+  "message_type": "action_request"
 }
