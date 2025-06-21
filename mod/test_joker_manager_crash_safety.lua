@@ -93,23 +93,37 @@ function TestFramework:run_tests()
     return self.failed == 0
 end
 
--- Load required modules with SMODS availability check
-local JokerManager, CrashDiagnostics
+-- Load JokerManager module directly for testing
+dofile("joker_manager.lua")
+local JokerManager = _G.JokerManager or require("joker_manager")
 
-if SMODS and SMODS.load_file then
-    JokerManager = assert(SMODS.load_file("joker_manager.lua"))()
-    CrashDiagnostics = assert(SMODS.load_file("crash_diagnostics.lua"))()
-else
-    -- Fallback: try direct require for testing
-    local success1, module1 = pcall(require, "joker_manager")
-    local success2, module2 = pcall(require, "crash_diagnostics")
-    
-    if success1 and success2 then
-        JokerManager = module1
-        CrashDiagnostics = module2
-    else
-        error("Required modules not available - SMODS not found and direct require failed")
-    end
+-- Mock CrashDiagnostics for testing
+local CrashDiagnostics = {}
+CrashDiagnostics.__index = CrashDiagnostics
+
+function CrashDiagnostics.new()
+    local self = setmetatable({}, CrashDiagnostics)
+    return self
+end
+
+function CrashDiagnostics:log(message)
+    print("CRASH_DIAGNOSTICS: " .. tostring(message))
+end
+
+function CrashDiagnostics:validate_object_config(obj, name, operation)
+    print("CRASH_DIAGNOSTICS: Validating " .. tostring(name) .. " during " .. tostring(operation))
+end
+
+function CrashDiagnostics:track_hook_chain(hook_name)
+    print("CRASH_DIAGNOSTICS: Tracking hook chain for " .. tostring(hook_name))
+end
+
+function CrashDiagnostics:validate_game_state(operation)
+    print("CRASH_DIAGNOSTICS: Validating game state during " .. tostring(operation))
+end
+
+function CrashDiagnostics:create_safe_hook(func, hook_name)
+    return func
 end
 
 local test_framework = TestFramework.new()
