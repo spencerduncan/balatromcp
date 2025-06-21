@@ -1,6 +1,6 @@
 {
-  "sequence_id": 3,
-  "action_type": "play_hand",
-  "card_indices": [1, 2],
+  "sequence_id": 5,
+  "action_type": "discard_cards",
+  "card_indices": [2, 6, 7],
   "message_type": "action_request"
 }

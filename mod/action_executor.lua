@@ -50,6 +50,10 @@ function ActionExecutor:execute_action(action_data)
         success, error_message = self:execute_sort_hand_by_suit(action_data)
     elseif action_type == "use_consumable" then
         success, error_message = self:execute_use_consumable(action_data)
+    elseif action_type == "diagnose_blind_progression" then
+        success, error_message = self:execute_diagnose_blind_progression(action_data)
+    elseif action_type == "diagnose_blind_activation" then
+        success, error_message = self:execute_diagnose_blind_activation(action_data)
     else
         success = false
         error_message = "Unknown action type: " .. action_type
@@ -143,71 +147,176 @@ function ActionExecutor:execute_discard_cards(action_data)
 end
 
 function ActionExecutor:execute_go_to_shop(action_data)
-    -- Navigate to shop
-  --  print("ActionExecutor: DEBUG - Before go_to_shop call")
+    -- Navigate to shop using cash_out function
+    print("BalatroMCP: Executing cash_out to go to shop")
     
-    -- CRITICAL: Use direct global access to ensure fresh state
-    local state_before_direct = _G.G and _G.G.STATE or "NIL"
-    local state_before_cached = G and G.STATE or "NIL"
-    
-   -- print("ActionExecutor: TIMING - Direct _G.G.STATE before = " .. tostring(state_before_direct))
-   -- print("ActionExecutor: TIMING - Cached G.STATE before = " .. tostring(state_before_cached))
-    --print("ActionExecutor: TIMING - Are they equal? " .. tostring(state_before_direct == state_before_cached))
-    
-    if _G.G and _G.G.STATES then
-        for key, value in pairs(_G.G.STATES) do
-            local marker = (_G.G.STATE == value) and " *** CURRENT ***" or ""
-         --   print("ActionExecutor: DEBUG - " .. key .. " = " .. tostring(value) .. marker)
-        end
+    -- STATE VALIDATION: Ensure we're in correct state for cash out
+    if not G or not G.STATE or not G.STATES then
+        return false, "Game state not available"
     end
     
-    if G.FUNCS and G.FUNCS.go_to_shop then
-    --    print("ActionExecutor: DEBUG - Calling G.FUNCS.go_to_shop()")
-        G.FUNCS.go_to_shop()
-        
-        -- DIAGNOSTIC: Check state after function call using both methods
-        local state_after_direct = _G.G and _G.G.STATE or "NIL"
-        local state_after_cached = G and G.STATE or "NIL"
-        
-     --   print("ActionExecutor: TIMING - Direct _G.G.STATE after = " .. tostring(state_after_direct))
-      --  print("ActionExecutor: TIMING - Cached G.STATE after = " .. tostring(state_after_cached))
-     --   print("ActionExecutor: TIMING - Are they equal? " .. tostring(state_after_direct == state_after_cached))
-        
+    if G.STATE ~= G.STATES.ROUND_EVAL then
+        local current_state_name = "UNKNOWN"
+        if G.STATES then
+            for name, value in pairs(G.STATES) do
+                if value == G.STATE then
+                    current_state_name = name
+                    break
+                end
+            end
+        end
+        return false, "Cannot cash out, must be in round eval state. Current state: " .. current_state_name
+    end
+    
+    -- Validate G.FUNCS.cash_out exists
+    if not G.FUNCS or not G.FUNCS.cash_out then
+        return false, "Cash out function not available"
+    end
+    
+    -- Create fake button config for cash_out function
+    local fake_button = {
+        config = {
+            button = ""
+        }
+    }
+    
+    -- Execute cash_out using event manager
+    if G.E_MANAGER and G.E_MANAGER.add_event then
+        G.E_MANAGER:add_event(Event({
+            trigger = 'immediate',
+            no_delete = true,
+            func = function()
+                G.FUNCS.cash_out(fake_button)
+                return true
+            end
+        }))
+        print("BalatroMCP: Cash out event added successfully")
         return true, nil
     else
-        return false, "Shop navigation not available"
+        return false, "Event manager not available"
     end
 end
 
 function ActionExecutor:execute_buy_item(action_data)
-    -- Buy an item from the shop
+    -- Buy an item from the shop using the correct Balatro purchase pattern for different item types
     local shop_index = action_data.shop_index
     
     if not shop_index or shop_index < 0 then
         return false, "Invalid shop index"
     end
     
-    -- Access shop items
-    if not G or not G.shop_jokers or not G.shop_jokers.cards then
-        return false, "No shop available"
+    -- STATE VALIDATION: Ensure we're in shop state
+    if not G or not G.STATE or not G.STATES then
+        return false, "Game state not available"
     end
     
-    local item = G.shop_jokers.cards[shop_index + 1] -- Lua 1-based indexing
-    if not item then
-        return false, "Shop item not found at index: " .. shop_index
+    if G.STATE ~= G.STATES.SHOP then
+        local current_state_name = "UNKNOWN"
+        if G.STATES then
+            for name, value in pairs(G.STATES) do
+                if value == G.STATE then
+                    current_state_name = name
+                    break
+                end
+            end
+        end
+        return false, "Cannot buy item, must be in shop state. Current state: " .. current_state_name
     end
     
-    -- Check if player can afford it
-    if G.GAME and G.GAME.dollars < (item.cost or 0) then
-        return false, "Insufficient funds"
+    -- Build unified shop list with item type tracking in the same order as the game displays them
+    local shop_items = {}
+    local shop_collections = {
+        {collection = G.shop_jokers, name = "jokers", type = "main"},
+        {collection = G.shop_consumables, name = "consumables", type = "main"},  -- For planets, tarots, spectrals
+        {collection = G.shop_booster, name = "boosters", type = "booster"},      -- For booster packs
+        {collection = G.shop_vouchers, name = "vouchers", type = "voucher"}      -- For vouchers
+    }
+    
+    -- Build unified shop list in display order, tracking item types
+    for _, shop_collection in ipairs(shop_collections) do
+        if shop_collection.collection and shop_collection.collection.cards then
+            for _, card in ipairs(shop_collection.collection.cards) do
+                table.insert(shop_items, {card = card, type = shop_collection.type, name = shop_collection.name})
+            end
+        end
     end
     
-    -- Execute purchase
-    if item.buy then
-        item:buy()
+    -- Validate shop index
+    if #shop_items == 0 then
+        return false, "No shop items available"
+    end
+    
+    if shop_index >= #shop_items then
+        return false, "Shop item not found at index: " .. shop_index .. " (max: " .. (#shop_items - 1) .. ")"
+    end
+    
+    local shop_item = shop_items[shop_index + 1] -- Lua 1-based indexing
+    local card = shop_item.card
+    local item_type = shop_item.type
+    local item_category = shop_item.name
+    
+    print("BalatroMCP: Attempting to buy " .. item_category .. " item at index " .. shop_index .. " (type: " .. item_type .. ")")
+    
+    -- Check if there's space for the purchase (only for main items)
+    if item_type == "main" and G.FUNCS and G.FUNCS.check_for_buy_space then
+        if not G.FUNCS.check_for_buy_space(card) then
+            return false, "Cannot buy item - no space available"
+        end
+    end
+    
+    -- Check if player can afford it (accounting for bankrupt_at like the working code)
+    local cost = card.cost or 0
+    local available_money = (G.GAME.dollars or 0) - (G.GAME.bankrupt_at or 0)
+    
+    if cost > available_money and cost > 0 then
+        return false, "Not enough money: need " .. cost .. " but have " .. available_money .. " available"
+    end
+    
+    -- Execute purchase using the correct Balatro pattern based on item type
+    local success, error_result
+    
+    if item_type == "main" then
+        -- Main shop items (jokers, consumables) use buy_from_shop
+        if not G.FUNCS or not G.FUNCS.buy_from_shop then
+            return false, "Buy function not available"
+        end
+        
+        print("BalatroMCP: Calling G.FUNCS.buy_from_shop for " .. item_category)
+        success, error_result = pcall(function()
+            G.FUNCS.buy_from_shop({config = {ref_table = card}})
+        end)
+        
+    elseif item_type == "voucher" then
+        -- Vouchers use use_card
+        if not G.FUNCS or not G.FUNCS.use_card then
+            return false, "Use card function not available"
+        end
+        
+        print("BalatroMCP: Calling G.FUNCS.use_card for voucher")
+        success, error_result = pcall(function()
+            G.FUNCS.use_card({config = {ref_table = card}})
+        end)
+        
+    elseif item_type == "booster" then
+        -- Boosters use use_card
+        if not G.FUNCS or not G.FUNCS.use_card then
+            return false, "Use card function not available"
+        end
+        
+        print("BalatroMCP: Calling G.FUNCS.use_card for booster pack")
+        success, error_result = pcall(function()
+            G.FUNCS.use_card({config = {ref_table = card}})
+        end)
+        
+    else
+        return false, "Unknown item type: " .. item_type
+    end
+    
+    if success then
+        print("BalatroMCP: " .. item_category .. " purchase successful!")
         return true, nil
     else
-        return false, "Item cannot be purchased"
+        return false, "Purchase failed: " .. tostring(error_result)
     end
 end
 
@@ -275,19 +384,14 @@ function ActionExecutor:execute_reorder_jokers(action_data)
 end
 
 function ActionExecutor:execute_select_blind(action_data)
-    -- Select a blind with comprehensive diagnostics to solve the config nil issue
+    -- Select a blind using the correct UI button element approach
     local blind_type = action_data.blind_type
     
     if not blind_type then
         return false, "No blind type specified"
     end
     
-    -- Load diagnostic module using SMODS with required ID
-    local BlindSelectionDiagnostics = SMODS.load_file('blind_selection_diagnostics.lua', 'balatro_mcp')()
-    local diagnostics = BlindSelectionDiagnostics.new()
-    
-    diagnostics:log("=== BLIND SELECTION REQUESTED ===")
-    diagnostics:log("Requested blind type: " .. blind_type)
+    print("BalatroMCP: Selecting blind: " .. blind_type)
     
     -- STATE VALIDATION: Ensure we're in correct state for blind selection
     if not G or not G.STATE or not G.STATES then
@@ -307,68 +411,53 @@ function ActionExecutor:execute_select_blind(action_data)
         return false, "Game not in blind selection state. Current state: " .. current_state_name
     end
     
-    -- DIAGNOSTIC: Run comprehensive diagnosis for troubleshooting
-    diagnostics:run_complete_diagnosis()
-    
     -- Validate G.FUNCS.select_blind exists
     if not G.FUNCS or not G.FUNCS.select_blind then
         return false, "Blind selection function not available"
     end
     
-    -- FIXED APPROACH: Use validated button argument patterns
-    -- Based on diagnostic findings, try patterns in order of most likely to work
-    local patterns_to_try = {
-        -- Most likely: Button-like object with config.id (standard UI button pattern)
-        function()
-            return G.FUNCS.select_blind({config = {id = blind_type}})
-        end,
-        
-        -- Alternative: Complex button structure with multiple config fields
-        function()
-            return G.FUNCS.select_blind({config = {blind = blind_type, id = blind_type, type = blind_type}})
-        end,
-        
-        -- Alternative: Simple table with type field
-        function()
-            return G.FUNCS.select_blind({type = blind_type})
-        end,
-        
-        -- Alternative: Nested blind config structure
-        function()
-            return G.FUNCS.select_blind({config = {blind = {type = blind_type}}})
-        end,
-        
-        -- Fallback: Direct string argument
-        function()
-            return G.FUNCS.select_blind(blind_type)
-        end
-    }
+    -- CORRECTED APPROACH: Use real UI button element like working game code
+    -- Based on the working code sample: G.blind_select_opts[string.lower(G.GAME.blind_on_deck)]:get_UIE_by_ID("select_blind_button")
     
-    local success_pattern = nil
-    local last_error = nil
-    
-    for i, pattern_func in ipairs(patterns_to_try) do
-        local pattern_name = "pattern_" .. i
-        diagnostics:log("Trying " .. pattern_name)
-        
-        local success, error_result = pcall(pattern_func)
-        
-        if success then
-            diagnostics:log("SUCCESS: " .. pattern_name .. " worked!")
-            success_pattern = pattern_name
-            break
-        else
-            diagnostics:log("FAILED: " .. pattern_name .. " - " .. tostring(error_result))
-            last_error = error_result
-        end
+    -- First, validate that G.blind_select_opts exists
+    if not G.blind_select_opts then
+        return false, "G.blind_select_opts not available - blind selection UI not initialized"
     end
     
-    if success_pattern then
-        diagnostics:log("BLIND SELECTION SUCCESSFUL using " .. success_pattern)
+    -- Get the blind option UI element for the requested blind type
+    local blind_key = string.lower(blind_type)
+    local blind_option = G.blind_select_opts[blind_key]
+    
+    if not blind_option then
+        -- List available blind options for debugging
+        local available_blinds = {}
+        for key, _ in pairs(G.blind_select_opts) do
+            table.insert(available_blinds, key)
+        end
+        return false, "Blind option '" .. blind_key .. "' not found. Available: " .. table.concat(available_blinds, ", ")
+    end
+    
+    -- Get the actual button element from the blind option
+    if not blind_option.get_UIE_by_ID then
+        return false, "Blind option missing get_UIE_by_ID method"
+    end
+    
+    local select_button = blind_option:get_UIE_by_ID("select_blind_button")
+    if not select_button then
+        return false, "Select blind button not found in blind option UI"
+    end
+    
+    -- Call G.FUNCS.select_blind with the actual button element
+    print("BalatroMCP: Calling G.FUNCS.select_blind with proper UI button")
+    local success, error_result = pcall(function()
+        G.FUNCS.select_blind(select_button)
+    end)
+    
+    if success then
+        print("BalatroMCP: Blind selection successful!")
         return true, nil
     else
-        diagnostics:log("ALL PATTERNS FAILED - blind selection not possible")
-        return false, "Blind selection failed with all argument patterns. Last error: " .. tostring(last_error)
+        return false, "Blind selection failed: " .. tostring(error_result)
     end
 end
 
@@ -483,6 +572,36 @@ function ActionExecutor:execute_use_consumable(action_data)
     else
         return false, "Consumable cannot be used"
     end
+end
+
+function ActionExecutor:execute_diagnose_blind_progression(action_data)
+    -- Execute blind progression diagnostics
+    print("BalatroMCP: Running blind progression diagnostics...")
+    
+    -- Load diagnostic module using SMODS with required ID
+    local BlindProgressionDiagnostics = SMODS.load_file('blind_progression_diagnostics.lua', 'balatro_mcp')()
+    local diagnostics = BlindProgressionDiagnostics.new()
+    
+    -- Run comprehensive diagnosis
+    diagnostics:diagnose_blind_state()
+    diagnostics:log_hand_result_processing()
+    
+    return true, nil
+end
+
+function ActionExecutor:execute_diagnose_blind_activation(action_data)
+    -- Execute blind activation diagnostics
+    print("BalatroMCP: Running blind activation diagnostics...")
+    
+    -- Load diagnostic module using SMODS with required ID
+    local BlindActivationDiagnostics = SMODS.load_file('blind_activation_diagnostics.lua', 'balatro_mcp')()
+    local diagnostics = BlindActivationDiagnostics.new()
+    
+    -- Run comprehensive activation diagnosis
+    diagnostics:diagnose_blind_activation_state()
+    diagnostics:check_blind_database()
+    
+    return true, nil
 end
 
 return ActionExecutor

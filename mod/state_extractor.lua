@@ -560,11 +560,54 @@ function StateExtractor:extract_shop_contents()
         end
     end
     
-    -- Log extraction results for debugging
+    -- Extract vouchers from G.shop_vouchers.cards if it exists
+    if self:safe_check_path(G, {"shop_vouchers", "cards"}) then
+        for i, item in ipairs(G.shop_vouchers.cards) do
+            if item and item.ability and item.ability.set then
+                local ability_set = self:safe_primitive_nested_value(item, {"ability", "set"}, "")
+                local item_type = string.lower(ability_set)
+                
+                local safe_item = {
+                    index = (#shop_contents), -- Continue indexing
+                    item_type = item_type,
+                    name = self:safe_primitive_nested_value(item, {"ability", "name"}, "Unknown"),
+                    cost = self:safe_primitive_value(item, "cost", 0),
+                    properties = {}
+                }
+                table.insert(shop_contents, safe_item)
+            end
+        end
+    end
+    
+    -- Log extraction results for debugging with detailed collection info
     if #shop_contents > 0 then
         self:log("Extracted " .. #shop_contents .. " shop items")
+        
+        -- Debug log: Check which collections have items
+        local jokers_count = (self:safe_check_path(G, {"shop_jokers", "cards"}) and #G.shop_jokers.cards) or 0
+        local consumables_count = (self:safe_check_path(G, {"shop_consumables", "cards"}) and #G.shop_consumables.cards) or 0
+        local boosters_count = (self:safe_check_path(G, {"shop_booster", "cards"}) and #G.shop_booster.cards) or 0
+        local vouchers_count = (self:safe_check_path(G, {"shop_vouchers", "cards"}) and #G.shop_vouchers.cards) or 0
+        
+        self:log("Shop collection counts: jokers=" .. jokers_count ..
+                ", consumables=" .. consumables_count ..
+                ", boosters=" .. boosters_count ..
+                ", vouchers=" .. vouchers_count)
     else
         self:log("WARNING: No shop items found in any shop arrays")
+        
+        -- Debug log: Check which collections exist when empty
+        local collections_debug = {}
+        if G then
+            table.insert(collections_debug, "shop_jokers=" .. (G.shop_jokers and "exists" or "nil"))
+            table.insert(collections_debug, "shop_consumables=" .. (G.shop_consumables and "exists" or "nil"))
+            table.insert(collections_debug, "shop_booster=" .. (G.shop_booster and "exists" or "nil"))
+            table.insert(collections_debug, "shop_vouchers=" .. (G.shop_vouchers and "exists" or "nil"))
+        end
+        
+        if #collections_debug > 0 then
+            self:log("Shop collections status: " .. table.concat(collections_debug, ", "))
+        end
     end
     
     return shop_contents

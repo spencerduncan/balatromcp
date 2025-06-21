@@ -16,7 +16,8 @@ local test_modules = {
     {name = "test_crash_diagnostics", description = "CrashDiagnostics object validation and hook safety"},
     {name = "test_joker_manager_crash_safety", description = "JokerManager defensive programming and safe config access"},
     {name = "test_balatromcp_crash_integration", description = "BalatroMCP crash diagnostics integration and error handling"},
-    {name = "test_love2d_update_crash_protection", description = "Love2D update hook crash protection for 'config field nil' errors"}
+    {name = "test_love2d_update_crash_protection", description = "Love2D update hook crash protection for 'config field nil' errors"},
+    {name = "test_shop_state_detection", description = "Shop state detection and timing mechanisms"}
 }
 
 local total_passed = 0
@@ -88,6 +89,7 @@ if #failed_modules == 0 and total_failed == 0 then
     print("✅ BalatroMCP crash diagnostics integration provides error handling and graceful degradation")
     print("✅ Crash fix implementation addresses 'config field nil errors' that occur in hook interference scenarios")
     print("✅ Love2D update hook crash protection prevents game crashes with pcall error handling")
+    print("✅ Shop state detection and timing mechanisms ensure accurate shop data loading and coordination")
     os.exit(0)
 else
     print("\n❌ FAILURE: Some tests failed!")

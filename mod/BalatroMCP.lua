@@ -268,6 +268,9 @@ function BalatroMCP:update(dt)
     -- NON-INTRUSIVE BLIND SELECTION DETECTION
     self:detect_blind_selection_transition()
     
+    -- NON-INTRUSIVE SHOP STATE DETECTION
+    self:detect_shop_state_transition()
+    
     -- Handle delayed blind state capture
     if self.delayed_blind_state_capture then
         self.delayed_blind_capture_timer = self.delayed_blind_capture_timer - dt
@@ -423,20 +426,26 @@ end
 function BalatroMCP:hook_shop_interactions()
     -- Hook shop interaction events with enhanced crash diagnostics
     if G.FUNCS then
-        local original_go_to_shop = G.FUNCS.go_to_shop
-        if original_go_to_shop then
-            G.FUNCS.go_to_shop = self.crash_diagnostics:create_safe_hook(
+        -- CORRECTED: Hook cash_out function since go_to_shop doesn't exist
+        local original_cash_out = G.FUNCS.cash_out
+        if original_cash_out then
+            G.FUNCS.cash_out = self.crash_diagnostics:create_safe_hook(
                 function(...)
-                    self.crash_diagnostics:track_hook_chain("go_to_shop")
-                    self.crash_diagnostics:validate_game_state("go_to_shop")
-                    print("BalatroMCP: Entered shop - capturing state")
-                    local result = original_go_to_shop(...)
+                    self.crash_diagnostics:track_hook_chain("cash_out")
+                    self.crash_diagnostics:validate_game_state("cash_out")
+                    print("BalatroMCP: Cash out triggered - capturing state")
+                    local result = original_cash_out(...)
                     self:on_shop_entered()
                     return result
                 end,
-                "go_to_shop"
+                "cash_out"
             )
+        else
+            print("BalatroMCP: WARNING - G.FUNCS.cash_out not available for shop hooks")
         end
+        
+        -- Also add a state detection hook for when we enter shop state directly
+        self:setup_shop_state_detection()
     end
 end
 
@@ -701,9 +710,18 @@ function BalatroMCP:on_shop_entered()
     local shop_items = current_state and current_state.shop_contents and #current_state.shop_contents or 0
     print("BalatroMCP: DEBUG - Hook fired with state: phase=" .. phase .. ", money=" .. tostring(money) .. ", shop_items=" .. tostring(shop_items))
     
-    -- Delay state capture to allow shop contents to populate
+    -- Delay state capture to allow shop contents to populate - increased delay
     self.delayed_shop_state_capture = true
-    self.delayed_shop_capture_timer = 0.5  -- Wait 0.5 seconds for shop to populate
+    self.delayed_shop_capture_timer = 1.0  -- Wait 1.0 seconds for shop to populate
+end
+
+function BalatroMCP:setup_shop_state_detection()
+    -- Set up additional shop state detection for cases where cash_out hook doesn't fire
+    print("BalatroMCP: Setting up shop state detection")
+    
+    -- Initialize shop state tracking
+    self.last_shop_state = nil
+    self.shop_state_initialized = false
 end
 
 function BalatroMCP:detect_blind_selection_transition()
@@ -740,6 +758,50 @@ function BalatroMCP:detect_blind_selection_transition()
     -- Update state tracking
     self.last_blind_state = current_state
 end
+
+function BalatroMCP:detect_shop_state_transition()
+    -- NON-INTRUSIVE detection of shop state transitions
+    -- This catches cases where the cash_out hook doesn't fire
+    
+    if not G or not G.STATE or not G.STATES then
+        return
+    end
+    
+    local current_state = G.STATE
+    
+    -- Initialize tracking on first run
+    if not self.last_shop_state then
+        self.last_shop_state = current_state
+        self.shop_state_initialized = false
+        return
+    end
+    
+    -- Skip if we're already processing a delayed shop capture
+    if self.delayed_shop_state_capture then
+        return
+    end
+    
+    -- Detect transition INTO shop state
+    local was_not_shop = (self.last_shop_state ~= G.STATES.SHOP)
+    local is_shop = (current_state == G.STATES.SHOP)
+    
+    if was_not_shop and is_shop and not self.shop_state_initialized then
+        print("BalatroMCP: NON_INTRUSIVE_DETECTION - Shop state entered: " ..
+              tostring(self.last_shop_state) .. " -> " .. tostring(current_state))
+        
+        self.shop_state_initialized = true
+        self:on_shop_entered()
+    end
+    
+    -- Reset shop state flag when leaving shop
+    if current_state ~= G.STATES.SHOP then
+        self.shop_state_initialized = false
+    end
+    
+    -- Update state tracking
+    self.last_shop_state = current_state
+end
+
 function BalatroMCP:on_game_started()
     -- Called when a new game/run is started - THIS WAS THE MISSING EVENT HANDLER!
     print("BalatroMCP: Game started event - capturing initial state")
