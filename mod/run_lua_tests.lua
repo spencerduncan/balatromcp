@@ -9,7 +9,8 @@ print("Running unit tests for validation logic and JSON fallback functionality..
 -- Test modules to run
 local test_modules = {
     {name = "test_state_extractor", description = "StateExtractor validation logic"},
-    {name = "test_file_io", description = "FileIO JSON fallback functionality"}
+    {name = "test_file_io", description = "FileIO JSON fallback functionality"},
+    {name = "test_steammodded_loading", description = "Steammodded module loading mechanism"}
 }
 
 local total_passed = 0
@@ -71,8 +72,10 @@ end
 if #failed_modules == 0 and total_failed == 0 then
     print("\n🎉 SUCCESS: All tests passed!")
     print("✅ StateExtractor module correctly handles missing and malformed G object structures")
-    print("✅ FileIO module provides robust JSON fallback functionality")
+    print("✅ FileIO module provides robust JSON fallback functionality with Steammodded loading")
+    print("✅ Steammodded module loading mechanism works correctly for all dependencies")
     print("✅ Critical dependency issues have been resolved with proper error handling")
+    print("✅ Module inter-dependencies and initialization patterns are validated")
     os.exit(0)
 else
     print("\n❌ FAILURE: Some tests failed!")

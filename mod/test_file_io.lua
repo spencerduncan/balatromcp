@@ -91,8 +91,35 @@ function TestFramework:run_tests()
 end
 
 -- Test suite for FileIO
-local FileIO = require("file_io")
 local test_framework = TestFramework.new()
+
+-- Mock SMODS environment for testing
+local function setup_mock_smods()
+    if not _G.SMODS then
+        -- Create mock SMODS object
+        _G.SMODS = {
+            load_file = function(filename)
+                -- Mock implementation that mimics SMODS.load_file behavior
+                if filename == "libs/json.lua" then
+                    -- Return a function that when called returns the JSON library
+                    return function()
+                        return require("libs.json")
+                    end
+                else
+                    error("Mock SMODS: File not found: " .. filename)
+                end
+            end
+        }
+    end
+end
+
+-- Clean up SMODS mock
+local function cleanup_mock_smods()
+    _G.SMODS = nil
+end
+
+-- Test suite for FileIO with SMODS loading support
+local FileIO = nil
 
 -- Mock love.filesystem for testing
 local function setup_mock_love_filesystem()
@@ -147,21 +174,81 @@ end
 -- BASIC FILEIO TESTS
 -- =============================================================================
 
-test_framework:add_test("FileIO initialization", function(t)
+test_framework:add_test("FileIO initialization with SMODS", function(t)
     setup_mock_love_filesystem()
+    setup_mock_smods()
     
-    local fileio = FileIO.new("test_shared")
+    -- Load FileIO module with SMODS available
+    local success, FileIO_module = pcall(require, "file_io")
+    t:assert_true(success, "Should load FileIO module with SMODS available")
+    
+    local fileio = FileIO_module.new("test_shared")
     
     t:assert_not_nil(fileio, "FileIO should initialize")
     t:assert_not_nil(fileio.json, "JSON should be available")
     t:assert_type("function", fileio.json.encode, "Should have encode function")
     t:assert_type("function", fileio.json.decode, "Should have decode function")
+    
+    cleanup_mock_smods()
+end)
+
+test_framework:add_test("FileIO initialization without SMODS fails gracefully", function(t)
+    setup_mock_love_filesystem()
+    -- Don't setup SMODS - test failure case
+    
+    -- The require() will succeed because module is cached, but FileIO.new() should fail
+    local FileIO_module = require("file_io")
+    
+    -- This should fail during FileIO.new() because SMODS is not available
+    local success, error_msg = pcall(function()
+        FileIO_module.new("test_shared")
+    end)
+    
+    t:assert_false(success, "Should fail to create FileIO instance without SMODS")
+    t:assert_contains(tostring(error_msg), "SMODS", "Error should mention SMODS")
+end)
+
+test_framework:add_test("SMODS.load_file JSON loading success", function(t)
+    setup_mock_love_filesystem()
+    setup_mock_smods()
+    
+    -- Test SMODS loading mechanism directly
+    local load_success, json_loader = pcall(function()
+        return assert(SMODS.load_file("libs/json.lua"))
+    end)
+    
+    t:assert_true(load_success, "SMODS.load_file should succeed for libs/json.lua")
+    t:assert_type("function", json_loader, "Should return a function")
+    
+    -- Test that the loader function works
+    local json_lib = json_loader()
+    t:assert_not_nil(json_lib, "JSON loader should return library")
+    t:assert_type("function", json_lib.encode, "Should have encode function")
+    t:assert_type("function", json_lib.decode, "Should have decode function")
+    
+    cleanup_mock_smods()
+end)
+
+test_framework:add_test("SMODS.load_file failure handling", function(t)
+    setup_mock_smods()
+    
+    -- Test SMODS loading failure
+    local load_success, error_msg = pcall(function()
+        return assert(SMODS.load_file("nonexistent_file.lua"))
+    end)
+    
+    t:assert_false(load_success, "SMODS.load_file should fail for nonexistent file")
+    t:assert_contains(tostring(error_msg), "File not found", "Should show file not found error")
+    
+    cleanup_mock_smods()
 end)
 
 test_framework:add_test("FileIO write_game_state", function(t)
     setup_mock_love_filesystem()
+    setup_mock_smods()
     
-    local fileio = FileIO.new("test_shared")
+    local FileIO_module = require("file_io")
+    local fileio = FileIO_module.new("test_shared")
     
     local test_state = {
         current_phase = "hand_selection",
@@ -180,12 +267,16 @@ test_framework:add_test("FileIO write_game_state", function(t)
     t:assert_not_nil(file_content, "Should create game state file")
     t:assert_contains(file_content, "hand_selection", "Should contain phase data")
     t:assert_contains(file_content, "message_type", "Should contain message structure")
+    
+    cleanup_mock_smods()
 end)
 
 test_framework:add_test("FileIO write_action_result", function(t)
     setup_mock_love_filesystem()
+    setup_mock_smods()
     
-    local fileio = FileIO.new("test_shared")
+    local FileIO_module = require("file_io")
+    local fileio = FileIO_module.new("test_shared")
     
     local test_result = {
         success = true,
@@ -204,12 +295,16 @@ test_framework:add_test("FileIO write_action_result", function(t)
     t:assert_not_nil(file_content, "Should create action results file")
     t:assert_contains(file_content, "Action completed successfully", "Should contain result message")
     t:assert_contains(file_content, "action_result", "Should contain message type")
+    
+    cleanup_mock_smods()
 end)
 
 test_framework:add_test("FileIO read_actions", function(t)
     setup_mock_love_filesystem()
+    setup_mock_smods()
     
-    local fileio = FileIO.new("test_shared")
+    local FileIO_module = require("file_io")
+    local fileio = FileIO_module.new("test_shared")
     
     -- Create a mock actions file using the main JSON library
     local mock_action = {
@@ -237,26 +332,35 @@ test_framework:add_test("FileIO read_actions", function(t)
     -- Verify file was removed after reading
     local file_exists = love.filesystem.getInfo("test_shared/actions.json")
     t:assert_nil(file_exists, "Should remove actions file after reading")
+    
+    cleanup_mock_smods()
 end)
 
 test_framework:add_test("FileIO error handling - nil data", function(t)
     setup_mock_love_filesystem()
+    setup_mock_smods()
     
-    local fileio = FileIO.new("test_shared")
+    local FileIO_module = require("file_io")
+    local fileio = FileIO_module.new("test_shared")
     
     local success1 = fileio:write_game_state(nil)
     local success2 = fileio:write_action_result(nil)
     
     t:assert_false(success1, "Should fail to write nil game state")
     t:assert_false(success2, "Should fail to write nil action result")
+    
+    cleanup_mock_smods()
 end)
 
 test_framework:add_test("FileIO error handling - no love.filesystem", function(t)
+    setup_mock_smods()
+    
     -- Remove love.filesystem temporarily
     local original_love = love
     love = nil
     
-    local fileio = FileIO.new("test_shared")
+    local FileIO_module = require("file_io")
+    local fileio = FileIO_module.new("test_shared")
     
     local success1 = fileio:write_game_state({test = "data"})
     local success2 = fileio:write_action_result({test = "result"})
@@ -268,12 +372,15 @@ test_framework:add_test("FileIO error handling - no love.filesystem", function(t
     
     -- Restore love
     love = original_love
+    cleanup_mock_smods()
 end)
 
 test_framework:add_test("FileIO sequence ID management", function(t)
     setup_mock_love_filesystem()
+    setup_mock_smods()
     
-    local fileio = FileIO.new("test_shared")
+    local FileIO_module = require("file_io")
+    local fileio = FileIO_module.new("test_shared")
     
     local id1 = fileio:get_next_sequence_id()
     local id2 = fileio:get_next_sequence_id()
@@ -282,34 +389,41 @@ test_framework:add_test("FileIO sequence ID management", function(t)
     t:assert_equal(1, id1, "First sequence ID should be 1")
     t:assert_equal(2, id2, "Second sequence ID should be 2")
     t:assert_equal(3, id3, "Third sequence ID should be 3")
+    
+    cleanup_mock_smods()
 end)
 
-test_framework:add_test("FileIO JSON library load failure", function(t)
-    -- Mock a failed JSON library load by temporarily removing the libs directory
-    local original_require = require
-    require = function(module_name)
-        if module_name == "libs.json" then
-            error("module 'libs.json' not found")
+test_framework:add_test("FileIO Steammodded JSON loading failure", function(t)
+    setup_mock_love_filesystem()
+    
+    -- Mock SMODS that fails to load JSON
+    _G.SMODS = {
+        load_file = function(filename)
+            if filename == "libs/json.lua" then
+                error("Failed to load libs/json.lua via SMODS")
+            end
+            return function() end
         end
-        return original_require(module_name)
-    end
+    }
     
     -- This should fail during FileIO initialization
     local success, err = pcall(function()
-        FileIO.new("test_shared")
+        local FileIO_module = require("file_io")
+        FileIO_module.new("test_shared")
     end)
     
-    t:assert_false(success, "Should fail when JSON library can't be loaded")
+    t:assert_false(success, "Should fail when JSON library can't be loaded via SMODS")
     t:assert_contains(tostring(err), "Failed to load required JSON library", "Should show appropriate error message")
     
-    -- Restore original require
-    require = original_require
+    cleanup_mock_smods()
 end)
 
 test_framework:add_test("FileIO JSON encoding error handling", function(t)
     setup_mock_love_filesystem()
+    setup_mock_smods()
     
-    local fileio = FileIO.new("test_shared")
+    local FileIO_module = require("file_io")
+    local fileio = FileIO_module.new("test_shared")
     
     -- Mock the JSON encoder to throw an error
     local original_encode = fileio.json.encode
@@ -326,12 +440,16 @@ test_framework:add_test("FileIO JSON encoding error handling", function(t)
     
     -- Restore original encoder
     fileio.json.encode = original_encode
+    
+    cleanup_mock_smods()
 end)
 
 test_framework:add_test("FileIO JSON decoding error handling", function(t)
     setup_mock_love_filesystem()
+    setup_mock_smods()
     
-    local fileio = FileIO.new("test_shared")
+    local FileIO_module = require("file_io")
+    local fileio = FileIO_module.new("test_shared")
     
     -- Create a file with malformed JSON
     love.filesystem.write("test_shared/actions.json", '{"invalid": json content}')
@@ -349,6 +467,8 @@ test_framework:add_test("FileIO JSON decoding error handling", function(t)
     
     -- Restore original decoder
     fileio.json.decode = original_decode
+    
+    cleanup_mock_smods()
 end)
 
 -- Run all tests

@@ -7,12 +7,12 @@
 --- MOD_AUTHOR: [MCP Integration]
 --- MOD_DESCRIPTION: Enables AI agent interaction with Balatro through MCP protocol
 
--- Import modules
-local DebugLogger = require('debug_logger')
-local FileIO = require('file_io')
-local StateExtractor = require('state_extractor')
-local ActionExecutor = require('action_executor')
-local JokerManager = require('joker_manager')
+-- Import modules using Steammodded loading
+local DebugLogger = assert(SMODS.load_file("debug_logger.lua"))()
+local FileIO = assert(SMODS.load_file("file_io.lua"))()
+local StateExtractor = assert(SMODS.load_file("state_extractor.lua"))()
+local ActionExecutor = assert(SMODS.load_file("action_executor.lua"))()
+local JokerManager = assert(SMODS.load_file("joker_manager.lua"))()
 
 -- Main mod class
 local BalatroMCP = {}

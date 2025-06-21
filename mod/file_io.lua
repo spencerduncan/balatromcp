@@ -68,14 +68,16 @@ function FileIO:log(message)
 end
 -- Initialize JSON handling
 function FileIO:_initialize_json()
-    -- Load the main JSON library
-    local json_success, json_result = pcall(require, "libs.json")
+    -- Load the main JSON library using Steammodded loading
+    local json_success, json_result = pcall(function()
+        return assert(SMODS.load_file("libs/json.lua"))()
+    end)
     if json_success then
         self.json = json_result
         self:log("JSON library loaded successfully")
     else
         self:log("ERROR: JSON library failed to load: " .. tostring(json_result))
-        error("Failed to load required JSON library")
+        error("Failed to load required JSON library via SMODS")
     end
 end
 
