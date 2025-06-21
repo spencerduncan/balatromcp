@@ -109,7 +109,6 @@ function CrashDiagnostics:post_hook_validation(hook_name)
 end
 
 function CrashDiagnostics:create_safe_hook(original_func, hook_name)
-    -- Create a wrapped version of the hook with diagnostics
     return function(...)
         local args = {...}  -- Capture varargs in local variable
         
@@ -147,7 +146,6 @@ function CrashDiagnostics:create_safe_hook(original_func, hook_name)
 end
 
 function CrashDiagnostics:monitor_joker_operations()
-    -- Add specific monitoring for joker operations that access config
     if G and G.jokers and G.jokers.cards then
        -- self:log("MONITORING: Scanning " .. #G.jokers.cards .. " jokers for config validity")
         
@@ -174,7 +172,6 @@ function CrashDiagnostics:monitor_joker_operations()
 end
 
 function CrashDiagnostics:validate_game_state(operation)
-    -- Comprehensive game state validation before critical operations
     self:log("STATE_VALIDATION: Starting for operation: " .. operation)
     
     if not G then
@@ -211,7 +208,6 @@ function CrashDiagnostics:validate_game_state(operation)
 end
 
 function CrashDiagnostics:track_hook_chain(hook_name)
-    -- Track the chain of hooks being called to identify patterns before crashes
     if not self.hook_chain then
         self.hook_chain = {}
     end
@@ -231,7 +227,6 @@ function CrashDiagnostics:track_hook_chain(hook_name)
 end
 
 function CrashDiagnostics:analyze_hook_chain()
-    -- Analyze the hook chain for patterns that might lead to crashes
     if not self.hook_chain or #self.hook_chain == 0 then
         return "No hook chain data available"
     end
@@ -260,7 +255,6 @@ function CrashDiagnostics:analyze_hook_chain()
 end
 
 function CrashDiagnostics:emergency_state_dump()
-    -- Emergency dump of critical game state when crash is detected
     self:log("EMERGENCY_DUMP: Starting critical state dump")
     
     -- Dump G object structure
@@ -309,7 +303,6 @@ function CrashDiagnostics:emergency_state_dump()
 end
 
 function CrashDiagnostics:get_crash_context()
-    -- Return context information for crash analysis
     return {
         last_hook_called = self.last_hook_called,
         hook_call_count = self.hook_call_count,

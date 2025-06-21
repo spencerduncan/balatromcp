@@ -72,7 +72,6 @@ function DebugLogger:error(message, component)
 end
 
 function DebugLogger:test_environment()
-    -- Test and log environment capabilities
     self:info("=== ENVIRONMENT TESTING ===", "ENV")
     
     -- Test Lua version
@@ -134,7 +133,6 @@ function DebugLogger:test_environment()
 end
 
 function DebugLogger:log_g_object_structure()
-    -- Log the structure of the G object to understand actual game internals
     self:info("=== G OBJECT STRUCTURE ANALYSIS ===", "G_STRUCT")
     
     if not G then
@@ -187,7 +185,6 @@ function DebugLogger:log_g_object_structure()
 end
 
 function DebugLogger:log_card_area_structure(area, area_name)
-    -- Log structure of card areas (hand, jokers, etc.)
     self:info("=== " .. string.upper(area_name) .. " AREA STRUCTURE ===", "CARD_AREA")
     
     if not area then
@@ -216,7 +213,6 @@ function DebugLogger:log_card_area_structure(area, area_name)
 end
 
 function DebugLogger:log_card_structure(card, card_name)
-    -- Log structure of individual cards
     self:info("=== " .. string.upper(card_name) .. " CARD STRUCTURE ===", "CARD")
     
     if not card then
@@ -257,7 +253,6 @@ function DebugLogger:log_card_structure(card, card_name)
 end
 
 function DebugLogger:log_game_object_structure(game)
-    -- Log structure of G.GAME object
     self:info("=== GAME OBJECT STRUCTURE ===", "GAME")
     
     local game_keys = {}
@@ -281,7 +276,6 @@ function DebugLogger:log_game_object_structure(game)
 end
 
 function DebugLogger:test_file_communication()
-    -- Test file-based communication system
     self:info("=== FILE COMMUNICATION TEST ===", "FILE_IO")
     
     -- Test directory creation (only for subdirectories)

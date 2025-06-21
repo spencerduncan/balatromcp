@@ -14,12 +14,10 @@ function JokerManager.new()
 end
 
 function JokerManager:set_crash_diagnostics(crash_diagnostics)
-    -- Inject crash diagnostics for defensive programming
     self.crash_diagnostics = crash_diagnostics
 end
 
 function JokerManager:safe_validate_joker(joker, joker_index, operation)
-    -- Safely validate joker object and config before access
     if not joker then
         if self.crash_diagnostics then
             self.crash_diagnostics:log("ERROR: Joker at index " .. tostring(joker_index) .. " is nil during " .. operation)
@@ -46,7 +44,6 @@ function JokerManager:safe_validate_joker(joker, joker_index, operation)
 end
 
 function JokerManager:safe_get_joker_key(joker, joker_index, operation)
-    -- Safely get joker key with full validation
     if not self:safe_validate_joker(joker, joker_index, operation) then
         return nil
     end
@@ -134,7 +131,6 @@ function JokerManager:reorder_jokers(new_order)
 end
 
 function JokerManager:update_joker_positions()
-    -- Update visual positions of jokers after reordering
     if not G or not G.jokers or not G.jokers.cards then
         return
     end
@@ -202,7 +198,6 @@ function JokerManager:setup_post_hand_hook()
 end
 
 function JokerManager:execute_pending_reorder()
-    -- Execute the pending joker reorder
     if not self.reorder_pending or not self.pending_order then
         return
     end
@@ -223,7 +218,6 @@ function JokerManager:execute_pending_reorder()
 end
 
 function JokerManager:get_joker_order()
-    -- Get current joker order as array of indices
     if not G or not G.jokers or not G.jokers.cards then
         return {}
     end
@@ -238,7 +232,6 @@ function JokerManager:get_joker_order()
 end
 
 function JokerManager:find_joker_by_id(joker_id)
-    -- Find joker by its unique ID
     if not G or not G.jokers or not G.jokers.cards then
         return nil, -1
     end
@@ -318,7 +311,6 @@ function JokerManager:get_blueprint_brainstorm_optimization()
 end
 
 function JokerManager:is_reorder_beneficial()
-    -- Determine if reordering would be beneficial
     local current_order = self:get_joker_order()
     local optimal_order = self:get_blueprint_brainstorm_optimization()
     

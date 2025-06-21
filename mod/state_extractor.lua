@@ -16,13 +16,11 @@ function StateExtractor.new()
 end
 
 function StateExtractor:log(message)
-    -- Simple logging for this component
     local log_msg = "BalatroMCP [" .. self.component_name .. "]: " .. message
     print(log_msg)
 end
 
 function StateExtractor:validate_g_object()
-    -- Comprehensive validation of G object structure
     self:log("=== VALIDATING G OBJECT STRUCTURE ===")
     
     if not G then
@@ -187,9 +185,6 @@ function StateExtractor:validate_states()
 end
 
 function StateExtractor:extract_current_state()
-    -- This function will extract the current game state
-    -- Implementation will depend on Balatro's internal structure
-    
     local state = {}
     local extraction_errors = {}
     
@@ -235,7 +230,6 @@ function StateExtractor:extract_current_state()
 end
 
 function StateExtractor:get_session_id()
-    -- Generate or retrieve session ID
     if not self.session_id then
         self.session_id = "session_" .. tostring(os.time()) .. "_" .. tostring(math.random(1000, 9999))
     end
@@ -243,7 +237,6 @@ function StateExtractor:get_session_id()
 end
 
 function StateExtractor:get_current_phase()
-    -- Determine current game phase with safe access
     if not self:safe_check_path(G, {"STATE"}) then
         self:log("WARNING: G.STATE not accessible, returning default phase")
         return "hand_selection"
@@ -273,19 +266,16 @@ function StateExtractor:get_current_phase()
 end
 
 function StateExtractor:get_ante()
-    -- Get current ante level with safe access
     local ante = self:safe_get_nested_value(G, {"GAME", "round_resets", "ante"}, 1)
     return ante
 end
 
 function StateExtractor:get_money()
-    -- Get current money with safe access
     local money = self:safe_get_nested_value(G, {"GAME", "dollars"}, 0)
     return money
 end
 
 function StateExtractor:get_hands_remaining()
-    -- Get remaining hands for current round with safe access
     if G and G.GAME and G.GAME.current_round and type(G.GAME.current_round.hands_left) == "number" then
         return G.GAME.current_round.hands_left
     end
@@ -293,7 +283,6 @@ function StateExtractor:get_hands_remaining()
 end
 
 function StateExtractor:get_discards_remaining()
-    -- Get remaining discards for current round with safe access
     if G and G.GAME and G.GAME.current_round and type(G.GAME.current_round.discards_left) == "number" then
         return G.GAME.current_round.discards_left
     end
@@ -327,7 +316,6 @@ function StateExtractor:extract_hand_cards()
 end
 
 function StateExtractor:get_card_enhancement(card)
-    -- Determine card enhancement with safe access
     if not card then
         return "none"
     end
@@ -349,7 +337,6 @@ function StateExtractor:get_card_enhancement(card)
 end
 
 function StateExtractor:get_card_edition(card)
-    -- Determine card edition with safe access
     if not card then
         return "none"
     end
@@ -369,7 +356,6 @@ function StateExtractor:get_card_edition(card)
 end
 
 function StateExtractor:get_card_seal(card)
-    -- Determine card seal
     if card.seal then
         return card.seal
     end
@@ -402,7 +388,6 @@ function StateExtractor:extract_jokers()
 end
 
 function StateExtractor:extract_joker_properties(joker)
-    -- Extract joker-specific properties with safe access
     local properties = {}
     
     if not joker then
@@ -460,7 +445,6 @@ function StateExtractor:extract_current_blind()
 end
 
 function StateExtractor:determine_blind_type(blind)
-    -- Determine the type of blind with safe access
     if not blind then
         return "small"
     end
@@ -613,7 +597,6 @@ function StateExtractor:extract_shop_contents()
 end
 
 function StateExtractor:get_available_actions()
-    -- Determine available actions based on current game state
     local actions = {}
     local phase = self:get_current_phase()
     
@@ -651,15 +634,11 @@ function StateExtractor:get_available_actions()
 end
 
 function StateExtractor:is_joker_reorder_available()
-    -- Check if joker reordering is currently available
-    -- This would be true during the critical timing window after hand play
-    -- Implementation depends on tracking game state timing
     return false -- Placeholder - needs implementation
 end
 
 -- Safe access utility functions
 function StateExtractor:safe_check_path(root, path)
-    -- Safely check if a nested path exists in a table
     if not root then
         return false
     end
@@ -675,7 +654,6 @@ function StateExtractor:safe_check_path(root, path)
 end
 
 function StateExtractor:safe_get_value(table, key, default)
-    -- Safely get a value from a table with default fallback
     if not table or type(table) ~= "table" then
         return default
     end
@@ -688,7 +666,6 @@ function StateExtractor:safe_get_value(table, key, default)
 end
 
 function StateExtractor:safe_get_nested_value(root, path, default)
-    -- Safely get a nested value from a table structure
     if not root then
         return default
     end

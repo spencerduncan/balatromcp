@@ -44,7 +44,6 @@ function FileIO.new(base_path)
 end
 
 function FileIO:log(message)
-    -- Simple logging for this component
     local log_msg = "BalatroMCP [" .. self.component_name .. "]: " .. message
     print(log_msg)
     
@@ -74,7 +73,6 @@ function FileIO:log(message)
         end
     end
 end
--- Initialize JSON handling
 function FileIO:_initialize_json()
     -- Load the main JSON library using Steammodded loading
     local json_success, json_result = pcall(function()
@@ -104,7 +102,6 @@ function FileIO:write_game_state(state_data)
         filepath = self.base_path .. "/game_state.json"
     end
     
-    -- Validate inputs
     if not state_data then
         self:log("ERROR: No state data provided")
         return false
@@ -282,7 +279,6 @@ end
 function FileIO:write_action_result(result_data)
     self:log("Attempting to write action result")
     
-    -- Validate inputs
     if not result_data then
         self:log("ERROR: No result data provided")
         return false
@@ -307,7 +303,6 @@ function FileIO:write_action_result(result_data)
     
     self:log("Created action result message with sequence_id: " .. message.sequence_id)
     
-    -- Test JSON encoding with proper error handling
     local encode_success, encoded_data = pcall(self.json.encode, message)
     if not encode_success then
         self:log("ERROR: JSON encoding failed: " .. tostring(encoded_data))
