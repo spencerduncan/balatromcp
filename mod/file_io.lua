@@ -295,7 +295,7 @@ function FileIO:read_actions()
         self:log("WARNING: Failed to remove actions file")
     end
     
-    return data.data
+    return data
 end
 
 function FileIO:write_action_result(result_data)
