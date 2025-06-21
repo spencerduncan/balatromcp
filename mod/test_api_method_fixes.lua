@@ -181,30 +181,23 @@ test_framework:add_test("API method calls validation", function(t)
     print("✓ All FileIO API method calls validated")
 end)
 
--- Test that the old incorrect method names would fail
-test_framework:add_test("Deprecated method names should fail", function(t)
+-- Test API method name consistency - consolidates deprecated/correct method validation
+test_framework:add_test("API method name consistency validation", function(t)
     local file_io = MockFileIO.new()
     
-    -- Test that the old incorrect method names don't exist
+    -- Verify deprecated method names are absent
     t:assert_nil(file_io.get_next_sequence, "get_next_sequence should not exist")
-    t:assert_nil(file_io.read_action, "read_action should not exist") 
+    t:assert_nil(file_io.read_action, "read_action should not exist")
     t:assert_nil(file_io.write_response, "write_response should not exist")
     t:assert_nil(file_io.write_state, "write_state should not exist")
     
-    print("✓ Deprecated method names correctly absent")
-end)
-
--- Test that the correct method names exist
-test_framework:add_test("Correct method names should exist", function(t)
-    local file_io = MockFileIO.new()
-    
-    -- Test that the correct method names exist
+    -- Verify correct method names exist
     t:assert_not_nil(file_io.get_next_sequence_id, "get_next_sequence_id should exist")
     t:assert_not_nil(file_io.read_actions, "read_actions should exist")
     t:assert_not_nil(file_io.write_action_result, "write_action_result should exist")
     t:assert_not_nil(file_io.write_game_state, "write_game_state should exist")
     
-    print("✓ Correct method names validated")
+    print("✓ API method consistency validated - deprecated methods absent, correct methods present")
 end)
 
 -- Run all tests

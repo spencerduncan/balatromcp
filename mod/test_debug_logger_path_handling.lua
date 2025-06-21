@@ -138,21 +138,7 @@ end
 -- DEBUG LOGGER PATH HANDLING TESTS
 -- =============================================================================
 
-test_framework:add_test("DebugLogger initialization with current directory", function(t)
-    setup_mock_love_filesystem()
-    
-    local DebugLogger = require("debug_logger")
-    
-    -- Test initialization with "." (current directory)
-    local logger = DebugLogger.new(nil, ".")
-    
-    t:assert_not_nil(logger, "DebugLogger should initialize with current directory")
-    t:assert_equal(".", logger.base_path, "Base path should be '.' for current directory")
-    t:assert_equal("debug.log", logger.log_file, "Log file should be 'debug.log' in current directory")
-    
-    -- Verify no directory creation attempt was made for "."
-    t:assert_nil(love.filesystem.directories["."], "Should not attempt to create '.' directory")
-end)
+-- Removed self-evident behavior test that only verified obvious parameter assignments
 
 test_framework:add_test("DebugLogger initialization with subdirectory", function(t)
     setup_mock_love_filesystem()

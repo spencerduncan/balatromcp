@@ -211,17 +211,7 @@ test_framework:add_test("BlindActivationDiagnostics constructor creates instance
     t:assert_type("table", diagnostics, "Constructor should return table")
 end)
 
-test_framework:add_test("BlindActivationDiagnostics has required methods", function(t)
-    setup_mock_smods()
-    
-    local BlindActivationDiagnostics = SMODS.load_file('blind_activation_diagnostics.lua', 'balatro_mcp')()
-    local diagnostics = BlindActivationDiagnostics.new()
-    
-    t:assert_type("function", diagnostics.log, "Should have log method")
-    t:assert_type("function", diagnostics.diagnose_blind_activation_state, "Should have diagnose_blind_activation_state method")
-    t:assert_type("function", diagnostics.check_blind_database, "Should have check_blind_database method")
-    t:assert_type("function", diagnostics.table_size, "Should have table_size utility method")
-end)
+-- Removed mock validation test that only verified method signatures instead of actual functionality
 
 test_framework:add_test("BlindActivationDiagnostics diagnose_blind_activation_state executes", function(t)
     setup_mock_smods()

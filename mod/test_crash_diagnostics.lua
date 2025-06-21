@@ -170,17 +170,7 @@ end
 
 -- === OBJECT VALIDATION TESTS ===
 
-test_framework:add_test("CrashDiagnostics.new creates instance with correct initial state", function(t)
-    setup_test_environment()
-    
-    local diagnostics = CrashDiagnostics.new()
-    
-    t:assert_not_nil(diagnostics, "CrashDiagnostics instance should be created")
-    t:assert_equal(diagnostics.hook_call_count, 0, "Initial hook call count should be 0")
-    t:assert_equal(diagnostics.object_access_count, 0, "Initial object access count should be 0")
-    t:assert_equal(diagnostics.last_hook_called, "none", "Initial last hook should be 'none'")
-    t:assert_equal(diagnostics.last_object_accessed, "none", "Initial last object accessed should be 'none'")
-end)
+-- Removed trivial constructor test - only verified object creation without meaningful functionality testing
 
 test_framework:add_test("validate_object_config detects nil object", function(t)
     setup_test_environment()

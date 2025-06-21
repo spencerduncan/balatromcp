@@ -18,6 +18,7 @@ local test_modules = {
     {name = "test_balatromcp_crash_integration", description = "BalatroMCP crash diagnostics integration and error handling"},
     {name = "test_love2d_update_crash_protection", description = "Love2D update hook crash protection for 'config field nil' errors"},
     {name = "test_shop_state_detection", description = "Shop state detection and timing mechanisms"}
+    -- Removed test_love2d_filesystem as it's a diagnostic tool, not a unit test
 }
 
 local total_passed = 0
