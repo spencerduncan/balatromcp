@@ -76,7 +76,7 @@ class TestBalatroFileIOInitialization:
     def test_initialization_default_path(self):
         """Test initialization with default path."""
         file_io = BalatroFileIO()
-        assert file_io.base_path == Path("shared")
+        assert file_io.base_path == Path("C:/Users/whokn/Documents/balatroman/shared")
         assert file_io._sequence_id == 0
         assert file_io._last_read_sequence == {}
 

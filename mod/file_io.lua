@@ -6,7 +6,8 @@ FileIO.__index = FileIO
 
 function FileIO.new(base_path)
     local self = setmetatable({}, FileIO)
-    self.base_path = base_path or "shared"
+    -- Use absolute path to project root shared folder for reliable communication
+    self.base_path = base_path or "C:/Users/whokn/Documents/balatroman/shared"
     self.sequence_id = 0
     self.last_read_sequences = {}
     

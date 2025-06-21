@@ -46,7 +46,7 @@ class BalatroFileIO(IFileIO):
         r"(?:^|[\\/])(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?$",  # Windows reserved names
     ]
 
-    def __init__(self, base_path: str = "shared"):
+    def __init__(self, base_path: str = "C:/Users/whokn/Documents/balatroman/shared"):
         """Initialize file I/O with base path for communication files."""
         validated_path = self._validate_and_sanitize_path(base_path)
         self.base_path = Path(validated_path)

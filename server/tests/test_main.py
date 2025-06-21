@@ -92,7 +92,7 @@ class TestBalatroMCPServerInitialization:
         server = BalatroMCPServer()
         
         # Verify dependencies are created
-        mock_file_io.assert_called_once_with("shared")
+        mock_file_io.assert_called_once_with("C:/Users/whokn/Documents/balatroman/shared")
         mock_state_manager.assert_called_once()
         mock_action_handler.assert_called_once()
         

@@ -56,7 +56,7 @@ logger = logging.getLogger(__name__)
 class BalatroMCPServer(IMCPServer):
     """Main MCP Server implementation for Balatro."""
 
-    def __init__(self, shared_path: str = "shared"):
+    def __init__(self, shared_path: str = "C:/Users/whokn/Documents/balatroman/shared"):
         """Initialize the MCP server with dependency injection."""
         # Initialize dependencies
         self.file_io: IFileIO = BalatroFileIO(shared_path)

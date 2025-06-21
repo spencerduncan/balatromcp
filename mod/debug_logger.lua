@@ -6,13 +6,13 @@ DebugLogger.__index = DebugLogger
 
 function DebugLogger.new(log_file_path)
     local self = setmetatable({}, DebugLogger)
-    self.log_file = log_file_path or "shared/debug.log"
+    self.log_file = log_file_path or "C:/Users/whokn/Documents/balatroman/shared/debug.log"
     self.log_level = "DEBUG" -- DEBUG, INFO, WARN, ERROR
     self.session_id = "session_" .. tostring(os.time())
     
     -- Ensure log directory exists
     if love and love.filesystem then
-        love.filesystem.createDirectory("shared")
+        love.filesystem.createDirectory("C:/Users/whokn/Documents/balatroman/shared")
     end
     
     self:log("INFO", "Debug logger initialized for session: " .. self.session_id)
@@ -274,7 +274,7 @@ function DebugLogger:test_file_communication()
     
     -- Test directory creation
     if love and love.filesystem then
-        local success = love.filesystem.createDirectory("shared")
+        local success = love.filesystem.createDirectory("C:/Users/whokn/Documents/balatroman/shared")
         if success then
             self:info("Directory creation: SUCCESS", "FILE_IO")
         else
@@ -287,7 +287,7 @@ function DebugLogger:test_file_communication()
         if json_success then
             local encode_success, encoded = pcall(json.encode, test_data)
             if encode_success then
-                local write_success = love.filesystem.write("shared/test_write.json", encoded)
+                local write_success = love.filesystem.write("C:/Users/whokn/Documents/balatroman/shared/test_write.json", encoded)
                 if write_success then
                     self:info("File write test: SUCCESS", "FILE_IO")
                     
