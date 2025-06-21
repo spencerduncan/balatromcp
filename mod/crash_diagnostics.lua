@@ -147,8 +147,6 @@ end
 
 function CrashDiagnostics:monitor_joker_operations()
     if G and G.jokers and G.jokers.cards then
-       -- self:log("MONITORING: Scanning " .. #G.jokers.cards .. " jokers for config validity")
-        
         
         for i, joker in ipairs(G.jokers.cards) do
             if not self:validate_object_config(joker, "monitored_joker[" .. i .. "]", "monitor_joker_operations") then

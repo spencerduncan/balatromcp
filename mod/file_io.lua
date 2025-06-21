@@ -207,7 +207,6 @@ function FileIO:write_game_state(state_data)
 end
 
 function FileIO:read_actions()
-   -- self:log("Attempting to read actions")
     
     -- Handle path construction for current directory vs subdirectory
     local filepath
@@ -216,7 +215,6 @@ function FileIO:read_actions()
     else
         filepath = self.base_path .. "/actions.json"
     end
-  --  self:log("Looking for actions file: " .. filepath)
     
     if not love or not love.filesystem then
         self:log("ERROR: love.filesystem not available")
@@ -224,7 +222,7 @@ function FileIO:read_actions()
     end
     
     if not love.filesystem.getInfo(filepath) then
-    --    self:log("No actions file found (this is normal)")
+        self:log("No actions file found (this is normal)")
         return nil
     end
     
