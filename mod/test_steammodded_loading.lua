@@ -177,7 +177,12 @@ local function setup_mock_smods()
                 elseif filename == "joker_manager.lua" then
                     return function() return create_mock_joker_manager() end
                 elseif filename == "libs/json.lua" then
-                    return function() return require("libs.json") end
+                    return function()
+                        return {
+                            encode = function(data) return "{}" end,
+                            decode = function(str) return {} end
+                        }
+                    end
                 else
                     error("Mock SMODS: File not found: " .. filename)
                 end
@@ -210,6 +215,7 @@ end
 -- =============================================================================
 
 test_framework:add_test("SMODS.load_file loads debug_logger successfully", function(t)
+    cleanup_mock_smods()  -- Ensure clean state
     setup_mock_smods()
     
     local success, loader = pcall(function()
@@ -220,7 +226,8 @@ test_framework:add_test("SMODS.load_file loads debug_logger successfully", funct
     t:assert_type("function", loader, "Should return a function")
     
     -- Test the loader function
-    local module = loader()
+    local module_success, module = pcall(loader)
+    t:assert_true(module_success, "Loader function should execute successfully")
     t:assert_not_nil(module, "Should return debug logger module")
     t:assert_type("function", module.new, "Should have new function")
     
@@ -228,6 +235,7 @@ test_framework:add_test("SMODS.load_file loads debug_logger successfully", funct
 end)
 
 test_framework:add_test("SMODS.load_file loads file_io successfully", function(t)
+    cleanup_mock_smods()  -- Ensure clean state
     setup_mock_smods()
     
     local success, loader = pcall(function()
@@ -238,7 +246,8 @@ test_framework:add_test("SMODS.load_file loads file_io successfully", function(t
     t:assert_type("function", loader, "Should return a function")
     
     -- Test the loader function
-    local module = loader()
+    local module_success, module = pcall(loader)
+    t:assert_true(module_success, "Loader function should execute successfully")
     t:assert_not_nil(module, "Should return file IO module")
     t:assert_type("function", module.new, "Should have new function")
     
@@ -246,6 +255,7 @@ test_framework:add_test("SMODS.load_file loads file_io successfully", function(t
 end)
 
 test_framework:add_test("SMODS.load_file loads state_extractor successfully", function(t)
+    cleanup_mock_smods()  -- Ensure clean state
     setup_mock_smods()
     
     local success, loader = pcall(function()
@@ -256,7 +266,8 @@ test_framework:add_test("SMODS.load_file loads state_extractor successfully", fu
     t:assert_type("function", loader, "Should return a function")
     
     -- Test the loader function
-    local module = loader()
+    local module_success, module = pcall(loader)
+    t:assert_true(module_success, "Loader function should execute successfully")
     t:assert_not_nil(module, "Should return state extractor module")
     t:assert_type("function", module.new, "Should have new function")
     
@@ -264,6 +275,7 @@ test_framework:add_test("SMODS.load_file loads state_extractor successfully", fu
 end)
 
 test_framework:add_test("SMODS.load_file loads action_executor successfully", function(t)
+    cleanup_mock_smods()  -- Ensure clean state
     setup_mock_smods()
     
     local success, loader = pcall(function()
@@ -274,7 +286,8 @@ test_framework:add_test("SMODS.load_file loads action_executor successfully", fu
     t:assert_type("function", loader, "Should return a function")
     
     -- Test the loader function
-    local module = loader()
+    local module_success, module = pcall(loader)
+    t:assert_true(module_success, "Loader function should execute successfully")
     t:assert_not_nil(module, "Should return action executor module")
     t:assert_type("function", module.new, "Should have new function")
     
@@ -282,6 +295,7 @@ test_framework:add_test("SMODS.load_file loads action_executor successfully", fu
 end)
 
 test_framework:add_test("SMODS.load_file loads joker_manager successfully", function(t)
+    cleanup_mock_smods()  -- Ensure clean state
     setup_mock_smods()
     
     local success, loader = pcall(function()
@@ -292,7 +306,8 @@ test_framework:add_test("SMODS.load_file loads joker_manager successfully", func
     t:assert_type("function", loader, "Should return a function")
     
     -- Test the loader function
-    local module = loader()
+    local module_success, module = pcall(loader)
+    t:assert_true(module_success, "Loader function should execute successfully")
     t:assert_not_nil(module, "Should return joker manager module")
     t:assert_type("function", module.new, "Should have new function")
     
@@ -300,10 +315,12 @@ test_framework:add_test("SMODS.load_file loads joker_manager successfully", func
 end)
 
 test_framework:add_test("SMODS.load_file fails for nonexistent file", function(t)
+    cleanup_mock_smods()  -- Ensure clean state
     setup_mock_smods()
     
     local success, error_msg = pcall(function()
-        return assert(SMODS.load_file("nonexistent_module.lua"))
+        local loader = SMODS.load_file("nonexistent_module.lua")
+        return assert(loader, "Should fail to load nonexistent file")
     end)
     
     t:assert_false(success, "Should fail for nonexistent file")

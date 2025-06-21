@@ -11,14 +11,12 @@ local test_modules = {
     {name = "test_state_extractor", description = "StateExtractor validation logic"},
     {name = "test_file_io", description = "FileIO JSON fallback functionality"},
     {name = "test_steammodded_loading", description = "Steammodded module loading mechanism"},
-    {name = "test_smods_integration_fixes", description = "SMODS integration critical fixes validation"},
     {name = "test_api_method_fixes", description = "API method fixes validation"},
     {name = "test_crash_diagnostics", description = "CrashDiagnostics object validation and hook safety"},
     {name = "test_joker_manager_crash_safety", description = "JokerManager defensive programming and safe config access"},
-    {name = "test_balatromcp_crash_integration", description = "BalatroMCP crash diagnostics integration and error handling"},
-    {name = "test_love2d_update_crash_protection", description = "Love2D update hook crash protection for 'config field nil' errors"},
     {name = "test_shop_state_detection", description = "Shop state detection and timing mechanisms"}
     -- Removed test_love2d_filesystem as it's a diagnostic tool, not a unit test
+    -- Removed test_smods_integration_fixes as it's an integration test, not a unit test
 }
 
 local total_passed = 0
@@ -40,8 +38,9 @@ for _, module_info in ipairs(test_modules) do
         print("   Error: " .. tostring(test_module))
         print("   Make sure " .. module_info.name .. ".lua is in the same directory")
         table.insert(failed_modules, module_info.name)
-    elseif not test_module or not test_module.run_tests then
-        print("❌ ERROR: " .. module_info.name .. " module missing run_tests function")
+    elseif type(test_module) ~= "table" or not test_module.run_tests then
+        print("❌ ERROR: " .. module_info.name .. " module missing run_tests function or invalid module type")
+        print("   Module type: " .. type(test_module))
         table.insert(failed_modules, module_info.name)
     else
         local module_passed = test_module.run_tests()

@@ -203,7 +203,7 @@ test_framework:add_test("FileIO default path initialization", function(t)
     local fileio = FileIO_module.new()
     
     t:assert_not_nil(fileio, "FileIO should initialize with default path")
-    t:assert_equal("./", fileio.base_path, "Default base path should be 'shared' (relative path)")
+    t:assert_equal("shared", fileio.base_path, "Default base path should be 'shared' (relative path)")
     
     -- Test that the default creates the correct directory structure
     local expected_files = {
@@ -213,7 +213,7 @@ test_framework:add_test("FileIO default path initialization", function(t)
     }
     
     -- Verify directory was created
-    t:assert_true(love.filesystem.directories["./"], "Should create 'shared' directory by default")
+    t:assert_true(love.filesystem.directories["shared"], "Should create 'shared' directory by default")
     
     cleanup_mock_smods()
 end)
@@ -222,16 +222,17 @@ test_framework:add_test("FileIO initialization without SMODS fails gracefully", 
     setup_mock_love_filesystem()
     -- Don't setup SMODS - test failure case
     
-    -- The require() will succeed because module is cached, but FileIO.new() should fail
-    local FileIO_module = require("file_io")
+    -- Clear any existing SMODS to ensure clean test
+    _G.SMODS = nil
     
-    -- This should fail during FileIO.new() because SMODS is not available
     local success, error_msg = pcall(function()
+        local FileIO_module = require("file_io")
         FileIO_module.new("test_shared")
     end)
     
-    t:assert_false(success, "Should fail to create FileIO instance without SMODS")
-    t:assert_contains(tostring(error_msg), "SMODS", "Error should mention SMODS")
+    -- Should fail because SMODS is not available for JSON loading
+    t:assert_false(success, "Should fail when SMODS is not available")
+    t:assert_contains(tostring(error_msg), "SMODS", "Error should mention SMODS dependency")
 end)
 
 test_framework:add_test("SMODS.load_file JSON loading success", function(t)
@@ -351,9 +352,9 @@ test_framework:add_test("FileIO read_actions", function(t)
     local result = fileio:read_actions()
     
     t:assert_not_nil(result, "Should successfully read actions")
-    t:assert_equal("play_hand", result.action_type, "Should decode action type")
-    t:assert_type("table", result.cards, "Should decode cards array")
-    t:assert_equal(2, #result.cards, "Should preserve cards count")
+    t:assert_equal("play_hand", result.data.action_type, "Should decode action type from data field")
+    t:assert_type("table", result.data.cards, "Should decode cards array from data field")
+    t:assert_equal(2, #result.data.cards, "Should preserve cards count")
     
     -- Verify file was removed after reading
     local file_exists = love.filesystem.getInfo("test_shared/actions.json")
@@ -562,7 +563,7 @@ test_framework:add_test("FileIO current directory read_actions path construction
     local result = fileio:read_actions()
     
     t:assert_not_nil(result, "Should successfully read actions from current directory")
-    t:assert_equal("play_hand", result.action_type, "Should decode action type correctly")
+    t:assert_equal("play_hand", result.data.action_type, "Should decode action type correctly from data field")
     
     -- Verify file was removed from current directory after reading
     local file_exists = love.filesystem.getInfo("actions.json")
