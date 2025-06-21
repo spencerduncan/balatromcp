@@ -259,34 +259,16 @@ function StateExtractor:get_current_phase()
     local states = _G.G.STATES       -- Direct global access
     
     -- DIAGNOSTIC: Log all state information for debugging
-    self:log("DEBUG - DIRECT _G.G.STATE VALUE: " .. tostring(current_state))
-    self:log("DEBUG - Regular G.STATE VALUE: " .. tostring(G.STATE))
-    self:log("DEBUG - Are they equal? " .. tostring(current_state == G.STATE))
-    self:log("DEBUG - G.STATES TABLE:")
-    if type(states) == "table" then
-        for key, value in pairs(states) do
-            local marker = (current_state == value) and " *** CURRENT ***" or ""
-            self:log("  " .. key .. " = " .. tostring(value) .. marker)
-        end
-    else
-        self:log("  G.STATES is not a table: " .. type(states))
-    end
-    
     -- Safe state comparison with fallback
     if current_state == self:safe_get_value(states, "SELECTING_HAND", nil) then
-        self:log("DEBUG - Detected phase: hand_selection")
         return "hand_selection"
     elseif current_state == self:safe_get_value(states, "SHOP", nil) then
-        self:log("DEBUG - Detected phase: shop")
         return "shop"
     elseif current_state == self:safe_get_value(states, "BLIND_SELECT", nil) then
-        self:log("DEBUG - Detected phase: blind_selection")
         return "blind_selection"
     elseif current_state == self:safe_get_value(states, "DRAW_TO_HAND", nil) then
-        self:log("DEBUG - Detected phase: hand_selection (via DRAW_TO_HAND)")
         return "hand_selection"
     else
-        self:log("WARNING: Unknown game state: " .. tostring(current_state) .. ", using default")
         return "hand_selection" -- Default
     end
 end
@@ -294,18 +276,12 @@ end
 function StateExtractor:get_ante()
     -- Get current ante level with safe access
     local ante = self:safe_get_nested_value(G, {"GAME", "round_resets", "ante"}, 1)
-    if ante == 1 and not self:safe_check_path(G, {"GAME", "round_resets", "ante"}) then
-        self:log("WARNING: Unable to access G.GAME.round_resets.ante, returning default 1")
-    end
     return ante
 end
 
 function StateExtractor:get_money()
     -- Get current money with safe access
     local money = self:safe_get_nested_value(G, {"GAME", "dollars"}, 0)
-    if money == 0 and not self:safe_check_path(G, {"GAME", "dollars"}) then
-        self:log("WARNING: Unable to access G.GAME.dollars, returning default 0")
-    end
     return money
 end
 
@@ -314,7 +290,6 @@ function StateExtractor:get_hands_remaining()
     if G and G.GAME and G.GAME.current_round and type(G.GAME.current_round.hands_left) == "number" then
         return G.GAME.current_round.hands_left
     end
-    self:log("WARNING: Unable to access G.GAME.current_round.hands_left, returning default 0")
     return 0
 end
 
@@ -323,7 +298,6 @@ function StateExtractor:get_discards_remaining()
     if G and G.GAME and G.GAME.current_round and type(G.GAME.current_round.discards_left) == "number" then
         return G.GAME.current_round.discards_left
     end
-    self:log("WARNING: Unable to access G.GAME.current_round.discards_left, returning default 0")
     return 0
 end
 
@@ -332,7 +306,6 @@ function StateExtractor:extract_hand_cards()
     local hand_cards = {}
     
     if not self:safe_check_path(G, {"hand", "cards"}) then
-        self:log("WARNING: G.hand.cards not accessible, returning empty hand")
         return hand_cards
     end
     
@@ -348,8 +321,6 @@ function StateExtractor:extract_hand_cards()
                 seal = self:get_card_seal_safe(card)
             }
             table.insert(hand_cards, safe_card)
-        else
-            self:log("WARNING: Null card found at hand position " .. i)
         end
     end
     
@@ -411,7 +382,6 @@ function StateExtractor:extract_jokers()
     local jokers = {}
     
     if not self:safe_check_path(G, {"jokers", "cards"}) then
-        self:log("WARNING: G.jokers.cards not accessible, returning empty jokers")
         return jokers
     end
     
@@ -452,7 +422,6 @@ function StateExtractor:extract_consumables()
     local consumables = {}
     
     if not self:safe_check_path(G, {"consumeables", "cards"}) then
-        self:log("WARNING: G.consumeables.cards not accessible, returning empty consumables")
         return consumables
     end
     
@@ -477,7 +446,6 @@ end
 function StateExtractor:extract_current_blind()
     -- Extract current blind information with CIRCULAR REFERENCE SAFE access
     if not self:safe_check_path(G, {"GAME", "blind"}) then
-        self:log("WARNING: G.GAME.blind not accessible, returning nil")
         return nil
     end
     
@@ -495,7 +463,6 @@ end
 function StateExtractor:determine_blind_type(blind)
     -- Determine the type of blind with safe access
     if not blind then
-        self:log("WARNING: Blind object is nil, returning default type")
         return "small"
     end
     
@@ -518,7 +485,6 @@ function StateExtractor:extract_shop_contents()
     local shop_contents = {}
     
     if not self:safe_check_path(G, {"shop_jokers", "cards"}) then
-        self:log("WARNING: G.shop_jokers.cards not accessible, returning empty shop")
         return shop_contents
     end
     

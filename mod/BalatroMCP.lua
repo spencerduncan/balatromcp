@@ -126,9 +126,9 @@ function BalatroMCP.new()
     
     -- Initialize nil config diagnostics
     if NilConfigDiagnostics then
-        self.nil_config_diagnostics = NilConfigDiagnostics.new()
+        --self.nil_config_diagnostics = NilConfigDiagnostics.new()
         -- Store globally for access from wrappers
-        _G.BalatroMCP_NilConfigDiagnostics = self.nil_config_diagnostics
+        --_G.BalatroMCP_NilConfigDiagnostics = self.nil_config_diagnostics
         self.debug_logger:info("Nil config diagnostics initialized", "INIT")
     else
         self.debug_logger:error("NilConfigDiagnostics not available", "INIT")
@@ -566,10 +566,6 @@ end
 function BalatroMCP:check_and_send_state_update()
     -- Check if game state has changed and send update if needed
     local current_state = self.state_extractor:extract_current_state()
-    if not current_state then
-        print("BalatroMCP: DEBUG_STATE_UPDATE - No current state extracted")
-        return
-    end
     
     -- DIAGNOSTIC: Log detailed state during transitions
     local g_state = G and G.STATE or "NIL"
@@ -577,23 +573,13 @@ function BalatroMCP:check_and_send_state_update()
     local money = current_state.money or "NIL"
     local ante = current_state.ante or "NIL"
     
-    print("BalatroMCP: DEBUG_STATE_UPDATE - G.STATE=" .. tostring(g_state) ..
-          ", phase=" .. tostring(phase) ..
-          ", money=" .. tostring(money) ..
-          ", ante=" .. tostring(ante))
-    
     -- Calculate state hash for change detection
     local state_hash = self:calculate_state_hash(current_state)
     
-    print("BalatroMCP: DEBUG_STATE_UPDATE - Current hash=" .. tostring(state_hash) ..
-          ", Last hash=" .. tostring(self.last_state_hash))
     
     if state_hash ~= self.last_state_hash then
-        print("BalatroMCP: DEBUG_STATE_UPDATE - State change detected, sending update")
         self.last_state_hash = state_hash
         self:send_state_update(current_state)
-    else
-        print("BalatroMCP: DEBUG_STATE_UPDATE - No state change detected")
     end
 end
 
@@ -624,52 +610,33 @@ function BalatroMCP:calculate_state_hash(state)
     local hash_components = {}
     
     -- DIAGNOSTIC: Log each component for debugging
-    print("BalatroMCP: DEBUG_HASH - Starting hash calculation")
+  --  print("BalatroMCP: DEBUG_HASH - Starting hash calculation")
     
     if state.current_phase then
         table.insert(hash_components, tostring(state.current_phase))
-        print("BalatroMCP: DEBUG_HASH - Added current_phase: " .. tostring(state.current_phase))
-    else
-        print("BalatroMCP: DEBUG_HASH - Missing current_phase")
     end
     
     if state.ante then
         table.insert(hash_components, tostring(state.ante))
-        print("BalatroMCP: DEBUG_HASH - Added ante: " .. tostring(state.ante))
-    else
-        print("BalatroMCP: DEBUG_HASH - Missing ante")
     end
     
     if state.money then
         table.insert(hash_components, tostring(state.money))
-        print("BalatroMCP: DEBUG_HASH - Added money: " .. tostring(state.money))
-    else
-        print("BalatroMCP: DEBUG_HASH - Missing money")
     end
     
     if state.hands_remaining then
         table.insert(hash_components, tostring(state.hands_remaining))
-        print("BalatroMCP: DEBUG_HASH - Added hands_remaining: " .. tostring(state.hands_remaining))
-    else
-        print("BalatroMCP: DEBUG_HASH - Missing hands_remaining")
     end
     
     if state.hand_cards then
         table.insert(hash_components, tostring(#state.hand_cards))
-        print("BalatroMCP: DEBUG_HASH - Added hand_cards count: " .. tostring(#state.hand_cards))
-    else
-        print("BalatroMCP: DEBUG_HASH - Missing hand_cards")
     end
     
     if state.jokers then
         table.insert(hash_components, tostring(#state.jokers))
-        print("BalatroMCP: DEBUG_HASH - Added jokers count: " .. tostring(#state.jokers))
-    else
-        print("BalatroMCP: DEBUG_HASH - Missing jokers")
     end
     
     local final_hash = table.concat(hash_components, "|")
-    print("BalatroMCP: DEBUG_HASH - Final hash: " .. tostring(final_hash))
     
     return final_hash
 end

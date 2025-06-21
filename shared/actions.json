@@ -1,5 +1,5 @@
 {
-  "sequence_id": 5,
+  "sequence_id": 3,
   "action_type": "play_hand",
   "card_indices": [1, 2],
   "message_type": "action_request"
