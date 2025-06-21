@@ -35,7 +35,7 @@ def enhanced_card():
     return Card(
         id="card_2",
         rank="K",
-        suit="spades", 
+        suit="spades",
         enhancement=CardEnhancement.GOLD,
         edition=CardEdition.FOIL,
         seal=CardSeal.RED,
@@ -109,7 +109,9 @@ def minimal_game_state():
 
 
 @pytest.fixture
-def complete_game_state(basic_card, basic_joker, basic_consumable, boss_blind, shop_item_joker):
+def complete_game_state(
+    basic_card, basic_joker, basic_consumable, boss_blind, shop_item_joker
+):
     """Create a complete game state with all components for testing."""
     return GameState(
         session_id="complete_session",
@@ -187,7 +189,7 @@ def timestamp_now():
 # Test markers for categorizing tests
 pytest_markers = [
     "unit: Unit tests",
-    "slow: Slow running tests", 
+    "slow: Slow running tests",
     "integration: Integration tests",
     "schemas: Schema validation tests",
     "file_io: File I/O tests",
@@ -206,7 +208,7 @@ def pytest_configure(config):
 # Test utilities
 class TestDataFactory:
     """Factory class for creating test data."""
-    
+
     @staticmethod
     def create_cards(count: int, suit: str = "hearts") -> list[Card]:
         """Create a list of cards for testing."""
@@ -215,25 +217,32 @@ class TestDataFactory:
             Card(id=f"card_{i}", rank=ranks[i % len(ranks)], suit=suit)
             for i in range(count)
         ]
-    
+
     @staticmethod
     def create_jokers(count: int) -> list[Joker]:
         """Create a list of jokers for testing."""
         joker_names = [
-            "Joker", "Greedy Joker", "Lusty Joker", "Wrathful Joker",
-            "Gluttonous Joker", "Jolly Joker", "Zany Joker", "Mad Joker",
-            "Crazy Joker", "Droll Joker", "Sly Joker", "Wily Joker",
-            "Clever Joker", "Devious Joker", "Crafty Joker"
+            "Joker",
+            "Greedy Joker",
+            "Lusty Joker",
+            "Wrathful Joker",
+            "Gluttonous Joker",
+            "Jolly Joker",
+            "Zany Joker",
+            "Mad Joker",
+            "Crazy Joker",
+            "Droll Joker",
+            "Sly Joker",
+            "Wily Joker",
+            "Clever Joker",
+            "Devious Joker",
+            "Crafty Joker",
         ]
         return [
-            Joker(
-                id=f"joker_{i}",
-                name=joker_names[i % len(joker_names)],
-                position=i
-            )
+            Joker(id=f"joker_{i}", name=joker_names[i % len(joker_names)], position=i)
             for i in range(count)
         ]
-    
+
     @staticmethod
     def create_shop_items(count: int) -> list[ShopItem]:
         """Create a list of shop items for testing."""
@@ -243,7 +252,7 @@ class TestDataFactory:
                 index=i,
                 item_type=item_types[i % len(item_types)],
                 name=f"Shop Item {i}",
-                cost=50 + (i * 10)
+                cost=50 + (i * 10),
             )
             for i in range(count)
         ]

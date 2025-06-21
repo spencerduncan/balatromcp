@@ -127,8 +127,7 @@ class BalatroFileIO(IFileIO):
                     for marker in ["tmp", "temp", "test", "pytest"]
                 )
                 is_balatro_mod = any(
-                    marker in resolved_str.lower()
-                    for marker in ["balatro", "mods"]
+                    marker in resolved_str.lower() for marker in ["balatro", "mods"]
                 )
 
                 if not (is_child_of_cwd or is_temp_or_test or is_balatro_mod):

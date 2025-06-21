@@ -139,9 +139,7 @@ class TestJoker:
     def test_joker_creation_with_properties(self):
         """Test creating joker with properties."""
         properties = {"multiplier": 2, "bonus": 10}
-        joker = Joker(
-            id="joker_2", name="Blueprint", position=1, properties=properties
-        )
+        joker = Joker(id="joker_2", name="Blueprint", position=1, properties=properties)
         assert joker.properties == properties
 
     def test_joker_validation_errors(self):
@@ -184,9 +182,7 @@ class TestShopItem:
 
     def test_shop_item_creation(self):
         """Test creating shop item."""
-        item = ShopItem(
-            index=0, item_type="joker", name="Test Joker", cost=50
-        )
+        item = ShopItem(index=0, item_type="joker", name="Test Joker", cost=50)
         assert item.index == 0
         assert item.item_type == "joker"
         assert item.name == "Test Joker"
@@ -222,7 +218,7 @@ class TestGameState:
         """Test game state with cards and jokers."""
         cards = [Card(id="c1", rank="A", suit="hearts")]
         jokers = [Joker(id="j1", name="Test", position=0)]
-        
+
         state = GameState(
             session_id="session_2",
             current_phase=GamePhase.SHOP,
@@ -345,7 +341,7 @@ class TestCommunicationMessages:
             shop_contents=[],
             available_actions=[],
         )
-        
+
         message = GameStateMessage(game_state=state, sequence_id=1)
         assert message.message_type == MessageType.GAME_STATE
         assert message.sequence_id == 1
@@ -355,7 +351,7 @@ class TestCommunicationMessages:
         """Test ActionCommandMessage creation."""
         action = PlayHandAction(card_indices=[0, 1])
         message = ActionCommandMessage(action=action, sequence_id=2)
-        
+
         assert message.message_type == MessageType.ACTION_COMMAND
         assert message.sequence_id == 2
         assert isinstance(message.timestamp, datetime)
@@ -367,9 +363,7 @@ class TestCommunicationMessages:
         assert result.error_message is None
         assert result.new_state is None
 
-        result_with_error = ActionResult(
-            success=False, error_message="Invalid action"
-        )
+        result_with_error = ActionResult(success=False, error_message="Invalid action")
         assert result_with_error.success is False
         assert result_with_error.error_message == "Invalid action"
 
@@ -377,7 +371,7 @@ class TestCommunicationMessages:
         """Test ActionResultMessage creation."""
         result = ActionResult(success=True)
         message = ActionResultMessage(result=result, sequence_id=3)
-        
+
         assert message.message_type == MessageType.ACTION_RESULT
         assert message.sequence_id == 3
         assert isinstance(message.timestamp, datetime)
@@ -391,13 +385,13 @@ class TestActionValidation:
         # Empty list is actually valid for PlayHandAction
         action = PlayHandAction(card_indices=[])
         assert action.card_indices == []
-            
+
         with pytest.raises(ValidationError):
             BuyItemAction()  # Missing shop_index
-            
+
         with pytest.raises(ValidationError):
             SellJokerAction()  # Missing joker_index
-            
+
         with pytest.raises(ValidationError):
             UseConsumableAction()  # Missing item_id
 
@@ -406,6 +400,6 @@ class TestActionValidation:
         # These should be valid at schema level, validation happens at business logic level
         action = BuyItemAction(shop_index=-1)
         assert action.shop_index == -1
-        
+
         action = SellJokerAction(joker_index=-1)
         assert action.joker_index == -1
