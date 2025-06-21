@@ -490,7 +490,7 @@ function BalatroMCP:process_pending_actions()
     end
     
     -- Check sequence number to avoid duplicate processing
-    local sequence = action_data.sequence or 0
+    local sequence = action_data.sequence_id or 0
     if sequence <= self.last_action_sequence then
         return -- Already processed this action
     end
