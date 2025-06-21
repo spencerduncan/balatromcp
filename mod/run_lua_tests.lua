@@ -14,8 +14,6 @@ local test_modules = {
     {name = "test_crash_diagnostics", description = "CrashDiagnostics object validation and hook safety"},
     {name = "test_joker_manager_crash_safety", description = "JokerManager defensive programming and safe config access"},
     {name = "test_shop_state_detection", description = "Shop state detection and timing mechanisms"}
-    -- Removed test_love2d_filesystem as it's a diagnostic tool, not a unit test
-    -- Removed test_smods_integration_fixes as it's an integration test, not a unit test
 }
 
 local total_passed = 0
