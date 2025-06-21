@@ -29,7 +29,7 @@ function CrashDiagnostics:validate_object_config(obj, obj_name, access_location)
     
     if not obj.config then
         self:log("ERROR: " .. obj_name .. ".config is nil (accessed from " .. access_location .. ")")
-        self:log("DIAGNOSTIC: " .. obj_name .. " type: " .. type(obj))
+        self:log("Object type: " .. type(obj))
         
         -- Log available properties
         if type(obj) == "table" then
@@ -37,7 +37,7 @@ function CrashDiagnostics:validate_object_config(obj, obj_name, access_location)
             for k, v in pairs(obj) do
                 table.insert(props, k .. ":" .. type(v))
             end
-            self:log("DIAGNOSTIC: " .. obj_name .. " properties: " .. table.concat(props, ", "))
+            self:log("Object properties: " .. table.concat(props, ", "))
         end
         return false
     end

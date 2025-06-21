@@ -97,17 +97,12 @@ end
 function FileIO:write_game_state(state_data)
     self:log("Attempting to write game state")
     
-    -- DIAGNOSTIC: Track file recovery and persistence issues
     local filepath
     if self.base_path == "." then
         filepath = "game_state.json"
     else
         filepath = self.base_path .. "/game_state.json"
     end
-    
-    -- Check if file exists before write attempt
-    local file_exists_before = love.filesystem.getInfo(filepath) ~= nil
-    self:log("DIAGNOSTIC: File exists before write: " .. tostring(file_exists_before))
     
     -- Validate inputs
     if not state_data then
@@ -138,14 +133,6 @@ function FileIO:write_game_state(state_data)
     local encode_success, encoded_data = pcall(self.json.encode, message)
     if not encode_success then
         self:log("ERROR: JSON encoding failed: " .. tostring(encoded_data))
-        self:log("DIAGNOSTIC: JSON encode failure - State data type: " .. type(state_data))
-        if type(state_data) == "table" then
-            local state_keys = {}
-            for k, v in pairs(state_data) do
-                table.insert(state_keys, k .. ":" .. type(v))
-            end
-            self:log("DIAGNOSTIC: State data keys: " .. table.concat(state_keys, ", "))
-        end
         return false
     end
     
@@ -153,13 +140,7 @@ function FileIO:write_game_state(state_data)
     
     self:log("Writing to file: " .. filepath)
     
-    -- ENHANCED DIAGNOSTIC: Track write operation details
-    local write_start_time = os.clock()
     local write_success = love.filesystem.write(filepath, encoded_data)
-    local write_end_time = os.clock()
-    local write_duration = write_end_time - write_start_time
-    
-    self:log("DIAGNOSTIC: Write operation duration: " .. tostring(write_duration) .. " seconds")
     
     if not write_success then
         self:log("ERROR: File write failed")

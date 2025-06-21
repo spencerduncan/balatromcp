@@ -7,9 +7,8 @@
 --- MOD_AUTHOR: [MCP Integration]
 --- MOD_DESCRIPTION: Enables AI agent interaction with Balatro through MCP protocol
 
--- CRITICAL DIAGNOSTIC: Load diagnostics FIRST before anything else
+-- Load diagnostics first before anything else
 print("BalatroMCP: MAIN FILE LOADING STARTED")
-print("BalatroMCP: Timestamp: " .. os.date("%Y-%m-%d %H:%M:%S"))
 
 -- Test if we can load ANY file through SMODS
 local ModLoadingDiagnostics = nil
@@ -261,9 +260,6 @@ function BalatroMCP:update(dt)
         return
     end
     
-    -- DIAGNOSTIC: Track update cycle timing and state changes
-    local update_start_time = love.timer and love.timer.getTime() or os.clock()
-    local state_at_update_start = G and G.STATE or "NIL"
     
     -- NON-INTRUSIVE BLIND SELECTION DETECTION
     self:detect_blind_selection_transition()
@@ -307,7 +303,7 @@ function BalatroMCP:update(dt)
     if (self.update_timer >= self.update_interval) and G.STATE ~= -1 then
         self.update_timer = 0
         
-        -- CRASH DIAGNOSTICS: Monitor joker objects before any operations
+        -- Monitor joker objects before any operations
         if self.crash_diagnostics then
             self.crash_diagnostics:monitor_joker_operations()
         end
@@ -325,41 +321,12 @@ function BalatroMCP:update(dt)
         self:check_and_send_state_update()
     end
     
-    -- DIAGNOSTIC: Track state changes during update
-    local state_at_update_end = G and G.STATE or "NIL"
-    if state_at_update_start ~= state_at_update_end then
-        print("BalatroMCP: STATE_CHANGE_DETECTED - From: " .. tostring(state_at_update_start) .. " To: " .. tostring(state_at_update_end))
-    end
 end
 
 function BalatroMCP:setup_game_hooks()
     -- Set up hooks for important game events
     print("BalatroMCP: Setting up game hooks")
     
-    -- DIAGNOSTIC: List available G.FUNCS to identify game start functions
-    print("BalatroMCP: DEBUG_HOOKS - Scanning available G.FUNCS for game start functions...")
-    if G and G.FUNCS then
-        local game_start_candidates = {}
-        for func_name, func_value in pairs(G.FUNCS) do
-            -- Look for functions that might be related to game start
-            local name_lower = string.lower(func_name)
-            if string.find(name_lower, "start") or
-               string.find(name_lower, "new") or
-               string.find(name_lower, "run") or
-               string.find(name_lower, "begin") or
-               string.find(name_lower, "init") then
-                table.insert(game_start_candidates, func_name)
-            end
-        end
-        
-        if #game_start_candidates > 0 then
-            print("BalatroMCP: DEBUG_HOOKS - Found potential game start functions: " .. table.concat(game_start_candidates, ", "))
-        else
-            print("BalatroMCP: DEBUG_HOOKS - No obvious game start functions found in G.FUNCS")
-        end
-    else
-        print("BalatroMCP: DEBUG_HOOKS - G.FUNCS not available for scanning")
-    end
     
     -- Hook into game start events (MISSING - this is the problem!)
     self:hook_game_start()
@@ -470,7 +437,6 @@ function BalatroMCP:hook_game_start()
         for _, func_name in ipairs(game_start_functions) do
             local original_func = G.FUNCS[func_name]
             if original_func then
-                print("BalatroMCP: DEBUG_HOOKS - Found and hooking " .. func_name)
                 
                 G.FUNCS[func_name] = function(...)
                     print("BalatroMCP: Game start detected via " .. func_name .. " - capturing state")

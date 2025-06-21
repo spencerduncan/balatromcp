@@ -258,7 +258,6 @@ function StateExtractor:get_current_phase()
     local current_state = _G.G.STATE  -- Direct global access
     local states = _G.G.STATES       -- Direct global access
     
-    -- DIAGNOSTIC: Log all state information for debugging
     -- Safe state comparison with fallback
     if current_state == self:safe_get_value(states, "SELECTING_HAND", nil) then
         return "hand_selection"
