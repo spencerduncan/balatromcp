@@ -238,7 +238,7 @@ function BalatroMCP:process_pending_actions()
         return -- Already processing an action
     end
     
-    local action_data = self.file_io:read_action()
+    local action_data = self.file_io:read_actions()
     if not action_data then
         return -- No pending actions
     end
@@ -267,7 +267,7 @@ function BalatroMCP:process_pending_actions()
         new_state = result.new_state
     }
     
-    self.file_io:write_response(response)
+    self.file_io:write_action_result(response)
     
     self.processing_action = false
     
@@ -307,11 +307,11 @@ function BalatroMCP:send_state_update(state)
     local state_message = {
         message_type = "state_update",
         timestamp = os.time(),
-        sequence = self.file_io:get_next_sequence(),
+        sequence = self.file_io:get_next_sequence_id(),
         state = state
     }
     
-    self.file_io:write_state(state_message)
+    self.file_io:write_game_state(state_message)
     print("BalatroMCP: State update sent")
 end
 
@@ -372,35 +372,88 @@ function BalatroMCP:on_shop_entered()
     self:send_current_state()
 end
 
--- Steammodded integration
+-- Steammodded integration with defensive programming
 local mod_instance = nil
 
-function SMODS.INIT.BalatroMCP()
-    -- Initialize the mod when Steammodded loads it
-    print("BalatroMCP: Initializing through Steammodded")
+-- CRITICAL FIX: Check for SMODS table existence before attempting to access
+-- Replace the failing SMODS.INIT/UPDATE/QUIT pattern with self-initializing module
+if SMODS then
+    print("BalatroMCP: SMODS framework detected, initializing mod...")
+
+    -- Initialize mod directly when loaded (Pattern A: Self-initializing module)
+    local init_success, init_error = pcall(function()
+        mod_instance = BalatroMCP.new()
+        if mod_instance then
+            mod_instance:start()
+            print("BalatroMCP: Mod initialized and started successfully")
+        else
+            error("Failed to create mod instance")
+        end
+    end)
     
-    mod_instance = BalatroMCP.new()
+    if not init_success then
+        print("BalatroMCP: CRITICAL ERROR - Mod initialization failed: " .. tostring(init_error))
+    end
     
-    -- Start the MCP integration
-    mod_instance:start()
-end
-
-function SMODS.UPDATE.BalatroMCP(dt)
-    -- Update function called by Steammodded
-    if mod_instance then
-        mod_instance:update(dt)
+    -- Store globally for access and debugging
+    _G.BalatroMCP_Instance = mod_instance
+    
+    -- Hook into update loop using Love2D callback pattern
+    -- Since SMODS.UPDATE table doesn't exist and G.STATE is a number, not a table
+    if mod_instance and love then
+        -- Try to hook into Love2D's update callback
+        local original_love_update = love.update
+        if original_love_update then
+            love.update = function(dt)
+                -- Call original Love2D update first
+                original_love_update(dt)
+                -- Then call our mod update
+                if mod_instance and mod_instance.update then
+                    pcall(function()
+                        mod_instance:update(dt)
+                    end)
+                end
+            end
+            print("BalatroMCP: Hooked into love.update")
+        else
+            print("BalatroMCP: WARNING - Could not hook into Love2D update, using timer fallback")
+            -- Fallback: Use a timer-based approach
+            if mod_instance then
+                mod_instance.fallback_timer = 0
+                mod_instance.fallback_update = function(self)
+                    -- This would need to be called manually or via another hook
+                    print("BalatroMCP: Using fallback update mechanism")
+                end
+            end
+        end
+    else
+        print("BalatroMCP: WARNING - No update mechanism available (Love2D not found)")
     end
-end
-
-function SMODS.QUIT.BalatroMCP()
-    -- Cleanup when quitting
-    print("BalatroMCP: Cleaning up on quit")
+    
+    -- Cleanup mechanism - hook into game exit if possible
     if mod_instance then
-        mod_instance:stop()
+        -- Since SMODS.QUIT doesn't exist, we can't rely on it for cleanup
+        -- Store cleanup function globally for manual cleanup if needed
+        _G.BalatroMCP_Cleanup = function()
+            print("BalatroMCP: Performing cleanup")
+            if mod_instance then
+                mod_instance:stop()
+            end
+        end
+        print("BalatroMCP: Cleanup function registered as _G.BalatroMCP_Cleanup")
     end
+    
+else
+    -- Fallback handling when SMODS is not available
+    print("BalatroMCP: WARNING - SMODS framework not available, mod cannot initialize")
+    print("BalatroMCP: This mod requires Steammodded to function properly")
+    
+    -- Create a minimal fallback instance for debugging
+    _G.BalatroMCP_Instance = nil
+    _G.BalatroMCP_Error = "SMODS framework not available"
 end
 
--- Global access for debugging
+-- Global access for debugging (compatible with both success and failure cases)
 _G.BalatroMCP = mod_instance
 
 return BalatroMCP

@@ -111,9 +111,10 @@ local function create_mock_file_io()
     return {
         new = function()
             return {
-                get_next_sequence = function(self) return 1 end,
-                write_state = function(self, data) return true end,
-                read_action = function(self) return nil end
+                get_next_sequence_id = function(self) return 1 end,
+                write_game_state = function(self, data) return true end,
+                read_actions = function(self) return nil end,
+                write_action_result = function(self, data) return true end
             }
         end
     }

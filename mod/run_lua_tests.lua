@@ -10,7 +10,9 @@ print("Running unit tests for validation logic and JSON fallback functionality..
 local test_modules = {
     {name = "test_state_extractor", description = "StateExtractor validation logic"},
     {name = "test_file_io", description = "FileIO JSON fallback functionality"},
-    {name = "test_steammodded_loading", description = "Steammodded module loading mechanism"}
+    {name = "test_steammodded_loading", description = "Steammodded module loading mechanism"},
+    {name = "test_smods_integration_fixes", description = "SMODS integration critical fixes validation"},
+    {name = "test_api_method_fixes", description = "API method fixes validation"}
 }
 
 local total_passed = 0
@@ -76,6 +78,7 @@ if #failed_modules == 0 and total_failed == 0 then
     print("✅ Steammodded module loading mechanism works correctly for all dependencies")
     print("✅ Critical dependency issues have been resolved with proper error handling")
     print("✅ Module inter-dependencies and initialization patterns are validated")
+    print("✅ API method naming issues have been fixed and validated to prevent regressions")
     os.exit(0)
 else
     print("\n❌ FAILURE: Some tests failed!")

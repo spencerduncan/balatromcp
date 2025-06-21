@@ -1,13 +1,14 @@
 {
   "name": "BalatroMCP",
   "id": "balatro_mcp",
-  "author": "BalatroMCP Team",
+  "author": ["BalatroMCP Team"],
+  "prefix": "bmcp",
   "description": "MCP (Model Context Protocol) server integration for AI agent interaction with Balatro",
   "version": "1.0.0",
   "min_steamodded_version": "1.0.0",
   "dependencies": [],
   "conflicts": [],
-  "main": "BalatroMCP.lua",
+  "main_file": "BalatroMCP.lua",
   "files": [
     "BalatroMCP.lua",
     "debug_logger.lua",
@@ -15,6 +16,6 @@
     "action_executor.lua",
     "joker_manager.lua",
     "file_io.lua",
-    "json.lua"
+    "libs/json.lua"
   ]
 }
