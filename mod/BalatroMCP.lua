@@ -89,6 +89,15 @@ if not crash_success then
     print("BalatroMCP: CrashDiagnostics load failed: " .. tostring(crash_error))
 end
 
+local NilConfigDiagnostics = nil
+local nil_config_success, nil_config_error = pcall(function()
+    NilConfigDiagnostics = assert(SMODS.load_file("nil_config_diagnostics.lua"))()
+    print("BalatroMCP: NilConfigDiagnostics loaded successfully")
+end)
+if not nil_config_success then
+    print("BalatroMCP: NilConfigDiagnostics load failed: " .. tostring(nil_config_error))
+end
+
 -- Report module loading status
 print("BalatroMCP: MODULE LOADING SUMMARY:")
 print("  Diagnostics: " .. (diag_success and "SUCCESS" or "FAILED"))
@@ -98,6 +107,7 @@ print("  StateExtractor: " .. (state_success and "SUCCESS" or "FAILED"))
 print("  ActionExecutor: " .. (action_success and "SUCCESS" or "FAILED"))
 print("  JokerManager: " .. (joker_success and "SUCCESS" or "FAILED"))
 print("  CrashDiagnostics: " .. (crash_success and "SUCCESS" or "FAILED"))
+print("  NilConfigDiagnostics: " .. (nil_config_success and "SUCCESS" or "FAILED"))
 
 -- Main mod class
 local BalatroMCP = {}
@@ -113,6 +123,16 @@ function BalatroMCP.new()
     -- Initialize crash diagnostics
     self.crash_diagnostics = CrashDiagnostics.new()
     self.debug_logger:info("Crash diagnostics initialized", "INIT")
+    
+    -- Initialize nil config diagnostics
+    if NilConfigDiagnostics then
+        self.nil_config_diagnostics = NilConfigDiagnostics.new()
+        -- Store globally for access from wrappers
+        _G.BalatroMCP_NilConfigDiagnostics = self.nil_config_diagnostics
+        self.debug_logger:info("Nil config diagnostics initialized", "INIT")
+    else
+        self.debug_logger:error("NilConfigDiagnostics not available", "INIT")
+    end
     
     -- Test environment immediately
     self.debug_logger:test_environment()
@@ -131,9 +151,16 @@ function BalatroMCP.new()
         init_success = false
     end
     
-    -- Test state extractor component
+    -- Test state extractor component with nil config diagnostics
     local state_success, state_error = pcall(function()
         self.state_extractor = StateExtractor.new()
+        
+        -- Wrap state extractor with nil config diagnostics
+        if self.nil_config_diagnostics then
+            self.nil_config_diagnostics:create_safe_state_extraction_wrapper(self.state_extractor)
+            self.debug_logger:info("StateExtractor wrapped with nil config diagnostics", "INIT")
+        end
+        
         self.debug_logger:info("StateExtractor component initialized successfully", "INIT")
     end)
     
@@ -233,6 +260,24 @@ function BalatroMCP:update(dt)
     -- DIAGNOSTIC: Track update cycle timing and state changes
     local update_start_time = love.timer and love.timer.getTime() or os.clock()
     local state_at_update_start = G and G.STATE or "NIL"
+    
+    -- NON-INTRUSIVE BLIND SELECTION DETECTION
+    self:detect_blind_selection_transition()
+    
+    -- Handle delayed blind state capture
+    if self.delayed_blind_state_capture then
+        self.delayed_blind_capture_timer = self.delayed_blind_capture_timer - dt
+        if self.delayed_blind_capture_timer <= 0 then
+            print("BalatroMCP: Executing delayed blind selection state capture")
+            self.delayed_blind_state_capture = false
+            self:send_current_state()
+        end
+    end
+    
+    -- Update blind transition cooldown
+    if self.blind_transition_cooldown > 0 then
+        self.blind_transition_cooldown = self.blind_transition_cooldown - dt
+    end
     
     self.update_timer = self.update_timer + dt
     
@@ -345,26 +390,14 @@ function BalatroMCP:hook_hand_evaluation()
 end
 
 function BalatroMCP:hook_blind_selection()
-    -- Hook blind selection events with crash diagnostics protection
-    if G.FUNCS then
-        local original_select_blind = G.FUNCS.select_blind
-        if original_select_blind then
-            G.FUNCS.select_blind = self.crash_diagnostics:create_safe_hook(
-                function(...)
-                    self.crash_diagnostics:track_hook_chain("select_blind")
-                    self.crash_diagnostics:validate_game_state("select_blind")
-                    print("BalatroMCP: Blind selected - capturing state")
-                    local result = original_select_blind(...)
-                    self:on_blind_selected()
-                    return result
-                end,
-                "select_blind"
-            )
-            print("BalatroMCP: DEBUG_HOOKS - Applied crash diagnostics protection to select_blind")
-        else
-            print("BalatroMCP: DEBUG_HOOKS - G.FUNCS.select_blind not found for protection")
-        end
-    end
+    -- CRITICAL FIX: DO NOT hook G.FUNCS.select_blind directly as it interferes with object lifecycle
+    -- Instead, use non-intrusive state change detection in the update loop
+    print("BalatroMCP: Using non-intrusive blind selection detection (no direct hooks)")
+    
+    -- Initialize blind selection state tracking
+    self.last_blind_state = G and G.STATE or nil
+    self.blind_transition_detected = false
+    self.blind_transition_cooldown = 0
 end
 
 function BalatroMCP:hook_shop_interactions()
@@ -655,9 +688,15 @@ function BalatroMCP:on_cards_discarded()
 end
 
 function BalatroMCP:on_blind_selected()
-    -- Called when a blind is selected
-    print("BalatroMCP: Blind selected event")
-    self:send_current_state()
+    -- Called when a blind selection transition is detected (non-intrusively)
+    print("BalatroMCP: Blind selection transition detected")
+    
+    -- Set a cooldown to prevent rapid-fire detection
+    self.blind_transition_cooldown = 3.0  -- 3 second cooldown
+    
+    -- Delay state capture to allow transition to complete
+    self.delayed_blind_state_capture = true
+    self.delayed_blind_capture_timer = 1.0  -- Wait 1 second for transition to complete
 end
 
 function BalatroMCP:on_shop_entered()
@@ -673,6 +712,40 @@ function BalatroMCP:on_shop_entered()
     self:send_current_state()
 end
 
+function BalatroMCP:detect_blind_selection_transition()
+    -- NON-INTRUSIVE detection of blind selection transitions
+    -- This detects state changes without hooking into the transition functions
+    
+    if not G or not G.STATE or not G.STATES then
+        return
+    end
+    
+    local current_state = G.STATE
+    
+    -- Initialize tracking on first run
+    if not self.last_blind_state then
+        self.last_blind_state = current_state
+        return
+    end
+    
+    -- Skip detection during cooldown to prevent rapid-fire triggers
+    if self.blind_transition_cooldown > 0 then
+        return
+    end
+    
+    -- Detect transition FROM blind selection TO hand selection (this is the critical transition)
+    local was_blind_select = (self.last_blind_state == G.STATES.BLIND_SELECT)
+    local is_hand_select = (current_state == G.STATES.SELECTING_HAND or current_state == G.STATES.DRAW_TO_HAND)
+    
+    if was_blind_select and is_hand_select then
+        print("BalatroMCP: NON_INTRUSIVE_DETECTION - Blind selection completed: " .. 
+              tostring(self.last_blind_state) .. " -> " .. tostring(current_state))
+        self:on_blind_selected()
+    end
+    
+    -- Update state tracking
+    self.last_blind_state = current_state
+end
 function BalatroMCP:on_game_started()
     -- Called when a new game/run is started - THIS WAS THE MISSING EVENT HANDLER!
     print("BalatroMCP: Game started event - capturing initial state")

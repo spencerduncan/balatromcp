@@ -289,8 +289,8 @@ function ActionExecutor:execute_select_blind(action_data)
         return false, "No blind type specified"
     end
     
-    -- Load diagnostic module using SMODS
-    local BlindSelectionDiagnostics = SMODS.load_file('blind_selection_diagnostics.lua')()
+    -- Load diagnostic module using SMODS with required ID
+    local BlindSelectionDiagnostics = SMODS.load_file('blind_selection_diagnostics.lua', 'balatro_mcp')()
     local diagnostics = BlindSelectionDiagnostics.new()
     
     diagnostics:log("=== BLIND SELECTION REQUESTED ===")
