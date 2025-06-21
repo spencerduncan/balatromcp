@@ -192,6 +192,32 @@ test_framework:add_test("FileIO initialization with SMODS", function(t)
     cleanup_mock_smods()
 end)
 
+test_framework:add_test("FileIO default path initialization", function(t)
+    setup_mock_love_filesystem()
+    setup_mock_smods()
+    
+    -- Load FileIO module with SMODS available
+    local FileIO_module = require("file_io")
+    
+    -- Test default initialization (no path provided)
+    local fileio = FileIO_module.new()
+    
+    t:assert_not_nil(fileio, "FileIO should initialize with default path")
+    t:assert_equal("shared", fileio.base_path, "Default base path should be 'shared' (relative path)")
+    
+    -- Test that the default creates the correct directory structure
+    local expected_files = {
+        "shared/game_state.json",
+        "shared/actions.json",
+        "shared/action_results.json"
+    }
+    
+    -- Verify directory was created
+    t:assert_true(love.filesystem.directories["shared"], "Should create 'shared' directory by default")
+    
+    cleanup_mock_smods()
+end)
+
 test_framework:add_test("FileIO initialization without SMODS fails gracefully", function(t)
     setup_mock_love_filesystem()
     -- Don't setup SMODS - test failure case
@@ -467,6 +493,230 @@ test_framework:add_test("FileIO JSON decoding error handling", function(t)
     
     -- Restore original decoder
     fileio.json.decode = original_decode
+    
+    cleanup_mock_smods()
+end)
+
+-- =============================================================================
+-- PATH HANDLING TESTS - Testing "." (current directory) vs subdirectory logic
+-- =============================================================================
+
+test_framework:add_test("FileIO current directory path initialization", function(t)
+    setup_mock_love_filesystem()
+    setup_mock_smods()
+    
+    local FileIO_module = require("file_io")
+    
+    -- Test initialization with "." (current directory)
+    local fileio = FileIO_module.new(".")
+    
+    t:assert_not_nil(fileio, "FileIO should initialize with current directory path")
+    t:assert_equal(".", fileio.base_path, "Base path should be '.' for current directory")
+    
+    -- Verify directory creation was attempted for "." (implementation always creates directory)
+    t:assert_true(love.filesystem.directories["."], "Should attempt to create '.' directory")
+    
+    cleanup_mock_smods()
+end)
+
+test_framework:add_test("FileIO current directory vs subdirectory directory creation", function(t)
+    setup_mock_love_filesystem()
+    setup_mock_smods()
+    
+    local FileIO_module = require("file_io")
+    
+    -- Test subdirectory creation (existing behavior)
+    local fileio_sub = FileIO_module.new("test_shared")
+    t:assert_true(love.filesystem.directories["test_shared"], "Should create subdirectory")
+    
+    -- Clear filesystem state
+    love.filesystem.directories = {}
+    
+    -- Test current directory initialization - implementation creates directory but uses different path construction
+    local fileio_current = FileIO_module.new(".")
+    t:assert_true(love.filesystem.directories["."], "Should create '.' directory (implementation always creates directory)")
+    
+    cleanup_mock_smods()
+end)
+
+test_framework:add_test("FileIO current directory write_game_state path construction", function(t)
+    setup_mock_love_filesystem()
+    setup_mock_smods()
+    
+    local FileIO_module = require("file_io")
+    local fileio = FileIO_module.new(".")
+    
+    local test_state = {
+        current_phase = "hand_selection",
+        ante = 1,
+        money = 100
+    }
+    
+    local success = fileio:write_game_state(test_state)
+    t:assert_true(success, "Should successfully write game state to current directory")
+    
+    -- Verify file was written to current directory, not subdirectory
+    local file_content = love.filesystem.read("game_state.json")
+    t:assert_not_nil(file_content, "Should create game_state.json in current directory")
+    
+    -- Verify subdirectory path was NOT used
+    local sub_file_content = love.filesystem.read("./game_state.json")
+    t:assert_nil(sub_file_content, "Should not create file in './' subdirectory")
+    
+    cleanup_mock_smods()
+end)
+
+test_framework:add_test("FileIO current directory read_actions path construction", function(t)
+    setup_mock_love_filesystem()
+    setup_mock_smods()
+    
+    local FileIO_module = require("file_io")
+    local fileio = FileIO_module.new(".")
+    
+    -- Create a mock actions file in current directory
+    local mock_action = {
+        timestamp = "2024-01-01T00:00:00Z",
+        sequence_id = 1,
+        message_type = "action",
+        data = {
+            action_type = "play_hand",
+            cards = {"card1", "card2"}
+        }
+    }
+    
+    local encoded_action = fileio.json.encode(mock_action)
+    love.filesystem.write("actions.json", encoded_action)
+    
+    -- Read the actions
+    local result = fileio:read_actions()
+    
+    t:assert_not_nil(result, "Should successfully read actions from current directory")
+    t:assert_equal("play_hand", result.action_type, "Should decode action type correctly")
+    
+    -- Verify file was removed from current directory after reading
+    local file_exists = love.filesystem.getInfo("actions.json")
+    t:assert_nil(file_exists, "Should remove actions.json from current directory after reading")
+    
+    cleanup_mock_smods()
+end)
+
+test_framework:add_test("FileIO current directory write_action_result path construction", function(t)
+    setup_mock_love_filesystem()
+    setup_mock_smods()
+    
+    local FileIO_module = require("file_io")
+    local fileio = FileIO_module.new(".")
+    
+    local test_result = {
+        success = true,
+        message = "Action completed successfully",
+        data = {
+            cards_played = 2,
+            score = 1500
+        }
+    }
+    
+    local success = fileio:write_action_result(test_result)
+    t:assert_true(success, "Should successfully write action result to current directory")
+    
+    -- Verify file was written to current directory
+    local file_content = love.filesystem.read("action_results.json")
+    t:assert_not_nil(file_content, "Should create action_results.json in current directory")
+    t:assert_contains(file_content, "Action completed successfully", "Should contain result message")
+    
+    cleanup_mock_smods()
+end)
+
+test_framework:add_test("FileIO current directory cleanup_old_files path construction", function(t)
+    setup_mock_love_filesystem()
+    setup_mock_smods()
+    
+    local FileIO_module = require("file_io")
+    local fileio = FileIO_module.new(".")
+    
+    -- Create test files in current directory with old timestamps
+    love.filesystem.files["game_state.json"] = '{"test": "data"}'
+    love.filesystem.files["actions.json"] = '{"test": "action"}'
+    love.filesystem.files["action_results.json"] = '{"test": "result"}'
+    
+    -- Mock file info with old modification times
+    local original_getInfo = love.filesystem.getInfo
+    love.filesystem.getInfo = function(path)
+        if love.filesystem.files[path] then
+            return {
+                type = "file",
+                size = #love.filesystem.files[path],
+                modtime = os.time() - 600  -- 10 minutes ago
+            }
+        end
+        return nil
+    end
+    
+    -- Run cleanup (max_age = 300 seconds = 5 minutes)
+    fileio:cleanup_old_files(300)
+    
+    -- Verify files were removed from current directory
+    t:assert_nil(love.filesystem.files["game_state.json"], "Should remove old game_state.json from current directory")
+    t:assert_nil(love.filesystem.files["actions.json"], "Should remove old actions.json from current directory")
+    t:assert_nil(love.filesystem.files["action_results.json"], "Should remove old action_results.json from current directory")
+    
+    -- Restore original function
+    love.filesystem.getInfo = original_getInfo
+    
+    cleanup_mock_smods()
+end)
+
+test_framework:add_test("FileIO path construction comparison - current vs subdirectory", function(t)
+    setup_mock_love_filesystem()
+    setup_mock_smods()
+    
+    local FileIO_module = require("file_io")
+    
+    -- Test current directory FileIO
+    local fileio_current = FileIO_module.new(".")
+    
+    -- Test subdirectory FileIO
+    local fileio_sub = FileIO_module.new("test_shared")
+    
+    local test_state = {phase = "test"}
+    
+    -- Write with both instances
+    local success_current = fileio_current:write_game_state(test_state)
+    local success_sub = fileio_sub:write_game_state(test_state)
+    
+    t:assert_true(success_current, "Current directory write should succeed")
+    t:assert_true(success_sub, "Subdirectory write should succeed")
+    
+    -- Verify files were written to different locations
+    local current_file = love.filesystem.read("game_state.json")
+    local sub_file = love.filesystem.read("test_shared/game_state.json")
+    
+    t:assert_not_nil(current_file, "Should create file in current directory")
+    t:assert_not_nil(sub_file, "Should create file in subdirectory")
+    t:assert_contains(current_file, "test", "Current directory file should contain test data")
+    t:assert_contains(sub_file, "test", "Subdirectory file should contain test data")
+    
+    cleanup_mock_smods()
+end)
+
+test_framework:add_test("FileIO log file path construction with current directory", function(t)
+    setup_mock_love_filesystem()
+    setup_mock_smods()
+    
+    local FileIO_module = require("file_io")
+    local fileio = FileIO_module.new(".")
+    
+    -- Trigger logging which should create log file in current directory
+    fileio:log("Test log message")
+    
+    -- Verify log file was created in current directory, not subdirectory
+    local log_content = love.filesystem.read("file_io_debug.log")
+    t:assert_not_nil(log_content, "Should create debug log in current directory")
+    t:assert_contains(log_content, "Test log message", "Should contain logged message")
+    
+    -- Verify subdirectory log was NOT created
+    local sub_log_content = love.filesystem.read("./file_io_debug.log")
+    t:assert_nil(sub_log_content, "Should not create log in './' subdirectory")
     
     cleanup_mock_smods()
 end)

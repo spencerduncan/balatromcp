@@ -46,7 +46,10 @@ class BalatroFileIO(IFileIO):
         r"(?:^|[\\/])(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?$",  # Windows reserved names
     ]
 
-    def __init__(self, base_path: str = "C:/Users/whokn/Documents/balatroman/shared"):
+    def __init__(
+        self,
+        base_path: str = "C:/Users/whokn/AppData/Roaming/Balatro/mods/BalatroMCP/shared",
+    ):
         """Initialize file I/O with base path for communication files."""
         validated_path = self._validate_and_sanitize_path(base_path)
         self.base_path = Path(validated_path)
@@ -117,14 +120,18 @@ class BalatroFileIO(IFileIO):
                 cwd = Path.cwd().resolve()
                 cwd_str = str(cwd)
 
-                # Allow if it's a child of cwd or temp/test directory
+                # Allow if it's a child of cwd, temp/test directory, or Balatro mod directory
                 is_child_of_cwd = resolved_str.startswith(cwd_str)
                 is_temp_or_test = any(
                     marker in resolved_str.lower()
                     for marker in ["tmp", "temp", "test", "pytest"]
                 )
+                is_balatro_mod = any(
+                    marker in resolved_str.lower()
+                    for marker in ["balatro", "mods"]
+                )
 
-                if not (is_child_of_cwd or is_temp_or_test):
+                if not (is_child_of_cwd or is_temp_or_test or is_balatro_mod):
                     logger.warning(
                         f"Absolute path outside allowed directories: {resolved_str}"
                     )

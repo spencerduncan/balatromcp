@@ -4,18 +4,30 @@
 local DebugLogger = {}
 DebugLogger.__index = DebugLogger
 
-function DebugLogger.new(log_file_path)
+function DebugLogger.new(log_file_path, base_path)
     local self = setmetatable({}, DebugLogger)
-    self.log_file = log_file_path or "C:/Users/whokn/Documents/balatroman/shared/debug.log"
+    self.base_path = base_path or "shared"
+    
+    -- Handle log file path based on base path
+    if not log_file_path then
+        if self.base_path == "." then
+            self.log_file = "debug.log"
+        else
+            self.log_file = self.base_path .. "/debug.log"
+        end
+    else
+        self.log_file = log_file_path
+    end
+    
     self.log_level = "DEBUG" -- DEBUG, INFO, WARN, ERROR
     self.session_id = "session_" .. tostring(os.time())
     
-    -- Ensure log directory exists
-    if love and love.filesystem then
-        love.filesystem.createDirectory("C:/Users/whokn/Documents/balatroman/shared")
+    -- Ensure log directory exists (only for subdirectories)
+    if love and love.filesystem and self.base_path ~= "." then
+        love.filesystem.createDirectory(self.base_path)
     end
     
-    self:log("INFO", "Debug logger initialized for session: " .. self.session_id)
+    self:log("INFO", "Debug logger initialized for session: " .. self.session_id .. " (path: " .. self.base_path .. ")")
     return self
 end
 
@@ -272,13 +284,17 @@ function DebugLogger:test_file_communication()
     -- Test file-based communication system
     self:info("=== FILE COMMUNICATION TEST ===", "FILE_IO")
     
-    -- Test directory creation
+    -- Test directory creation (only for subdirectories)
     if love and love.filesystem then
-        local success = love.filesystem.createDirectory("C:/Users/whokn/Documents/balatroman/shared")
-        if success then
-            self:info("Directory creation: SUCCESS", "FILE_IO")
+        if self.base_path == "." then
+            self:info("Directory creation: SKIPPED (using current directory)", "FILE_IO")
         else
-            self:error("Directory creation: FAILED", "FILE_IO")
+            local success = love.filesystem.createDirectory(self.base_path)
+            if success then
+                self:info("Directory creation: SUCCESS", "FILE_IO")
+            else
+                self:error("Directory creation: FAILED", "FILE_IO")
+            end
         end
         
         -- Test file write
@@ -287,12 +303,20 @@ function DebugLogger:test_file_communication()
         if json_success then
             local encode_success, encoded = pcall(json.encode, test_data)
             if encode_success then
-                local write_success = love.filesystem.write("C:/Users/whokn/Documents/balatroman/shared/test_write.json", encoded)
+                -- Handle path construction for current directory vs subdirectory
+                local test_filepath
+                if self.base_path == "." then
+                    test_filepath = "test_write.json"
+                else
+                    test_filepath = self.base_path .. "/test_write.json"
+                end
+                
+                local write_success = love.filesystem.write(test_filepath, encoded)
                 if write_success then
                     self:info("File write test: SUCCESS", "FILE_IO")
                     
                     -- Test file read
-                    local content, size = love.filesystem.read("shared/test_write.json")
+                    local content, size = love.filesystem.read(test_filepath)
                     if content then
                         self:info("File read test: SUCCESS (size: " .. (size or 0) .. ")", "FILE_IO")
                         

@@ -6,8 +6,8 @@ FileIO.__index = FileIO
 
 function FileIO.new(base_path)
     local self = setmetatable({}, FileIO)
-    -- Use absolute path to project root shared folder for reliable communication
-    self.base_path = base_path or "C:/Users/whokn/Documents/balatroman/shared"
+    -- Use relative path within mod directory (Love2D filesystem sandbox)
+    self.base_path = base_path or "shared"
     self.sequence_id = 0
     self.last_read_sequences = {}
     
@@ -51,7 +51,14 @@ function FileIO:log(message)
     -- Try to write to debug log if possible
     if love and love.filesystem and self.base_path then
         local success, err = pcall(function()
-            local log_file = self.base_path .. "/file_io_debug.log"
+            -- Handle path construction for current directory vs subdirectory
+            local log_file
+            if self.base_path == "." then
+                log_file = "file_io_debug.log"
+            else
+                log_file = self.base_path .. "/file_io_debug.log"
+            end
+            
             local timestamp = os.date("%Y-%m-%d %H:%M:%S")
             local log_entry = "[" .. timestamp .. "] " .. message .. "\n"
             
@@ -124,7 +131,13 @@ function FileIO:write_game_state(state_data)
     
     self:log("JSON encoding successful, data length: " .. #encoded_data)
     
-    local filepath = self.base_path .. "/game_state.json"
+    -- Handle path construction for current directory vs subdirectory
+    local filepath
+    if self.base_path == "." then
+        filepath = "game_state.json"
+    else
+        filepath = self.base_path .. "/game_state.json"
+    end
     self:log("Writing to file: " .. filepath)
     
     local write_success = love.filesystem.write(filepath, encoded_data)
@@ -150,7 +163,13 @@ end
 function FileIO:read_actions()
     self:log("Attempting to read actions")
     
-    local filepath = self.base_path .. "/actions.json"
+    -- Handle path construction for current directory vs subdirectory
+    local filepath
+    if self.base_path == "." then
+        filepath = "actions.json"
+    else
+        filepath = self.base_path .. "/actions.json"
+    end
     self:log("Looking for actions file: " .. filepath)
     
     if not love or not love.filesystem then
@@ -248,7 +267,13 @@ function FileIO:write_action_result(result_data)
     
     self:log("JSON encoding successful, data length: " .. #encoded_data)
     
-    local filepath = self.base_path .. "/action_results.json"
+    -- Handle path construction for current directory vs subdirectory
+    local filepath
+    if self.base_path == "." then
+        filepath = "action_results.json"
+    else
+        filepath = self.base_path .. "/action_results.json"
+    end
     self:log("Writing to file: " .. filepath)
     
     local write_success = love.filesystem.write(filepath, encoded_data)
@@ -269,7 +294,13 @@ function FileIO:cleanup_old_files(max_age_seconds)
     local current_time = os.time()
     
     for _, filename in ipairs(files) do
-        local filepath = self.base_path .. "/" .. filename
+        -- Handle path construction for current directory vs subdirectory
+        local filepath
+        if self.base_path == "." then
+            filepath = filename
+        else
+            filepath = self.base_path .. "/" .. filename
+        end
         local info = love.filesystem.getInfo(filepath)
         
         if info and info.modtime then

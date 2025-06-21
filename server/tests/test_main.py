@@ -84,39 +84,47 @@ def sample_game_state():
 class TestBalatroMCPServerInitialization:
     """Test BalatroMCPServer initialization."""
 
-    @patch('server.main.BalatroFileIO')
-    @patch('server.main.BalatroStateManager')
-    @patch('server.main.BalatroActionHandler')
-    def test_initialization_default_path(self, mock_action_handler, mock_state_manager, mock_file_io):
+    @patch("server.main.BalatroFileIO")
+    @patch("server.main.BalatroStateManager")
+    @patch("server.main.BalatroActionHandler")
+    def test_initialization_default_path(
+        self, mock_action_handler, mock_state_manager, mock_file_io
+    ):
         """Test server initialization with default shared path."""
         server = BalatroMCPServer()
-        
+
         # Verify dependencies are created
-        mock_file_io.assert_called_once_with("C:/Users/whokn/Documents/balatroman/shared")
+        mock_file_io.assert_called_once_with(
+            "C:/Users/whokn/AppData/Roaming/Balatro/mods/BalatroMCP/shared"
+        )
         mock_state_manager.assert_called_once()
         mock_action_handler.assert_called_once()
-        
+
         # Verify server attributes
         assert server._running is False
         assert server._monitoring_task is None
 
-    @patch('server.main.BalatroFileIO')
-    @patch('server.main.BalatroStateManager')
-    @patch('server.main.BalatroActionHandler')
-    def test_initialization_custom_path(self, mock_action_handler, mock_state_manager, mock_file_io):
+    @patch("server.main.BalatroFileIO")
+    @patch("server.main.BalatroStateManager")
+    @patch("server.main.BalatroActionHandler")
+    def test_initialization_custom_path(
+        self, mock_action_handler, mock_state_manager, mock_file_io
+    ):
         """Test server initialization with custom shared path."""
         custom_path = "/custom/path"
         server = BalatroMCPServer(custom_path)
-        
+
         mock_file_io.assert_called_once_with(custom_path)
 
-    @patch('server.main.BalatroFileIO')
-    @patch('server.main.BalatroStateManager')
-    @patch('server.main.BalatroActionHandler')
-    def test_initialization_creates_mcp_server(self, mock_action_handler, mock_state_manager, mock_file_io):
+    @patch("server.main.BalatroFileIO")
+    @patch("server.main.BalatroStateManager")
+    @patch("server.main.BalatroActionHandler")
+    def test_initialization_creates_mcp_server(
+        self, mock_action_handler, mock_state_manager, mock_file_io
+    ):
         """Test that MCP server is created during initialization."""
         server = BalatroMCPServer()
-        
+
         assert server.server is not None
         assert server.server.name == "balatro-mcp"
 
@@ -127,9 +135,9 @@ class TestMCPResourceHandlers:
     @pytest.fixture
     def server(self):
         """Create server instance for testing."""
-        with patch('server.main.BalatroFileIO'), \
-             patch('server.main.BalatroStateManager'), \
-             patch('server.main.BalatroActionHandler'):
+        with patch("server.main.BalatroFileIO"), patch(
+            "server.main.BalatroStateManager"
+        ), patch("server.main.BalatroActionHandler"):
             return BalatroMCPServer()
 
     @pytest.mark.asyncio
@@ -138,7 +146,7 @@ class TestMCPResourceHandlers:
         # Test through the server's get_available_tools method instead
         tools = await server.get_available_tools()
         assert len(tools) >= 14  # At least the expected tools
-        
+
         # Test that the expected tools exist
         tool_names = [t.name for t in tools]
         assert "get_game_state" in tool_names
@@ -148,11 +156,13 @@ class TestMCPResourceHandlers:
     @pytest.mark.asyncio
     async def test_read_game_state_resource(self, server, sample_game_state):
         """Test reading game state resource through tool call."""
-        server.state_manager.get_current_state = AsyncMock(return_value=sample_game_state)
-        
+        server.state_manager.get_current_state = AsyncMock(
+            return_value=sample_game_state
+        )
+
         # Test the get_game_state functionality
         result = await server.handle_tool_call("get_game_state", {})
-        
+
         # Should return success with game state data
         assert result["success"] is True
         assert "game_state" in result
@@ -164,7 +174,7 @@ class TestMCPResourceHandlers:
     async def test_read_game_state_resource_no_state(self, server):
         """Test reading game state resource when no state available."""
         server.state_manager.get_current_state = AsyncMock(return_value=None)
-        
+
         # Test through handle_tool_call
         result = await server.handle_tool_call("get_game_state", {})
         assert result["success"] is False
@@ -176,8 +186,11 @@ class TestMCPResourceHandlers:
     async def test_read_available_actions_resource(self, server, sample_game_state):
         """Test reading available actions resource."""
         server.state_manager.get_current_state.return_value = sample_game_state
-        server.action_handler.get_available_actions.return_value = ["play_hand", "discard_cards"]
-        
+        server.action_handler.get_available_actions.return_value = [
+            "play_hand",
+            "discard_cards",
+        ]
+
         # Test tools are available
         tools = await server.get_available_tools()
         tool_names = [t.name for t in tools]
@@ -188,12 +201,12 @@ class TestMCPResourceHandlers:
     async def test_read_joker_order_resource(self, server, sample_game_state):
         """Test reading joker order resource."""
         server.state_manager.get_current_state.return_value = sample_game_state
-        
+
         # Test that reorder_jokers tool is available
         tools = await server.get_available_tools()
         tool_names = [t.name for t in tools]
         assert "reorder_jokers" in tool_names
-        
+
         # Find the reorder tool and check its description
         reorder_tool = next(t for t in tools if t.name == "reorder_jokers")
         assert "Blueprint/Brainstorm" in reorder_tool.description
@@ -204,7 +217,7 @@ class TestMCPResourceHandlers:
         sample_game_state.jokers = []
         sample_game_state.post_hand_joker_reorder_available = False
         server.state_manager.get_current_state.return_value = sample_game_state
-        
+
         # Still should have reorder_jokers tool available
         tools = await server.get_available_tools()
         tool_names = [t.name for t in tools]
@@ -221,8 +234,10 @@ class TestMCPResourceHandlers:
     @pytest.mark.asyncio
     async def test_read_resource_exception_handling(self, server):
         """Test resource reading exception handling."""
-        server.action_handler.execute_action = AsyncMock(side_effect=Exception("Test error"))
-        
+        server.action_handler.execute_action = AsyncMock(
+            side_effect=Exception("Test error")
+        )
+
         result = await server.handle_tool_call("play_hand", {"card_indices": [0]})
         assert "error" in result
         assert "Internal error" in result["error"]
@@ -234,18 +249,18 @@ class TestMCPToolHandlers:
     @pytest.fixture
     def server(self):
         """Create server instance for testing."""
-        with patch('server.main.BalatroFileIO'), \
-             patch('server.main.BalatroStateManager'), \
-             patch('server.main.BalatroActionHandler'):
+        with patch("server.main.BalatroFileIO"), patch(
+            "server.main.BalatroStateManager"
+        ), patch("server.main.BalatroActionHandler"):
             return BalatroMCPServer()
 
     @pytest.mark.asyncio
     async def test_list_tools(self, server):
         """Test listing available tools."""
         tools = await server.get_available_tools()
-        
+
         assert len(tools) == 15  # 14 actions + get_game_state
-        
+
         tool_names = [t.name for t in tools]
         assert "get_game_state" in tool_names
         assert "play_hand" in tool_names
@@ -257,9 +272,9 @@ class TestMCPToolHandlers:
         # Configure async mock to return ActionResult
         action_result = ActionResult(success=True)
         server.action_handler.execute_action = AsyncMock(return_value=action_result)
-        
+
         result = await server.handle_tool_call("play_hand", {"card_indices": [0, 1]})
-        
+
         assert result["success"] is True
         assert result["tool"] == "play_hand"
         assert "timestamp" in result
@@ -267,10 +282,12 @@ class TestMCPToolHandlers:
     @pytest.mark.asyncio
     async def test_call_tool_exception(self, server):
         """Test tool call exception handling."""
-        server.action_handler.execute_action = AsyncMock(side_effect=Exception("Test error"))
-        
+        server.action_handler.execute_action = AsyncMock(
+            side_effect=Exception("Test error")
+        )
+
         result = await server.handle_tool_call("play_hand", {"card_indices": [0, 1]})
-        
+
         assert "error" in result
         assert "Internal error" in result["error"]
 
@@ -281,9 +298,9 @@ class TestToolCallHandling:
     @pytest.fixture
     def server(self):
         """Create server instance for testing."""
-        with patch('server.main.BalatroFileIO'), \
-             patch('server.main.BalatroStateManager'), \
-             patch('server.main.BalatroActionHandler'):
+        with patch("server.main.BalatroFileIO"), patch(
+            "server.main.BalatroStateManager"
+        ), patch("server.main.BalatroActionHandler"):
             return BalatroMCPServer()
 
     @pytest.mark.asyncio
@@ -291,9 +308,9 @@ class TestToolCallHandling:
         """Test handling play hand tool call."""
         expected_result = ActionResult(success=True)
         server.action_handler.execute_action = AsyncMock(return_value=expected_result)
-        
+
         result = await server.handle_tool_call("play_hand", {"card_indices": [0, 1]})
-        
+
         assert result["success"] is True
         assert result["tool"] == "play_hand"
         assert "timestamp" in result
@@ -304,9 +321,9 @@ class TestToolCallHandling:
         """Test handling buy item tool call."""
         expected_result = ActionResult(success=True)
         server.action_handler.execute_action = AsyncMock(return_value=expected_result)
-        
+
         result = await server.handle_tool_call("buy_item", {"shop_index": 0})
-        
+
         assert result["success"] is True
         assert result["tool"] == "buy_item"
 
@@ -315,9 +332,11 @@ class TestToolCallHandling:
         """Test handling reorder jokers tool call."""
         expected_result = ActionResult(success=True)
         server.action_handler.execute_action = AsyncMock(return_value=expected_result)
-        
-        result = await server.handle_tool_call("reorder_jokers", {"new_order": [1, 0, 2]})
-        
+
+        result = await server.handle_tool_call(
+            "reorder_jokers", {"new_order": [1, 0, 2]}
+        )
+
         assert result["success"] is True
         assert result["tool"] == "reorder_jokers"
 
@@ -325,17 +344,19 @@ class TestToolCallHandling:
     async def test_handle_tool_call_unknown_tool(self, server):
         """Test handling unknown tool call."""
         result = await server.handle_tool_call("unknown_tool", {})
-        
+
         assert "error" in result
         assert "Unknown tool" in result["error"]
 
     @pytest.mark.asyncio
     async def test_handle_tool_call_exception(self, server):
         """Test tool call exception handling."""
-        server.action_handler.execute_action = AsyncMock(side_effect=Exception("Test error"))
-        
+        server.action_handler.execute_action = AsyncMock(
+            side_effect=Exception("Test error")
+        )
+
         result = await server.handle_tool_call("play_hand", {"card_indices": [0, 1]})
-        
+
         assert "error" in result
         assert "Internal error" in result["error"]
 
@@ -344,19 +365,21 @@ class TestToolCallHandling:
         """Test handling tool call when action fails."""
         expected_result = ActionResult(success=False, error_message="Action failed")
         server.action_handler.execute_action = AsyncMock(return_value=expected_result)
-        
+
         result = await server.handle_tool_call("play_hand", {"card_indices": [0, 1]})
-        
+
         assert result["success"] is False
         assert result["error_message"] == "Action failed"
 
     @pytest.mark.asyncio
     async def test_handle_get_game_state_with_state(self, server, sample_game_state):
         """Test handling get_game_state tool call with available state."""
-        server.state_manager.get_current_state = AsyncMock(return_value=sample_game_state)
-        
+        server.state_manager.get_current_state = AsyncMock(
+            return_value=sample_game_state
+        )
+
         result = await server.handle_tool_call("get_game_state", {})
-        
+
         assert result["success"] is True
         assert "game_state" in result
         assert result["tool"] == "get_game_state"
@@ -370,9 +393,9 @@ class TestToolCallHandling:
     async def test_handle_get_game_state_no_state(self, server):
         """Test handling get_game_state tool call with no available state."""
         server.state_manager.get_current_state = AsyncMock(return_value=None)
-        
+
         result = await server.handle_tool_call("get_game_state", {})
-        
+
         assert result["success"] is False
         assert result["error_message"] == "No game state available"
         assert result["tool"] == "get_game_state"
@@ -382,20 +405,24 @@ class TestToolCallHandling:
     @pytest.mark.asyncio
     async def test_handle_get_game_state_exception(self, server):
         """Test handling get_game_state tool call when state manager throws exception."""
-        server.state_manager.get_current_state = AsyncMock(side_effect=Exception("State error"))
-        
+        server.state_manager.get_current_state = AsyncMock(
+            side_effect=Exception("State error")
+        )
+
         result = await server.handle_tool_call("get_game_state", {})
-        
+
         assert "error" in result
         assert "Internal error" in result["error"]
 
     @pytest.mark.asyncio
     async def test_get_game_state_timestamp_format(self, server, sample_game_state):
         """Test that get_game_state returns properly formatted timestamp."""
-        server.state_manager.get_current_state = AsyncMock(return_value=sample_game_state)
-        
+        server.state_manager.get_current_state = AsyncMock(
+            return_value=sample_game_state
+        )
+
         result = await server.handle_tool_call("get_game_state", {})
-        
+
         assert result["success"] is True
         timestamp = result["timestamp"]
         # Should be ISO format with timezone
@@ -405,11 +432,13 @@ class TestToolCallHandling:
     @pytest.mark.asyncio
     async def test_get_game_state_no_action_execution(self, server, sample_game_state):
         """Test that get_game_state doesn't trigger action execution."""
-        server.state_manager.get_current_state = AsyncMock(return_value=sample_game_state)
+        server.state_manager.get_current_state = AsyncMock(
+            return_value=sample_game_state
+        )
         server.action_handler.execute_action = AsyncMock()
-        
+
         result = await server.handle_tool_call("get_game_state", {})
-        
+
         assert result["success"] is True
         # Action handler should not be called for get_game_state
         server.action_handler.execute_action.assert_not_called()
@@ -421,16 +450,18 @@ class TestActionCreation:
     @pytest.fixture
     def server(self):
         """Create server instance for testing."""
-        with patch('server.main.BalatroFileIO'), \
-             patch('server.main.BalatroStateManager'), \
-             patch('server.main.BalatroActionHandler'):
+        with patch("server.main.BalatroFileIO"), patch(
+            "server.main.BalatroStateManager"
+        ), patch("server.main.BalatroActionHandler"):
             return BalatroMCPServer()
 
     @pytest.mark.asyncio
     async def test_create_play_hand_action(self, server):
         """Test creating play hand action."""
-        action = await server._create_action_from_tool("play_hand", {"card_indices": [0, 1, 2]})
-        
+        action = await server._create_action_from_tool(
+            "play_hand", {"card_indices": [0, 1, 2]}
+        )
+
         assert isinstance(action, PlayHandAction)
         assert action.card_indices == [0, 1, 2]
 
@@ -438,15 +469,17 @@ class TestActionCreation:
     async def test_create_buy_item_action(self, server):
         """Test creating buy item action."""
         action = await server._create_action_from_tool("buy_item", {"shop_index": 2})
-        
+
         assert isinstance(action, BuyItemAction)
         assert action.shop_index == 2
 
     @pytest.mark.asyncio
     async def test_create_reorder_jokers_action(self, server):
         """Test creating reorder jokers action."""
-        action = await server._create_action_from_tool("reorder_jokers", {"new_order": [2, 0, 1]})
-        
+        action = await server._create_action_from_tool(
+            "reorder_jokers", {"new_order": [2, 0, 1]}
+        )
+
         assert isinstance(action, ReorderJokersAction)
         assert action.new_order == [2, 0, 1]
 
@@ -454,31 +487,36 @@ class TestActionCreation:
     async def test_create_action_get_game_state(self, server):
         """Test creating action for get_game_state (should return None)."""
         action = await server._create_action_from_tool("get_game_state", {})
-        
+
         assert action is None
 
     @pytest.mark.asyncio
     async def test_create_action_unknown_tool(self, server):
         """Test creating action for unknown tool."""
         action = await server._create_action_from_tool("unknown_tool", {})
-        
+
         assert action is None
 
     @pytest.mark.asyncio
     async def test_create_action_missing_argument(self, server):
         """Test creating action with missing required argument."""
-        action = await server._create_action_from_tool("buy_item", {})  # Missing shop_index
-        
+        action = await server._create_action_from_tool(
+            "buy_item", {}
+        )  # Missing shop_index
+
         assert action is None
 
     @pytest.mark.asyncio
     async def test_create_action_all_simple_actions(self, server):
         """Test creating all simple actions (no parameters)."""
         simple_actions = [
-            "go_to_shop", "reroll_boss", "reroll_shop", 
-            "sort_hand_by_rank", "sort_hand_by_suit"
+            "go_to_shop",
+            "reroll_boss",
+            "reroll_shop",
+            "sort_hand_by_rank",
+            "sort_hand_by_suit",
         ]
-        
+
         for action_name in simple_actions:
             action = await server._create_action_from_tool(action_name, {})
             assert action is not None
@@ -491,9 +529,9 @@ class TestServerLifecycle:
     @pytest.fixture
     def server(self):
         """Create server instance for testing."""
-        with patch('server.main.BalatroFileIO'), \
-             patch('server.main.BalatroStateManager'), \
-             patch('server.main.BalatroActionHandler'):
+        with patch("server.main.BalatroFileIO"), patch(
+            "server.main.BalatroStateManager"
+        ), patch("server.main.BalatroActionHandler"):
             return BalatroMCPServer()
 
     @pytest.mark.asyncio
@@ -501,10 +539,10 @@ class TestServerLifecycle:
         """Test starting the server."""
         # Configure file_io methods as AsyncMock
         server.file_io.ensure_directories = AsyncMock()
-        
-        with patch('asyncio.create_task', return_value=AsyncMock()) as mock_create_task:
+
+        with patch("asyncio.create_task", return_value=AsyncMock()) as mock_create_task:
             await server.start()
-            
+
         assert server._running is True
         server.file_io.ensure_directories.assert_called_once()
         mock_create_task.assert_called_once()
@@ -512,17 +550,18 @@ class TestServerLifecycle:
     @pytest.mark.asyncio
     async def test_stop_server(self, server):
         """Test stopping the server."""
+
         # Create a proper async task mock
         async def dummy_task():
             pass
-        
+
         mock_task = asyncio.create_task(dummy_task())
         mock_task.cancel = Mock()
         server._monitoring_task = mock_task
         server._running = True
-        
+
         await server.stop()
-        
+
         assert server._running is False
         mock_task.cancel.assert_called_once()
 
@@ -531,27 +570,28 @@ class TestServerLifecycle:
         """Test stopping server when no monitoring task exists."""
         server._running = True
         server._monitoring_task = None
-        
+
         # Should not raise exception
         await server.stop()
-        
+
         assert server._running is False
 
     @pytest.mark.asyncio
     async def test_stop_server_task_cancellation_error(self, server):
         """Test stopping server handles task cancellation error."""
+
         # Create a real task that will be cancelled
         async def dummy_task():
             await asyncio.sleep(10)  # Long running task
-        
+
         mock_task = asyncio.create_task(dummy_task())
         mock_task.cancel()  # Cancel it immediately
         server._monitoring_task = mock_task
         server._running = True
-        
+
         # Should handle exception gracefully
         await server.stop()
-        
+
         assert server._running is False
 
 
@@ -561,9 +601,9 @@ class TestBackgroundMonitoring:
     @pytest.fixture
     def server(self):
         """Create server instance for testing."""
-        with patch('server.main.BalatroFileIO'), \
-             patch('server.main.BalatroStateManager'), \
-             patch('server.main.BalatroActionHandler'):
+        with patch("server.main.BalatroFileIO"), patch(
+            "server.main.BalatroStateManager"
+        ), patch("server.main.BalatroActionHandler"):
             return BalatroMCPServer()
 
     @pytest.mark.asyncio
@@ -572,11 +612,13 @@ class TestBackgroundMonitoring:
         server._running = True
         server.state_manager.is_state_changed = AsyncMock(return_value=False)
         server.file_io.cleanup_old_files = AsyncMock()
-        
+
         # Mock sleep to prevent infinite loop
-        with patch('asyncio.sleep', side_effect=lambda x: setattr(server, '_running', False)):
+        with patch(
+            "asyncio.sleep", side_effect=lambda x: setattr(server, "_running", False)
+        ):
             await server._monitor_game_state()
-            
+
         server.state_manager.is_state_changed.assert_called()
         server.file_io.cleanup_old_files.assert_called()
 
@@ -585,25 +627,33 @@ class TestBackgroundMonitoring:
         """Test monitoring when state changes occur."""
         server._running = True
         server.state_manager.is_state_changed = AsyncMock(return_value=True)
-        server.state_manager.get_state_summary = AsyncMock(return_value={"phase": "hand_selection"})
+        server.state_manager.get_state_summary = AsyncMock(
+            return_value={"phase": "hand_selection"}
+        )
         server.file_io.cleanup_old_files = AsyncMock()
-        
+
         # Mock sleep to prevent infinite loop
-        with patch('asyncio.sleep', side_effect=lambda x: setattr(server, '_running', False)):
+        with patch(
+            "asyncio.sleep", side_effect=lambda x: setattr(server, "_running", False)
+        ):
             await server._monitor_game_state()
-            
+
         server.state_manager.get_state_summary.assert_called()
 
     @pytest.mark.asyncio
     async def test_monitor_game_state_exception_handling(self, server):
         """Test monitoring handles exceptions gracefully."""
         server._running = True
-        server.state_manager.is_state_changed = AsyncMock(side_effect=Exception("Test error"))
-        
+        server.state_manager.is_state_changed = AsyncMock(
+            side_effect=Exception("Test error")
+        )
+
         # Mock sleep to prevent infinite loop
-        with patch('asyncio.sleep', side_effect=lambda x: setattr(server, '_running', False)):
+        with patch(
+            "asyncio.sleep", side_effect=lambda x: setattr(server, "_running", False)
+        ):
             await server._monitor_game_state()
-            
+
         # Should not raise exception and continue monitoring
 
 
@@ -613,23 +663,23 @@ class TestGetAvailableTools:
     @pytest.fixture
     def server(self):
         """Create server instance for testing."""
-        with patch('server.main.BalatroFileIO'), \
-             patch('server.main.BalatroStateManager'), \
-             patch('server.main.BalatroActionHandler'):
+        with patch("server.main.BalatroFileIO"), patch(
+            "server.main.BalatroStateManager"
+        ), patch("server.main.BalatroActionHandler"):
             return BalatroMCPServer()
 
     @pytest.mark.asyncio
     async def test_get_available_tools_count(self, server):
         """Test that all expected tools are available."""
         tools = await server.get_available_tools()
-        
+
         assert len(tools) == 15  # 14 game actions + get_game_state
 
     @pytest.mark.asyncio
     async def test_get_available_tools_structure(self, server):
         """Test tool structure and schemas."""
         tools = await server.get_available_tools()
-        
+
         # Find play_hand tool
         play_hand_tool = next(t for t in tools if t.name == "play_hand")
         assert play_hand_tool.description is not None
@@ -640,7 +690,7 @@ class TestGetAvailableTools:
     async def test_get_available_tools_no_params(self, server):
         """Test tools that require no parameters."""
         tools = await server.get_available_tools()
-        
+
         # Find get_game_state tool
         get_state_tool = next(t for t in tools if t.name == "get_game_state")
         assert get_state_tool.inputSchema["required"] == []
@@ -649,7 +699,7 @@ class TestGetAvailableTools:
     async def test_get_available_tools_reorder_jokers(self, server):
         """Test reorder jokers tool schema."""
         tools = await server.get_available_tools()
-        
+
         # Find reorder_jokers tool
         reorder_tool = next(t for t in tools if t.name == "reorder_jokers")
         assert "Blueprint/Brainstorm" in reorder_tool.description
@@ -663,26 +713,30 @@ class TestIntegrationScenarios:
     @pytest.fixture
     def server(self):
         """Create server instance for testing."""
-        with patch('server.main.BalatroFileIO'), \
-             patch('server.main.BalatroStateManager'), \
-             patch('server.main.BalatroActionHandler'):
+        with patch("server.main.BalatroFileIO"), patch(
+            "server.main.BalatroStateManager"
+        ), patch("server.main.BalatroActionHandler"):
             return BalatroMCPServer()
 
     @pytest.mark.asyncio
     async def test_full_tool_call_flow(self, server, sample_game_state):
         """Test complete flow from tool call to action execution."""
         # Setup mocks
-        server.state_manager.get_current_state = AsyncMock(return_value=sample_game_state)
-        server.action_handler.execute_action = AsyncMock(return_value=ActionResult(success=True))
-        
+        server.state_manager.get_current_state = AsyncMock(
+            return_value=sample_game_state
+        )
+        server.action_handler.execute_action = AsyncMock(
+            return_value=ActionResult(success=True)
+        )
+
         # Execute tool call
         result = await server.handle_tool_call("play_hand", {"card_indices": [0]})
-        
+
         # Verify flow
         assert result["success"] is True
         assert result["tool"] == "play_hand"
         server.action_handler.execute_action.assert_called_once()
-        
+
         # Verify action was created correctly
         call_args = server.action_handler.execute_action.call_args[0]
         action = call_args[0]
@@ -694,12 +748,15 @@ class TestIntegrationScenarios:
         """Test that resources and tools provide consistent information."""
         # Setup state
         server.state_manager.get_current_state.return_value = sample_game_state
-        server.action_handler.get_available_actions.return_value = ["play_hand", "reorder_jokers"]
-        
+        server.action_handler.get_available_actions.return_value = [
+            "play_hand",
+            "reorder_jokers",
+        ]
+
         # Get available tools
         tools = await server.get_available_tools()
         tool_names = [t.name for t in tools]
-        
+
         # Verify consistency (available actions should be subset of available tools)
         assert "play_hand" in tool_names
         assert "reorder_jokers" in tool_names
