@@ -93,38 +93,12 @@ function TestFramework:run_tests()
     return self.failed == 0
 end
 
--- Load JokerManager module directly for testing
+-- Load modules directly for testing
 dofile("joker_manager.lua")
 local JokerManager = _G.JokerManager or require("joker_manager")
 
--- Mock CrashDiagnostics for testing
-local CrashDiagnostics = {}
-CrashDiagnostics.__index = CrashDiagnostics
-
-function CrashDiagnostics.new()
-    local self = setmetatable({}, CrashDiagnostics)
-    return self
-end
-
-function CrashDiagnostics:log(message)
-    print("CRASH_DIAGNOSTICS: " .. tostring(message))
-end
-
-function CrashDiagnostics:validate_object_config(obj, name, operation)
-    print("CRASH_DIAGNOSTICS: Validating " .. tostring(name) .. " during " .. tostring(operation))
-end
-
-function CrashDiagnostics:track_hook_chain(hook_name)
-    print("CRASH_DIAGNOSTICS: Tracking hook chain for " .. tostring(hook_name))
-end
-
-function CrashDiagnostics:validate_game_state(operation)
-    print("CRASH_DIAGNOSTICS: Validating game state during " .. tostring(operation))
-end
-
-function CrashDiagnostics:create_safe_hook(func, hook_name)
-    return func
-end
+dofile("crash_diagnostics.lua")
+local CrashDiagnostics = _G.CrashDiagnostics or require("crash_diagnostics")
 
 local test_framework = TestFramework.new()
 
