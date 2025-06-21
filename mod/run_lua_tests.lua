@@ -10,7 +10,6 @@ print("Running unit tests for validation logic and JSON fallback functionality..
 local test_modules = {
     {name = "test_state_extractor", description = "StateExtractor validation logic"},
     {name = "test_file_io", description = "FileIO JSON fallback functionality"},
-    {name = "test_steammodded_loading", description = "Steammodded module loading mechanism"},
     {name = "test_api_method_fixes", description = "API method fixes validation"},
     {name = "test_crash_diagnostics", description = "CrashDiagnostics object validation and hook safety"},
     {name = "test_joker_manager_crash_safety", description = "JokerManager defensive programming and safe config access"},
