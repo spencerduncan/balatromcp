@@ -97,6 +97,18 @@ end
 function FileIO:write_game_state(state_data)
     self:log("Attempting to write game state")
     
+    -- DIAGNOSTIC: Track file recovery and persistence issues
+    local filepath
+    if self.base_path == "." then
+        filepath = "game_state.json"
+    else
+        filepath = self.base_path .. "/game_state.json"
+    end
+    
+    -- Check if file exists before write attempt
+    local file_exists_before = love.filesystem.getInfo(filepath) ~= nil
+    self:log("DIAGNOSTIC: File exists before write: " .. tostring(file_exists_before))
+    
     -- Validate inputs
     if not state_data then
         self:log("ERROR: No state data provided")
@@ -122,46 +134,102 @@ function FileIO:write_game_state(state_data)
     
     self:log("Created message structure with sequence_id: " .. message.sequence_id)
     
-    -- Test JSON encoding
+    -- Test JSON encoding with enhanced error reporting
     local encode_success, encoded_data = pcall(self.json.encode, message)
     if not encode_success then
         self:log("ERROR: JSON encoding failed: " .. tostring(encoded_data))
+        self:log("DIAGNOSTIC: JSON encode failure - State data type: " .. type(state_data))
+        if type(state_data) == "table" then
+            local state_keys = {}
+            for k, v in pairs(state_data) do
+                table.insert(state_keys, k .. ":" .. type(v))
+            end
+            self:log("DIAGNOSTIC: State data keys: " .. table.concat(state_keys, ", "))
+        end
         return false
     end
     
     self:log("JSON encoding successful, data length: " .. #encoded_data)
     
-    -- Handle path construction for current directory vs subdirectory
-    local filepath
-    if self.base_path == "." then
-        filepath = "game_state.json"
-    else
-        filepath = self.base_path .. "/game_state.json"
-    end
     self:log("Writing to file: " .. filepath)
     
+    -- ENHANCED DIAGNOSTIC: Track write operation details
+    local write_start_time = os.clock()
     local write_success = love.filesystem.write(filepath, encoded_data)
+    local write_end_time = os.clock()
+    local write_duration = write_end_time - write_start_time
+    
+    self:log("DIAGNOSTIC: Write operation duration: " .. tostring(write_duration) .. " seconds")
     
     if not write_success then
         self:log("ERROR: File write failed")
+        self:log("DIAGNOSTIC: Attempting to diagnose write failure...")
+        
+        -- Check directory permissions
+        local dir_info = love.filesystem.getInfo(self.base_path or ".")
+        if dir_info then
+            self:log("DIAGNOSTIC: Base directory exists: " .. tostring(dir_info.type == "directory"))
+        else
+            self:log("DIAGNOSTIC: Base directory does not exist - attempting to create")
+            local create_success = love.filesystem.createDirectory(self.base_path or ".")
+            self:log("DIAGNOSTIC: Directory creation result: " .. tostring(create_success))
+        end
+        
+        -- Check filesystem availability
+        if love.filesystem.isFused() then
+            self:log("DIAGNOSTIC: Running in fused mode - filesystem limited")
+        else
+            self:log("DIAGNOSTIC: Running in development mode - full filesystem access")
+        end
+        
         return false
     end
     
     self:log("Game state written successfully")
     
-    -- Verify file was written correctly
+    -- ENHANCED VERIFICATION with corruption detection
+    local verify_start_time = os.clock()
     local verify_content, verify_size = love.filesystem.read(filepath)
+    local verify_end_time = os.clock()
+    local verify_duration = verify_end_time - verify_start_time
+    
+    self:log("DIAGNOSTIC: File verification duration: " .. tostring(verify_duration) .. " seconds")
+    
     if verify_content then
         self:log("File verification successful, size: " .. (verify_size or 0))
+        
+        -- CORRUPTION CHECK: Verify JSON can be parsed back
+        local parse_success, parsed_data = pcall(self.json.decode, verify_content)
+        if parse_success then
+            self:log("DIAGNOSTIC: File content is valid JSON")
+            if parsed_data.sequence_id == message.sequence_id then
+                self:log("DIAGNOSTIC: Sequence ID matches - write integrity confirmed")
+            else
+                self:log("WARNING: Sequence ID mismatch - possible write corruption")
+            end
+        else
+            self:log("ERROR: File content is corrupted JSON: " .. tostring(parsed_data))
+            self:log("DIAGNOSTIC: Corrupted content preview: " .. string.sub(verify_content, 1, 100))
+            return false
+        end
     else
-        self:log("WARNING: File verification failed")
+        self:log("WARNING: File verification failed - file may be corrupted or missing")
+        self:log("DIAGNOSTIC: This may cause file update cessation issue")
+        return false
     end
+    
+    -- PERSISTENCE TRACKING: Log successful write for monitoring
+    if not self.write_success_count then
+        self.write_success_count = 0
+    end
+    self.write_success_count = self.write_success_count + 1
+    self:log("DIAGNOSTIC: Total successful writes: " .. self.write_success_count)
     
     return true
 end
 
 function FileIO:read_actions()
-    self:log("Attempting to read actions")
+   -- self:log("Attempting to read actions")
     
     -- Handle path construction for current directory vs subdirectory
     local filepath
@@ -170,7 +238,7 @@ function FileIO:read_actions()
     else
         filepath = self.base_path .. "/actions.json"
     end
-    self:log("Looking for actions file: " .. filepath)
+  --  self:log("Looking for actions file: " .. filepath)
     
     if not love or not love.filesystem then
         self:log("ERROR: love.filesystem not available")
@@ -178,7 +246,7 @@ function FileIO:read_actions()
     end
     
     if not love.filesystem.getInfo(filepath) then
-        self:log("No actions file found (this is normal)")
+    --    self:log("No actions file found (this is normal)")
         return nil
     end
     

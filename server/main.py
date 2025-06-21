@@ -58,7 +58,7 @@ class BalatroMCPServer(IMCPServer):
 
     def __init__(
         self,
-        shared_path: str = "C:/Users/whokn/AppData/Roaming/Balatro/mods/BalatroMCP/shared",
+        shared_path: str = "C:/Users/whokn/AppData/Roaming/Balatro/mods/BalatroMCP/./",
     ):
         """Initialize the MCP server with dependency injection."""
         # Initialize dependencies

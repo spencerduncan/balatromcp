@@ -139,21 +139,32 @@ function BalatroMCP:update(dt)
         return
     end
     
+    -- DIAGNOSTIC: Track update cycle timing and state changes
+    local update_start_time = love.timer and love.timer.getTime() or os.clock()
+    local state_at_update_start = G and G.STATE or "NIL"
+    
     self.update_timer = self.update_timer + dt
     
-    if self.update_timer >= self.update_interval then
+    if (self.update_timer >= self.update_interval) and G.STATE ~= -1 then
         self.update_timer = 0
         
         -- Handle pending delayed state extraction first
         if self.pending_state_extraction then
+            print("BalatroMCP: PROCESSING_DELAYED_EXTRACTION")
             self:handle_delayed_state_extraction()
         end
         
-        -- Check for pending actions
+        -- Check for pending actions (only log if action found)
         self:process_pending_actions()
         
-        -- Send state updates if changed
+        -- Send state updates if changed (only logs if state changed)
         self:check_and_send_state_update()
+    end
+    
+    -- DIAGNOSTIC: Track state changes during update
+    local state_at_update_end = G and G.STATE or "NIL"
+    if state_at_update_start ~= state_at_update_end then
+        print("BalatroMCP: STATE_CHANGE_DETECTED - From: " .. tostring(state_at_update_start) .. " To: " .. tostring(state_at_update_end))
     end
 end
 
@@ -462,31 +473,41 @@ if SMODS then
         
         if original_love_update then
             love.update = function(dt)
-                -- DIAGNOSTIC: Log state BEFORE original Love2D update
+                -- SELECTIVE DIAGNOSTIC: Only log when states actually change
                 local state_before = G and G.STATE or "NIL"
+                local direct_state_before = _G.G and _G.G.STATE or "NIL"
                 
                 -- Call original Love2D update first
                 original_love_update(dt)
                 
-                -- DIAGNOSTIC: Log state AFTER original Love2D update
+                -- Check for state changes AFTER game update
                 local state_after = G and G.STATE or "NIL"
+                local direct_state_after = _G.G and _G.G.STATE or "NIL"
                 
-                -- Log state changes for timing analysis
-                if state_before ~= state_after then
-                    print("BalatroMCP: TIMING - STATE CHANGED in love.update - BEFORE: " .. tostring(state_before) .. " AFTER: " .. tostring(state_after))
+                -- ONLY LOG WHEN STATE CHANGES (not every frame)
+                if state_before ~= state_after or direct_state_before ~= direct_state_after then
+                    local timestamp = love.timer and love.timer.getTime() or os.clock()
+                    print("BalatroMCP: STATE_CHANGE_DETECTED @ " .. tostring(timestamp))
+                    print("  Cached G.STATE: " .. tostring(state_before) .. " -> " .. tostring(state_after))
+                    print("  Direct _G.G.STATE: " .. tostring(direct_state_before) .. " -> " .. tostring(direct_state_after))
+                    print("  State consistency: " .. tostring(state_after == direct_state_after))
                     last_known_state = state_after
-                elseif last_known_state and last_known_state ~= state_after then
-                    print("BalatroMCP: TIMING - STATE MISMATCH - Expected: " .. tostring(last_known_state) .. " Actual: " .. tostring(state_after))
+                    
+                    -- Log available state names for context
+                    if _G.G and _G.G.STATES and type(_G.G.STATES) == "table" then
+                        local current_state_name = "UNKNOWN"
+                        for name, value in pairs(_G.G.STATES) do
+                            if value == state_after then
+                                current_state_name = name
+                                break
+                            end
+                        end
+                        print("  New state name: " .. current_state_name)
+                    end
                 end
                 
-                -- Then call our mod update
+                -- Then call our mod update (minimal logging)
                 if mod_instance and mod_instance.update then
-                    -- DIAGNOSTIC: Log state when our mod runs
-                    local state_at_mod_run = G and G.STATE or "NIL"
-                    if state_at_mod_run ~= state_after then
-                        print("BalatroMCP: TIMING - STATE CHANGED BETWEEN GAME UPDATE AND MOD UPDATE - Game: " .. tostring(state_after) .. " Mod: " .. tostring(state_at_mod_run))
-                    end
-                    
                     pcall(function()
                         mod_instance:update(dt)
                     end)

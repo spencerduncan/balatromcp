@@ -48,7 +48,7 @@ class BalatroFileIO(IFileIO):
 
     def __init__(
         self,
-        base_path: str = "C:/Users/whokn/AppData/Roaming/Balatro/mods/BalatroMCP/shared",
+        base_path: str = "C:/Users/whokn/AppData/Roaming/Balatro/mods/BalatroMCP/./",
     ):
         """Initialize file I/O with base path for communication files."""
         validated_path = self._validate_and_sanitize_path(base_path)

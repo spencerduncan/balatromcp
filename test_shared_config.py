@@ -13,7 +13,7 @@ def test_shared_folder_config():
     print("=== Testing Shared Folder Configuration ===")
 
     # Test the absolute path
-    shared_path = "C:/Users/whokn/AppData/Roaming/Balatro/mods/BalatroMCP/shared"
+    shared_path = "C:/Users/whokn/AppData/Roaming/Balatro/mods/BalatroMCP/./"
     print(f"Testing path: {shared_path}")
 
     # Check if directory exists
@@ -56,7 +56,7 @@ def test_shared_folder_config():
 
     # Test that the mod would use the same path
     print("\n=== Mod Configuration Test ===")
-    mod_path = "C:/Users/whokn/AppData/Roaming/Balatro/mods/BalatroMCP/shared"
+    mod_path = "C:/Users/whokn/AppData/Roaming/Balatro/mods/BalatroMCP/./"
     print(f"Mod would use path: {mod_path}")
     print(f"✓ Paths match: {shared_path == mod_path}")
 

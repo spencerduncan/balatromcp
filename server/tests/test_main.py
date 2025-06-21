@@ -95,7 +95,7 @@ class TestBalatroMCPServerInitialization:
 
         # Verify dependencies are created
         mock_file_io.assert_called_once_with(
-            "C:/Users/whokn/AppData/Roaming/Balatro/mods/BalatroMCP/shared"
+            "C:/Users/whokn/AppData/Roaming/Balatro/mods/BalatroMCP/./"
         )
         mock_state_manager.assert_called_once()
         mock_action_handler.assert_called_once()

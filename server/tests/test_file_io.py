@@ -77,7 +77,7 @@ class TestBalatroFileIOInitialization:
         """Test initialization with default path."""
         file_io = BalatroFileIO()
         assert file_io.base_path == Path(
-            "C:/Users/whokn/AppData/Roaming/Balatro/mods/BalatroMCP/shared"
+            "C:/Users/whokn/AppData/Roaming/Balatro/mods/BalatroMCP/./"
         )
         assert file_io._sequence_id == 0
         assert file_io._last_read_sequence == {}
@@ -515,7 +515,7 @@ class TestPathValidationSecurity:
         file_io = BalatroFileIO()
 
         # Valid relative paths should pass
-        assert file_io._validate_and_sanitize_path("shared") == "shared"
+        assert file_io._validate_and_sanitize_path("./") == "./"
         assert file_io._validate_and_sanitize_path("data/files") == "data/files"
         assert file_io._validate_and_sanitize_path("test.json") == "test.json"
 

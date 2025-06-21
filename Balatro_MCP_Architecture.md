@@ -219,7 +219,7 @@ import time
 from pathlib import Path
 
 class BalatroFileIO:
-    def __init__(self, base_path="balatro_mcp"):
+    def __init__(self, base_path="."):
         self.base_path = Path(base_path)
         self.base_path.mkdir(exist_ok=True)
         self.sequence_id = 0
