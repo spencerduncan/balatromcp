@@ -86,19 +86,9 @@ function TestFramework:run_tests()
     return self.failed == 0
 end
 
--- Load the CrashDiagnostics module with SMODS availability check
-local CrashDiagnostics
-if SMODS and SMODS.load_file then
-    CrashDiagnostics = assert(SMODS.load_file("crash_diagnostics.lua"))()
-else
-    -- Fallback: try direct require for testing
-    local success, module = pcall(require, "crash_diagnostics")
-    if success then
-        CrashDiagnostics = module
-    else
-        error("CrashDiagnostics module not available - SMODS not found and direct require failed")
-    end
-end
+-- Load CrashDiagnostics module directly for testing
+dofile("crash_diagnostics.lua")
+local CrashDiagnostics = _G.CrashDiagnostics or require("crash_diagnostics")
 
 local test_framework = TestFramework.new()
 
