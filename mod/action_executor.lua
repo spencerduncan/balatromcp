@@ -282,19 +282,135 @@ function ActionExecutor:execute_reorder_jokers(action_data)
 end
 
 function ActionExecutor:execute_select_blind(action_data)
-    -- Select a blind
+    -- Select a blind with comprehensive crash diagnostics
     local blind_type = action_data.blind_type
     
     if not blind_type then
         return false, "No blind type specified"
     end
     
-    -- This needs to interface with Balatro's blind selection system
-    if G.FUNCS and G.FUNCS.select_blind then
-        G.FUNCS.select_blind(blind_type)
-        return true, nil
+    print("ActionExecutor: BLIND_SELECT_DEBUG - Starting select_blind for type: " .. tostring(blind_type))
+    
+    -- DIAGNOSTIC 1: Validate game state before blind selection
+    if not G then
+        print("ActionExecutor: BLIND_SELECT_ERROR - G object is nil")
+        return false, "Game state not available"
+    end
+    
+    if not G.STATE then
+        print("ActionExecutor: BLIND_SELECT_ERROR - G.STATE is nil")
+        return false, "Game state invalid"
+    end
+    
+    print("ActionExecutor: BLIND_SELECT_DEBUG - Current G.STATE: " .. tostring(G.STATE))
+    
+    -- DIAGNOSTIC 2: Check for blind-related objects and their config fields
+    local blind_objects_to_check = {"G.GAME", "G.GAME.current_blind", "G.GAME.blind_big", "G.GAME.blind_small"}
+    
+    for _, obj_path in ipairs(blind_objects_to_check) do
+        local obj = nil
+        if obj_path == "G.GAME" then
+            obj = G.GAME
+        elseif obj_path == "G.GAME.current_blind" then
+            obj = G.GAME and G.GAME.current_blind
+        elseif obj_path == "G.GAME.blind_big" then
+            obj = G.GAME and G.GAME.blind_big
+        elseif obj_path == "G.GAME.blind_small" then
+            obj = G.GAME and G.GAME.blind_small
+        end
+        
+        if obj then
+            print("ActionExecutor: BLIND_SELECT_DEBUG - " .. obj_path .. " exists")
+            if obj.config then
+                print("ActionExecutor: BLIND_SELECT_DEBUG - " .. obj_path .. ".config exists")
+            else
+                print("ActionExecutor: BLIND_SELECT_ERROR - " .. obj_path .. ".config is NIL - POTENTIAL CRASH SOURCE")
+            end
+        else
+            print("ActionExecutor: BLIND_SELECT_DEBUG - " .. obj_path .. " is nil")
+        end
+    end
+    
+    -- DIAGNOSTIC 3: Check what select_blind function expects
+    if not G.FUNCS then
+        print("ActionExecutor: BLIND_SELECT_ERROR - G.FUNCS is nil")
+        return false, "Game functions not available"
+    end
+    
+    if not G.FUNCS.select_blind then
+        print("ActionExecutor: BLIND_SELECT_ERROR - G.FUNCS.select_blind is nil")
+        return false, "Blind selection function not available"
+    end
+    
+    print("ActionExecutor: BLIND_SELECT_DEBUG - G.FUNCS.select_blind exists, type: " .. type(G.FUNCS.select_blind))
+    
+    -- DIAGNOSTIC 4: Try to find the actual blind selection UI elements
+    local blind_choice_elements = {"G.blind_select", "G.blind_select_opts", "G.ROOM"}
+    for _, element_path in ipairs(blind_choice_elements) do
+        local element = nil
+        if element_path == "G.blind_select" then
+            element = G.blind_select
+        elseif element_path == "G.blind_select_opts" then
+            element = G.blind_select_opts
+        elseif element_path == "G.ROOM" then
+            element = G.ROOM
+        end
+        
+        if element then
+            print("ActionExecutor: BLIND_SELECT_DEBUG - " .. element_path .. " exists, type: " .. type(element))
+        else
+            print("ActionExecutor: BLIND_SELECT_DEBUG - " .. element_path .. " is nil")
+        end
+    end
+    
+    -- DIAGNOSTIC 5: Wrap the function call in crash diagnostics
+    print("ActionExecutor: BLIND_SELECT_DEBUG - Attempting to call G.FUNCS.select_blind with parameter: " .. tostring(blind_type))
+    
+    local success, error_result = pcall(function()
+        -- Try different calling patterns that Balatro might expect
+        print("ActionExecutor: BLIND_SELECT_DEBUG - Trying direct string parameter call")
+        return G.FUNCS.select_blind(blind_type)
+    end)
+    
+    if not success then
+        print("ActionExecutor: BLIND_SELECT_ERROR - Direct call failed: " .. tostring(error_result))
+        
+        -- DIAGNOSTIC 6: Try alternative calling patterns
+        print("ActionExecutor: BLIND_SELECT_DEBUG - Trying alternative calling patterns...")
+        
+        -- Pattern 1: Try with table parameter (common Balatro pattern)
+        local alt_success1, alt_error1 = pcall(function()
+            print("ActionExecutor: BLIND_SELECT_DEBUG - Trying table parameter call")
+            return G.FUNCS.select_blind({type = blind_type})
+        end)
+        
+        if not alt_success1 then
+            print("ActionExecutor: BLIND_SELECT_ERROR - Table parameter call failed: " .. tostring(alt_error1))
+        else
+            print("ActionExecutor: BLIND_SELECT_SUCCESS - Table parameter call succeeded")
+            return true, nil
+        end
+        
+        -- Pattern 2: Try with button-like object (UI pattern)
+        local alt_success2, alt_error2 = pcall(function()
+            print("ActionExecutor: BLIND_SELECT_DEBUG - Trying button object parameter call")
+            return G.FUNCS.select_blind({config = {blind = {type = blind_type}}})
+        end)
+        
+        if not alt_success2 then
+            print("ActionExecutor: BLIND_SELECT_ERROR - Button object call failed: " .. tostring(alt_error2))
+        else
+            print("ActionExecutor: BLIND_SELECT_SUCCESS - Button object call succeeded")
+            return true, nil
+        end
+        
+        -- All patterns failed
+        print("ActionExecutor: BLIND_SELECT_CRITICAL - All calling patterns failed")
+        print("ActionExecutor: BLIND_SELECT_CRITICAL - Original error: " .. tostring(error_result))
+        return false, "Blind selection failed: " .. tostring(error_result)
     else
-        return false, "Blind selection not available"
+        print("ActionExecutor: BLIND_SELECT_SUCCESS - Direct call succeeded")
+        return true, nil
     end
 end
 

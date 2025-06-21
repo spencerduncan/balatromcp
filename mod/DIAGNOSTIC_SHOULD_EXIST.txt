@@ -1,0 +1,12 @@
+MOD LOADING DIAGNOSTIC FILE
+===========================
+
+This file should be created if the BalatroMCP mod is loading properly.
+
+Creation timestamp: 2025-06-21T08:15:00Z
+Test purpose: Verify mod directory is being accessed by Steammodded
+
+If you can see this file was created in the mod directory, then the mod loading system is working.
+If this file is NOT created, then Steammodded is not accessing our mod directory at all.
+
+This file will be created by the mod_loading_diagnostics.lua script.
