@@ -207,6 +207,10 @@ function BalatroMCP.new()
     self.pending_state_extraction = false
     self.pending_action_result = nil
     
+    -- Delayed shop state capture
+    self.delayed_shop_state_capture = false
+    self.delayed_shop_capture_timer = 0
+    
     -- Test file communication system
     if init_success then
         self.debug_logger:test_file_communication()
@@ -270,6 +274,22 @@ function BalatroMCP:update(dt)
         if self.delayed_blind_capture_timer <= 0 then
             print("BalatroMCP: Executing delayed blind selection state capture")
             self.delayed_blind_state_capture = false
+            self:send_current_state()
+        end
+    end
+    
+    -- Handle delayed shop state capture
+    if self.delayed_shop_state_capture then
+        self.delayed_shop_capture_timer = self.delayed_shop_capture_timer - dt
+        if self.delayed_shop_capture_timer <= 0 then
+            print("BalatroMCP: Executing delayed shop state capture")
+            self.delayed_shop_state_capture = false
+            
+            -- Extract and log shop state after delay
+            local current_state = self.state_extractor:extract_current_state()
+            local shop_items = current_state and current_state.shop_contents and #current_state.shop_contents or 0
+            print("BalatroMCP: DEBUG - Shop state after delay: shop_items=" .. tostring(shop_items))
+            
             self:send_current_state()
         end
     end
@@ -479,19 +499,23 @@ function BalatroMCP:cleanup_hooks()
 end
 
 function BalatroMCP:process_pending_actions()
+    print("procing")
     -- Check for and process pending actions from MCP server
     if self.processing_action then
+        print("already procing")
         return -- Already processing an action
     end
     
     local action_data = self.file_io:read_actions()
     if not action_data then
+        print("no action")
         return -- No pending actions
     end
     
     -- Check sequence number to avoid duplicate processing
     local sequence = action_data.sequence_id or 0
     if sequence <= self.last_action_sequence then
+        print("already procced")
         return -- Already processed this action
     end
     
@@ -668,15 +692,18 @@ end
 
 function BalatroMCP:on_shop_entered()
     -- Called when entering the shop
-    print("BalatroMCP: Shop entered event")
+    print("BalatroMCP: Shop entered event - delaying state capture for shop population")
     
     -- DIAGNOSTIC: Check state when hook fires
     local current_state = self.state_extractor:extract_current_state()
     local phase = current_state and current_state.current_phase or "unknown"
     local money = current_state and current_state.money or "unknown"
-    print("BalatroMCP: DEBUG - Hook fired with state: phase=" .. phase .. ", money=" .. tostring(money))
+    local shop_items = current_state and current_state.shop_contents and #current_state.shop_contents or 0
+    print("BalatroMCP: DEBUG - Hook fired with state: phase=" .. phase .. ", money=" .. tostring(money) .. ", shop_items=" .. tostring(shop_items))
     
-    self:send_current_state()
+    -- Delay state capture to allow shop contents to populate
+    self.delayed_shop_state_capture = true
+    self.delayed_shop_capture_timer = 0.5  -- Wait 0.5 seconds for shop to populate
 end
 
 function BalatroMCP:detect_blind_selection_transition()

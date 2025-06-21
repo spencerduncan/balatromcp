@@ -484,28 +484,88 @@ function StateExtractor:extract_shop_contents()
     -- Extract shop contents with CIRCULAR REFERENCE SAFE access
     local shop_contents = {}
     
-    if not self:safe_check_path(G, {"shop_jokers", "cards"}) then
-        return shop_contents
-    end
-    
-    for i, item in ipairs(G.shop_jokers.cards) do
-        if item then
-            local safe_item = {
-                index = i - 1, -- 0-based indexing
-                item_type = "joker",
-                name = self:safe_primitive_nested_value(item, {"ability", "name"}, "Unknown"),
-                cost = self:safe_primitive_value(item, "cost", 0),
-                -- AVOID CIRCULAR REFERENCE: Don't extract complex properties object
-                properties = {}
-            }
-            table.insert(shop_contents, safe_item)
-        else
-            self:log("WARNING: Null shop item found at position " .. i)
+    -- Extract jokers from G.shop_jokers.cards with proper ability.set filtering
+    if self:safe_check_path(G, {"shop_jokers", "cards"}) then
+        for i, item in ipairs(G.shop_jokers.cards) do
+            if item and item.ability and item.ability.set then
+                local item_type = "unknown"
+                local ability_set = self:safe_primitive_nested_value(item, {"ability", "set"}, "")
+                
+                -- Classify item based on ability.set
+                if ability_set == "Joker" then
+                    item_type = "joker"
+                elseif ability_set == "Planet" then
+                    item_type = "planet"
+                elseif ability_set == "Tarot" then
+                    item_type = "tarot"
+                elseif ability_set == "Spectral" then
+                    item_type = "spectral"
+                elseif ability_set == "Booster" then
+                    item_type = "booster"
+                else
+                    -- Use the raw ability.set value if unknown
+                    item_type = string.lower(ability_set)
+                end
+                
+                local safe_item = {
+                    index = i - 1, -- 0-based indexing
+                    item_type = item_type,
+                    name = self:safe_primitive_nested_value(item, {"ability", "name"}, "Unknown"),
+                    cost = self:safe_primitive_value(item, "cost", 0),
+                    -- AVOID CIRCULAR REFERENCE: Don't extract complex properties object
+                    properties = {}
+                }
+                table.insert(shop_contents, safe_item)
+            else
+                self:log("WARNING: Shop item at position " .. i .. " missing ability.set")
+            end
         end
     end
     
-    -- Add other shop items (booster packs, consumables, etc.)
-    -- This would need to be expanded based on Balatro's shop structure
+    -- Extract consumables from G.shop_consumables.cards if it exists
+    if self:safe_check_path(G, {"shop_consumables", "cards"}) then
+        for i, item in ipairs(G.shop_consumables.cards) do
+            if item and item.ability and item.ability.set then
+                local ability_set = self:safe_primitive_nested_value(item, {"ability", "set"}, "")
+                local item_type = string.lower(ability_set)
+                
+                local safe_item = {
+                    index = (#shop_contents), -- Continue indexing from jokers
+                    item_type = item_type,
+                    name = self:safe_primitive_nested_value(item, {"ability", "name"}, "Unknown"),
+                    cost = self:safe_primitive_value(item, "cost", 0),
+                    properties = {}
+                }
+                table.insert(shop_contents, safe_item)
+            end
+        end
+    end
+    
+    -- Extract boosters from G.shop_booster.cards if it exists
+    if self:safe_check_path(G, {"shop_booster", "cards"}) then
+        for i, item in ipairs(G.shop_booster.cards) do
+            if item and item.ability and item.ability.set then
+                local ability_set = self:safe_primitive_nested_value(item, {"ability", "set"}, "")
+                local item_type = string.lower(ability_set)
+                
+                local safe_item = {
+                    index = (#shop_contents), -- Continue indexing
+                    item_type = item_type,
+                    name = self:safe_primitive_nested_value(item, {"ability", "name"}, "Unknown"),
+                    cost = self:safe_primitive_value(item, "cost", 0),
+                    properties = {}
+                }
+                table.insert(shop_contents, safe_item)
+            end
+        end
+    end
+    
+    -- Log extraction results for debugging
+    if #shop_contents > 0 then
+        self:log("Extracted " .. #shop_contents .. " shop items")
+    else
+        self:log("WARNING: No shop items found in any shop arrays")
+    end
     
     return shop_contents
 end
