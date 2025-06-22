@@ -13,6 +13,7 @@ print(luaunit.indices)
 -- Test modules to run (will be populated as tests are migrated)
 local luaunit_test_modules = {
     {name = "test_debug_logger_path_handling_luaunit", description = "DebugLogger path handling functionality"},
+    {name = "test_file_io_luaunit", description = "FileIO JSON handling and file operations"},
 }
 
 local total_passed = 0
