@@ -12,11 +12,20 @@ luaunit = require('luaunit')
 print(luaunit.indices)
 -- Test modules to run (will be populated as tests are migrated)
 local luaunit_test_modules = {
+    -- Core modules (120 tests total)
     {name = "test_debug_logger_path_handling_luaunit", description = "DebugLogger path handling functionality"},
     {name = "test_file_io_luaunit", description = "FileIO JSON handling and file operations"},
     {name = "test_joker_manager_crash_safety_luaunit", description = "JokerManager crash safety and defensive programming"},
     {name = "test_shop_state_detection_luaunit", description = "ShopStateDetection shop state transition detection and timing mechanisms"},
     {name = "test_state_extractor_luaunit", description = "StateExtractor comprehensive state extraction functionality and validation logic"},
+    
+    -- Diagnostic modules (85 tests total)
+    {name = "test_api_method_fixes_luaunit", description = "API method fixes and validation"},
+    {name = "test_blind_diagnostics_luaunit", description = "Blind activation and progression diagnostics"},
+    {name = "test_crash_diagnostics_luaunit", description = "Crash diagnostics and hook safety validation"},
+    {name = "test_love2d_filesystem_luaunit", description = "Love2D filesystem capabilities and environment detection"},
+    {name = "test_sequence_id_processing_luaunit", description = "Sequence ID processing bug fixes and validation"},
+    {name = "test_blind_selection_diagnostics_luaunit", description = "Blind selection diagnostics and SMODS integration"},
 }
 
 local total_passed = 0
