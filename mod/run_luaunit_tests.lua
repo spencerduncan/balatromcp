@@ -15,6 +15,7 @@ local luaunit_test_modules = {
     {name = "test_debug_logger_path_handling_luaunit", description = "DebugLogger path handling functionality"},
     {name = "test_file_io_luaunit", description = "FileIO JSON handling and file operations"},
     {name = "test_joker_manager_crash_safety_luaunit", description = "JokerManager crash safety and defensive programming"},
+    {name = "test_shop_state_detection_luaunit", description = "ShopStateDetection shop state transition detection and timing mechanisms"},
 }
 
 local total_passed = 0
