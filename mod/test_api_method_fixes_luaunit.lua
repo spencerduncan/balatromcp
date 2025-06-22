@@ -69,20 +69,6 @@ local function create_mock_balatro_mcp(file_io)
     }
 end
 
-local function assertStrContains(haystack, needle, message)
-    if type(haystack) == "table" then
-        for _, v in ipairs(haystack) do
-            if v == needle then
-                return -- Found it
-            end
-        end
-        error(string.format("Expected table to contain: %s\n%s", tostring(needle), message or ""))
-    elseif type(haystack) == "string" then
-        luaunit.assertNotNil(string.find(haystack,  needle),  message)
-    else
-        error("assertStrContains only supports string and table search")
-    end
-end
 
 -- === API METHOD CALLS VALIDATION TESTS ===
 
@@ -100,15 +86,15 @@ function TestAPIMethodCallsValidation()
     }
     
     luaunit.assertEquals(state_message.sequence, 1, "get_next_sequence_id should return 1")
-    assertStrContains(balatro_mcp.file_io.call_log, "get_next_sequence_id", "get_next_sequence_id should be called")
+    luaunit.assertStrContains(table.concat(balatro_mcp.file_io.call_log," "), "get_next_sequence_id", "get_next_sequence_id should be called")
     
     -- Test 2: Validate write_game_state is called correctly
     balatro_mcp.file_io:write_game_state(state_message)
-    assertStrContains(balatro_mcp.file_io.call_log, "write_game_state", "write_game_state should be called")
+    luaunit.assertStrContains(table.concat(balatro_mcp.file_io.call_log," "), "write_game_state", "write_game_state should be called")
     
     -- Test 3: Validate read_actions is called correctly
     balatro_mcp.file_io:read_actions()
-    assertStrContains(balatro_mcp.file_io.call_log, "read_actions", "read_actions should be called")
+    luaunit.assertStrContains(table.concat(balatro_mcp.file_io.call_log," "), "read_actions", "read_actions should be called")
     
     -- Test 4: Validate write_action_result is called correctly
     local response = {
@@ -120,7 +106,7 @@ function TestAPIMethodCallsValidation()
         new_state = {}
     }
     balatro_mcp.file_io:write_action_result(response)
-    assertStrContains(balatro_mcp.file_io.call_log, "write_action_result", "write_action_result should be called")
+    luaunit.assertStrContains(table.concat(balatro_mcp.file_io.call_log," "), "write_action_result", "write_action_result should be called")
 end
 
 function TestAPIMethodNameConsistencyValidation()

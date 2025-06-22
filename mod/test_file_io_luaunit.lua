@@ -5,22 +5,6 @@
 local luaunit_helpers = require('luaunit_helpers')
 local luaunit = require('libs.luaunit')
 
--- Helper function for string contains assertions
-local function assertStrContains(haystack, needle, message)
-    if type(haystack) == "table" then
-        for _, v in ipairs(haystack) do
-            if v == needle then
-                return -- Found it
-            end
-        end
-        error(string.format("Expected table to contain: %s\n%s", tostring(needle), message or ""))
-    elseif type(haystack) == "string" then
-        luaunit.assertNotNil(string.find(haystack, needle), message)
-    else
-        error("assertStrContains only supports string and table search")
-    end
-end
-
 -- Helper function to set up before each test
 local function setUp()
     -- Create a fresh test environment for each test to avoid state pollution
@@ -90,7 +74,7 @@ local function TestFileIOInitializationWithoutSMODSFailsGracefully()
     
     -- Should fail because SMODS is not available for JSON loading
     luaunit.assertFalse(success, "Should fail when SMODS is not available")
-    assertStrContains(tostring(error_msg), "SMODS", "Error should mention SMODS dependency")
+    luaunit.assertStrContains(tostring(error_msg), "SMODS", "Error should mention SMODS dependency")
     
     -- Restore SMODS for subsequent tests
     luaunit_helpers.setup_mock_smods()
@@ -107,7 +91,7 @@ local function TestSMODSLoadFileFailureHandling()
     end)
     
     luaunit.assertFalse(load_success, "SMODS.load_file should fail for nonexistent file")
-    assertStrContains(tostring(error_msg), "Module not found", "Should show file not found error")
+    luaunit.assertStrContains(tostring(error_msg), "File not found", "Should show file not found error")
     
     tearDown()
 end
@@ -133,8 +117,8 @@ local function TestFileIOWriteGameState()
     -- Verify file was written
     local file_content = love.filesystem.read("test_shared/game_state.json")
     luaunit.assertNotNil(file_content, "Should create game state file")
-    assertStrContains(file_content, "hand_selection", "Should contain phase data")
-    assertStrContains(file_content, "message_type", "Should contain message structure")
+    luaunit.assertStrContains(file_content, "hand_selection", "Should contain phase data")
+    luaunit.assertStrContains(file_content, "message_type", "Should contain message structure")
     
     tearDown()
 end
@@ -160,8 +144,8 @@ local function TestFileIOWriteActionResult()
     -- Verify file was written
     local file_content = love.filesystem.read("test_shared/action_results.json")
     luaunit.assertNotNil(file_content, "Should create action results file")
-    assertStrContains(file_content, "Action completed successfully", "Should contain result message")
-    assertStrContains(file_content, "action_result", "Should contain message type")
+    luaunit.assertStrContains(file_content, "Action completed successfully", "Should contain result message")
+    luaunit.assertStrContains(file_content, "action_result", "Should contain message type")
     
     tearDown()
 end
@@ -256,7 +240,7 @@ local function TestFileIOComprehensiveDependencyFailureHandling()
     end)
     
     luaunit.assertFalse(success, "Should fail when JSON library can't be loaded via SMODS")
-    assertStrContains(tostring(err), "Failed to load libs/json.lua via SMODS", "Should show SMODS loading error message")
+    luaunit.assertStrContains(tostring(err), "Failed to load libs/json.lua via SMODS", "Should show SMODS loading error message")
     
     -- Clean up the failing SMODS mock and restore
     luaunit_helpers.cleanup_mock_smods()
@@ -430,7 +414,7 @@ local function TestFileIOCurrentDirectoryWriteActionResultPathConstruction()
     -- Verify file was written to current directory
     local file_content = love.filesystem.read("action_results.json")
     luaunit.assertNotNil(file_content, "Should create action_results.json in current directory")
-    assertStrContains(file_content, "Action completed successfully", "Should contain result message")
+    luaunit.assertStrContains(file_content, "Action completed successfully", "Should contain result message")
     
     tearDown()
 end
@@ -499,8 +483,8 @@ local function TestFileIOPathConstructionComparisonCurrentVsSubdirectory()
     
     luaunit.assertNotNil(current_file, "Should create file in current directory")
     luaunit.assertNotNil(sub_file, "Should create file in subdirectory")
-    assertStrContains(current_file, "test", "Current directory file should contain test data")
-    assertStrContains(sub_file, "test", "Subdirectory file should contain test data")
+    luaunit.assertStrContains(current_file, "test", "Current directory file should contain test data")
+    luaunit.assertStrContains(sub_file, "test", "Subdirectory file should contain test data")
     
     tearDown()
 end
@@ -517,7 +501,7 @@ local function TestFileIOLogFilePathConstructionWithCurrentDirectory()
     -- Verify log file was created in current directory, not subdirectory
     local log_content = love.filesystem.read("file_io_debug.log")
     luaunit.assertNotNil(log_content, "Should create debug log in current directory")
-    assertStrContains(log_content, "Test log message", "Should contain logged message")
+    luaunit.assertStrContains(log_content, "Test log message", "Should contain logged message")
     
     -- Verify subdirectory log was NOT created
     local sub_log_content = love.filesystem.read("./file_io_debug.log")

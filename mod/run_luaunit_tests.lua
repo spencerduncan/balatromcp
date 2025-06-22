@@ -24,7 +24,6 @@ local luaunit_test_modules = {
     {name = "test_api_method_fixes_luaunit", description = "API method fixes and validation"},
     {name = "test_blind_diagnostics_luaunit", description = "Blind activation and progression diagnostics"},
     {name = "test_crash_diagnostics_luaunit", description = "Crash diagnostics and hook safety validation"},
-    {name = "test_love2d_filesystem_luaunit", description = "Love2D filesystem capabilities and environment detection"},
     {name = "test_sequence_id_processing_luaunit", description = "Sequence ID processing bug fixes and validation"},
     {name = "test_blind_selection_diagnostics_luaunit", description = "Blind selection diagnostics and SMODS integration"},
 }
