@@ -16,6 +16,7 @@ local luaunit_test_modules = {
     {name = "test_file_io_luaunit", description = "FileIO JSON handling and file operations"},
     {name = "test_joker_manager_crash_safety_luaunit", description = "JokerManager crash safety and defensive programming"},
     {name = "test_shop_state_detection_luaunit", description = "ShopStateDetection shop state transition detection and timing mechanisms"},
+    {name = "test_state_extractor_luaunit", description = "StateExtractor comprehensive state extraction functionality and validation logic"},
 }
 
 local total_passed = 0
