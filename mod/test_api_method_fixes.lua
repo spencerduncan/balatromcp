@@ -37,7 +37,7 @@ function TestFramework:assert_not_nil(value, message)
     end
 end
 
-function TestFramework:assert_contains(haystack, needle, message)
+function TestFramework:luaunit.assertStrContains(haystack, needle, message)
     if type(haystack) == "table" then
         for _, v in ipairs(haystack) do
             if v == needle then
@@ -51,7 +51,7 @@ function TestFramework:assert_contains(haystack, needle, message)
                 message or "", needle, haystack))
         end
     else
-        error("assert_contains only supports string and table search")
+        error("luaunit.assertStrContains only supports string and table search")
     end
 end
 
@@ -156,15 +156,15 @@ test_framework:add_test("API method calls validation", function(t)
     }
     
     t:assert_equal(state_message.sequence, 1, "get_next_sequence_id should return 1")
-    t:assert_contains(balatro_mcp.file_io.call_log, "get_next_sequence_id", "get_next_sequence_id should be called")
+    t:luaunit.assertStrContains(balatro_mcp.file_io.call_log, "get_next_sequence_id", "get_next_sequence_id should be called")
     
     -- Test 2: Validate write_game_state is called correctly
     balatro_mcp.file_io:write_game_state(state_message)
-    t:assert_contains(balatro_mcp.file_io.call_log, "write_game_state", "write_game_state should be called")
+    t:luaunit.assertStrContains(balatro_mcp.file_io.call_log, "write_game_state", "write_game_state should be called")
     
     -- Test 3: Validate read_actions is called correctly
     balatro_mcp.file_io:read_actions()
-    t:assert_contains(balatro_mcp.file_io.call_log, "read_actions", "read_actions should be called")
+    t:luaunit.assertStrContains(balatro_mcp.file_io.call_log, "read_actions", "read_actions should be called")
     
     -- Test 4: Validate write_action_result is called correctly
     local response = {
@@ -176,7 +176,7 @@ test_framework:add_test("API method calls validation", function(t)
         new_state = {}
     }
     balatro_mcp.file_io:write_action_result(response)
-    t:assert_contains(balatro_mcp.file_io.call_log, "write_action_result", "write_action_result should be called")
+    t:luaunit.assertStrContains(balatro_mcp.file_io.call_log, "write_action_result", "write_action_result should be called")
     
     print("✓ All FileIO API method calls validated")
 end)

@@ -3,25 +3,21 @@
 -- Migrated from custom test framework to LuaUnit
 
 local luaunit = require('libs.luaunit')
+local luaunit_helpers = require('luaunit_helpers')
+
+-- Set up Love2D filesystem mock for all tests
+luaunit_helpers.setup_mock_love_filesystem()
 
 -- === LOVE2D AVAILABILITY TESTS ===
 
 function TestLove2dAvailability()
-    if not love then
-        luaunit.assertEquals(true, true, "Love2D test skipped - Love2D not available in test environment")
-        return
-    end
     luaunit.assertEquals(true, love ~= nil, "love object should be available")
     if love then
-        luaunit.assertEquals(true, love.filesystem ~= nil, "love.filesystem should be available")
+        luaunit.assertNotNil(love.filesystem, "love.filesystem should be available")
     end
 end
 
 function TestLove2dVersionInfo()
-    if not love then
-        luaunit.assertEquals(true, true, "Love2D version test skipped - Love2D not available")
-        return
-    end
     local success, major, minor, revision, codename = pcall(love.getVersion)
     if success then
         luaunit.assertNotNil(major, "Should have major version")

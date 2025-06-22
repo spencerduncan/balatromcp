@@ -2,7 +2,24 @@
 -- Tests safe joker validation, protected config access, Blueprint/Brainstorm optimization with corruption scenarios
 -- Migrated from test_joker_manager_crash_safety.lua to use LuaUnit framework with individual function exports
 
+local luaunit = require('libs.luaunit')
 local luaunit_helpers = require('luaunit_helpers')
+
+-- Helper function for string contains assertions
+local function assertStrContains(haystack, needle, message)
+    if type(haystack) == "table" then
+        for _, v in ipairs(haystack) do
+            if v == needle then
+                return -- Found it
+            end
+        end
+        error(string.format("Expected table to contain: %s\n%s", tostring(needle), message or ""))
+    elseif type(haystack) == "string" then
+        luaunit.assertNotNil(string.find(haystack, needle), message)
+    else
+        error("assertStrContains only supports string and table search")
+    end
+end
 
 -- Load JokerManager module directly for testing
 dofile("joker_manager.lua")
@@ -150,62 +167,6 @@ local function create_corrupted_joker_no_key(unique_val)
     }
 end
 
--- =============================================================================
--- ASSERTION HELPERS (preserve original behavior)
--- =============================================================================
-
-local function assert_equal(expected, actual, message)
-    if expected ~= actual then
-        error(string.format("ASSERTION FAILED: %s\nExpected: %s\nActual: %s",
-            message or "", tostring(expected), tostring(actual)))
-    end
-end
-
-local function assert_true(condition, message)
-    if not condition then
-        error(string.format("ASSERTION FAILED: %s\nExpected: true\nActual: false", message or ""))
-    end
-end
-
-local function assert_false(condition, message)
-    if condition then
-        error(string.format("ASSERTION FAILED: %s\nExpected: false\nActual: true", message or ""))
-    end
-end
-
-local function assert_nil(value, message)
-    if value ~= nil then
-        error(string.format("ASSERTION FAILED: %s\nExpected: nil\nActual: %s", message or "", tostring(value)))
-    end
-end
-
-local function assert_not_nil(value, message)
-    if value == nil then
-        error(string.format("ASSERTION FAILED: %s\nExpected: not nil\nActual: nil", message or ""))
-    end
-end
-
-local function assert_type(expected_type, value, message)
-    local actual_type = type(value)
-    if actual_type ~= expected_type then
-        error(string.format("ASSERTION FAILED: %s\nExpected type: %s\nActual type: %s",
-            message or "", expected_type, actual_type))
-    end
-end
-
-local function assert_match(text, pattern, message)
-    if not string.find(tostring(text), pattern) then
-        error(string.format("ASSERTION FAILED: %s\nText '%s' does not match pattern '%s'",
-            message or "", tostring(text), tostring(pattern)))
-    end
-end
-
-local function assert_table(value, message)
-    if type(value) ~= "table" then
-        error(string.format("ASSERTION FAILED: %s\nExpected: table\nActual: %s",
-            message or "", type(value)))
-    end
-end
 
 -- =============================================================================
 -- INITIALIZATION AND CRASH DIAGNOSTICS INJECTION TESTS
@@ -216,11 +177,11 @@ local function TestJokerManagerNewCreatesInstanceWithCorrectInitialState()
     
     local manager = JokerManager.new()
     
-    assert_not_nil(manager, "JokerManager instance should be created")
-    assert_false(manager.reorder_pending, "Initial reorder_pending should be false")
-    assert_nil(manager.pending_order, "Initial pending_order should be nil")
-    assert_false(manager.post_hand_hook_active, "Initial post_hand_hook_active should be false")
-    assert_nil(manager.crash_diagnostics, "Initial crash_diagnostics should be nil")
+    luaunit.assertNotNil(manager, "JokerManager instance should be created")
+    luaunit.assertFalse(manager.reorder_pending, "Initial reorder_pending should be false")
+    luaunit.assertNil(manager.pending_order, "Initial pending_order should be nil")
+    luaunit.assertFalse(manager.post_hand_hook_active, "Initial post_hand_hook_active should be false")
+    luaunit.assertNil(manager.crash_diagnostics, "Initial crash_diagnostics should be nil")
     
     tearDown()
 end
@@ -233,7 +194,7 @@ local function TestSetCrashDiagnosticsInjectsDiagnosticsCorrectly()
     
     manager:set_crash_diagnostics(diagnostics)
     
-    assert_equal(manager.crash_diagnostics, diagnostics, "Should inject crash diagnostics correctly")
+    luaunit.assertEquals(manager.crash_diagnostics, diagnostics, "Should inject crash diagnostics correctly")
     
     tearDown()
 end
@@ -251,7 +212,7 @@ local function TestSafeValidateJokerDetectsNilJoker()
     
     local result = manager:safe_validate_joker(nil, 1, "test_operation")
     
-    assert_false(result, "Should return false for nil joker")
+    luaunit.assertFalse(result, "Should return false for nil joker")
     
     tearDown()
 end
@@ -266,7 +227,7 @@ local function TestSafeValidateJokerDetectsNilConfig()
     local corrupted_joker = create_corrupted_joker_no_config()
     local result = manager:safe_validate_joker(corrupted_joker, 1, "test_operation")
     
-    assert_false(result, "Should return false for joker with nil config")
+    luaunit.assertFalse(result, "Should return false for joker with nil config")
     
     tearDown()
 end
@@ -281,7 +242,7 @@ local function TestSafeValidateJokerDetectsNilConfigCenter()
     local corrupted_joker = create_corrupted_joker_no_center()
     local result = manager:safe_validate_joker(corrupted_joker, 1, "test_operation")
     
-    assert_false(result, "Should return false for joker with nil config.center")
+    luaunit.assertFalse(result, "Should return false for joker with nil config.center")
     
     tearDown()
 end
@@ -296,7 +257,7 @@ local function TestSafeValidateJokerPassesForValidJoker()
     local valid_joker = create_valid_joker("j_joker", "Test Joker")
     local result = manager:safe_validate_joker(valid_joker, 1, "test_operation")
     
-    assert_true(result, "Should return true for valid joker")
+    luaunit.assertTrue(result, "Should return true for valid joker")
     
     tearDown()
 end
@@ -325,7 +286,7 @@ local function TestSafeValidateJokerLogsErrorsWithCrashDiagnostics()
             break
         end
     end
-    assert_true(found_error_log, "Should log validation errors through crash diagnostics")
+    luaunit.assertTrue(found_error_log, "Should log validation errors through crash diagnostics")
     
     tearDown()
 end
@@ -339,7 +300,7 @@ local function TestSafeValidateJokerWorksWithoutCrashDiagnostics()
     local corrupted_joker = create_corrupted_joker_no_config()
     local result = manager:safe_validate_joker(corrupted_joker, 1, "no_diagnostics_test")
     
-    assert_false(result, "Should still validate correctly without crash diagnostics")
+    luaunit.assertFalse(result, "Should still validate correctly without crash diagnostics")
     
     tearDown()
 end
@@ -356,7 +317,7 @@ local function TestSafeGetJokerKeyReturnsNilForInvalidJoker()
     
     local key = manager:safe_get_joker_key(corrupted_joker, 1, "key_test")
     
-    assert_nil(key, "Should return nil for corrupted joker")
+    luaunit.assertNil(key, "Should return nil for corrupted joker")
     
     tearDown()
 end
@@ -369,7 +330,7 @@ local function TestSafeGetJokerKeyReturnsNilForMissingKey()
     
     local key = manager:safe_get_joker_key(corrupted_joker, 1, "key_test")
     
-    assert_nil(key, "Should return nil for joker with missing key")
+    luaunit.assertNil(key, "Should return nil for joker with missing key")
     
     tearDown()
 end
@@ -382,7 +343,7 @@ local function TestSafeGetJokerKeyReturnsCorrectKeyForValidJoker()
     
     local key = manager:safe_get_joker_key(valid_joker, 1, "key_test")
     
-    assert_equal(key, "j_blueprint", "Should return correct key for valid joker")
+    luaunit.assertEquals(key, "j_blueprint", "Should return correct key for valid joker")
     
     tearDown()
 end
@@ -399,13 +360,13 @@ local function TestReorderJokersValidatesInputParameters()
     
     -- Test nil order
     local success, error = manager:reorder_jokers(nil)
-    assert_false(success, "Should reject nil order")
-    assert_match(error, "No new order specified", "Should provide appropriate error message")
+    luaunit.assertFalse(success, "Should reject nil order")
+    luaunit.assertStrContains(error, "No new order specified", "Should provide appropriate error message")
     
     -- Test empty order
     success, error = manager:reorder_jokers({})
-    assert_false(success, "Should reject empty order")
-    assert_match(error, "No new order specified", "Should provide appropriate error message")
+    luaunit.assertFalse(success, "Should reject empty order")
+    luaunit.assertStrContains(error, "No new order specified", "Should provide appropriate error message")
     
     tearDown()
 end
@@ -421,8 +382,8 @@ local function TestReorderJokersValidatesGJokersCardsAvailability()
     G.jokers.cards = nil
     
     local success, error = manager:reorder_jokers({0})
-    assert_false(success, "Should reject when G.jokers.cards is nil")
-    assert_match(error, "No jokers available", "Should provide appropriate error message")
+    luaunit.assertFalse(success, "Should reject when G.jokers.cards is nil")
+    luaunit.assertStrContains(error, "No jokers available", "Should provide appropriate error message")
     
     tearDown()
 end
@@ -442,8 +403,8 @@ local function TestReorderJokersValidatesAllJokersBeforeReordering()
     }
     
     local success, error = manager:reorder_jokers({0, 1, 2})
-    assert_false(success, "Should reject reordering when jokers are corrupted")
-    assert_match(error, "corrupted", "Should indicate corruption in error message")
+    luaunit.assertFalse(success, "Should reject reordering when jokers are corrupted")
+    luaunit.assertStrContains(error, "corrupted", "Should indicate corruption in error message")
     
     tearDown()
 end
@@ -458,8 +419,8 @@ local function TestReorderJokersValidatesOrderLengthMatchesJokerCount()
     }
     
     local success, error = manager:reorder_jokers({0})  -- Wrong length
-    assert_false(success, "Should reject order with wrong length")
-    assert_match(error, "length doesn't match", "Should indicate length mismatch")
+    luaunit.assertFalse(success, "Should reject order with wrong length")
+    luaunit.assertStrContains(error, "length doesn't match", "Should indicate length mismatch")
     
     tearDown()
 end
@@ -474,8 +435,8 @@ local function TestReorderJokersValidatesIndicesAreInRange()
     }
     
     local success, error = manager:reorder_jokers({0, 5})  -- Index 5 out of range
-    assert_false(success, "Should reject out-of-range indices")
-    assert_match(error, "Invalid joker index", "Should indicate invalid index")
+    luaunit.assertFalse(success, "Should reject out-of-range indices")
+    luaunit.assertStrContains(error, "Invalid joker index", "Should indicate invalid index")
     
     tearDown()
 end
@@ -490,8 +451,8 @@ local function TestReorderJokersDetectsDuplicateIndices()
     }
     
     local success, error = manager:reorder_jokers({0, 0})  -- Duplicate index
-    assert_false(success, "Should reject duplicate indices")
-    assert_match(error, "Duplicate index", "Should indicate duplicate index")
+    luaunit.assertFalse(success, "Should reject duplicate indices")
+    luaunit.assertStrContains(error, "Duplicate index", "Should indicate duplicate index")
     
     tearDown()
 end
@@ -509,10 +470,10 @@ local function TestReorderJokersPerformsSuccessfulReordering()
     
     local success, error = manager:reorder_jokers({1, 0})  -- Reverse order
     
-    assert_true(success, "Should successfully reorder valid jokers")
-    assert_nil(error, "Should not return error on success")
-    assert_equal(G.jokers.cards[1], joker2, "Should place second joker first")
-    assert_equal(G.jokers.cards[2], joker1, "Should place first joker second")
+    luaunit.assertTrue(success, "Should successfully reorder valid jokers")
+    luaunit.assertNil(error, "Should not return error on success")
+    luaunit.assertEquals(G.jokers.cards[1], joker2, "Should place second joker first")
+    luaunit.assertEquals(G.jokers.cards[2], joker1, "Should place first joker second")
     
     tearDown()
 end
@@ -542,8 +503,8 @@ local function TestReorderJokersValidatesJokersDuringReordering()
     
     local success, error = manager:reorder_jokers({1, 0})
     
-    assert_false(success, "Should detect corruption during reordering")
-    assert_match(error, "became corrupted", "Should indicate corruption during reorder")
+    luaunit.assertFalse(success, "Should detect corruption during reordering")
+    luaunit.assertStrContains(error, "became corrupted", "Should indicate corruption during reorder")
     
     tearDown()
 end
@@ -563,8 +524,8 @@ local function TestGetBlueprintBrainstormOptimizationHandlesMissingJokers()
     
     local optimization = manager:get_blueprint_brainstorm_optimization()
     
-    assert_table(optimization, "Should return empty table when no jokers available")
-    assert_equal(#optimization, 0, "Should return empty optimization")
+    luaunit.assertIsTable(optimization, "Should return empty table when no jokers available")
+    luaunit.assertEquals(#optimization, 0, "Should return empty optimization")
     
     tearDown()
 end
@@ -592,8 +553,8 @@ local function TestGetBlueprintBrainstormOptimizationSafelyHandlesCorruptedJoker
     
     _G.print = original_print
     
-    assert_table(optimization, "Should return optimization despite corrupted jokers")
-    assert_equal(#optimization, 2, "Should include only valid jokers")
+    luaunit.assertIsTable(optimization, "Should return optimization despite corrupted jokers")
+    luaunit.assertEquals(#optimization, 2, "Should include only valid jokers")
     
     -- Check that warnings were logged for corrupted jokers
     local found_warning = false
@@ -603,7 +564,7 @@ local function TestGetBlueprintBrainstormOptimizationSafelyHandlesCorruptedJoker
             break
         end
     end
-    assert_true(found_warning, "Should warn about corrupted jokers being skipped")
+    luaunit.assertTrue(found_warning, "Should warn about corrupted jokers being skipped")
     
     tearDown()
 end
@@ -624,13 +585,13 @@ local function TestGetBlueprintBrainstormOptimizationCreatesOptimalOrder()
     
     local optimization = manager:get_blueprint_brainstorm_optimization()
     
-    assert_equal(#optimization, 4, "Should include all valid jokers")
+    luaunit.assertEquals(#optimization, 4, "Should include all valid jokers")
     
     -- Verify order: high-value jokers first, then Blueprint/Brainstorm
-    assert_equal(optimization[1], 1, "High value joker should be first")
-    assert_equal(optimization[2], 3, "Another joker should be second")
-    assert_equal(optimization[3], 0, "Blueprint should be near end")
-    assert_equal(optimization[4], 2, "Brainstorm should be at end")
+    luaunit.assertEquals(optimization[1], 1, "High value joker should be first")
+    luaunit.assertEquals(optimization[2], 3, "Another joker should be second")
+    luaunit.assertEquals(optimization[3], 0, "Blueprint should be near end")
+    luaunit.assertEquals(optimization[4], 2, "Brainstorm should be at end")
     
     tearDown()
 end
@@ -670,9 +631,9 @@ local function TestGetBlueprintBrainstormOptimizationLogsAnalysisProgress()
         end
     end
     
-    assert_true(found_analysis_log, "Should log analysis start")
-    assert_true(found_blueprint_log, "Should log Blueprint detection")
-    assert_true(found_brainstorm_log, "Should log Brainstorm detection")
+    luaunit.assertTrue(found_analysis_log, "Should log analysis start")
+    luaunit.assertTrue(found_blueprint_log, "Should log Blueprint detection")
+    luaunit.assertTrue(found_brainstorm_log, "Should log Brainstorm detection")
     
     tearDown()
 end
@@ -692,8 +653,8 @@ local function TestGetJokerInfoHandlesMissingJokersGracefully()
     
     local info = manager:get_joker_info()
     
-    assert_table(info, "Should return empty table when no jokers available")
-    assert_equal(#info, 0, "Should return empty info array")
+    luaunit.assertIsTable(info, "Should return empty table when no jokers available")
+    luaunit.assertEquals(#info, 0, "Should return empty info array")
     
     tearDown()
 end
@@ -713,19 +674,19 @@ local function TestGetJokerInfoExtractsInfoSafelyFromCorruptedJokers()
     
     local info = manager:get_joker_info()
     
-    assert_equal(#info, 2, "Should extract info for actual joker slots")
+    luaunit.assertEquals(#info, 2, "Should extract info for actual joker slots")
     
     -- Check valid joker info
-    assert_equal(info[1].key, "j_joker", "Should extract key from valid joker")
-    assert_equal(info[1].name, "Good Joker", "Should extract name from valid joker")
+    luaunit.assertEquals(info[1].key, "j_joker", "Should extract key from valid joker")
+    luaunit.assertEquals(info[1].name, "Good Joker", "Should extract name from valid joker")
     
     -- Check corrupted joker info uses safe defaults
-    assert_equal(info[2].key, "unknown", "Should use safe default for corrupted joker key")
-    assert_equal(info[2].name, "Corrupted Joker", "Should use safe default for corrupted joker name")
+    luaunit.assertEquals(info[2].key, "unknown", "Should use safe default for corrupted joker key")
+    luaunit.assertEquals(info[2].name, "Corrupted Joker", "Should use safe default for corrupted joker name")
     
     -- Check nil joker info - adjust expectations based on actual implementation
     if info[3] then
-        assert_equal(info[3].cost, 0, "Should use safe default for nil joker cost")
+        luaunit.assertEquals(info[3].cost, 0, "Should use safe default for nil joker cost")
     end
     
     tearDown()
@@ -744,16 +705,16 @@ local function TestGetJokerInfoExtractsCompleteInfoFromValidJokers()
     
     local info = manager:get_joker_info()
     
-    assert_equal(#info, 1, "Should extract info for one joker")
+    luaunit.assertEquals(#info, 1, "Should extract info for one joker")
     
     local joker_info = info[1]
-    assert_equal(joker_info.index, 0, "Should use 0-based index")
-    assert_equal(joker_info.id, 1234, "Should extract unique ID")
-    assert_equal(joker_info.key, "j_blueprint", "Should extract joker key")
-    assert_equal(joker_info.name, "Blueprint", "Should extract joker name")
-    assert_equal(joker_info.rarity, 1, "Should extract joker rarity")
-    assert_equal(joker_info.cost, 5, "Should extract sell cost")
-    assert_equal(joker_info.edition, "foil", "Should extract edition type")
+    luaunit.assertEquals(joker_info.index, 0, "Should use 0-based index")
+    luaunit.assertEquals(joker_info.id, 1234, "Should extract unique ID")
+    luaunit.assertEquals(joker_info.key, "j_blueprint", "Should extract joker key")
+    luaunit.assertEquals(joker_info.name, "Blueprint", "Should extract joker name")
+    luaunit.assertEquals(joker_info.rarity, 1, "Should extract joker rarity")
+    luaunit.assertEquals(joker_info.cost, 5, "Should extract sell cost")
+    luaunit.assertEquals(joker_info.edition, "foil", "Should extract edition type")
     
     tearDown()
 end
@@ -793,9 +754,9 @@ local function TestGetJokerInfoLogsExtractionProgress()
         end
     end
     
-    assert_true(found_start_log, "Should log extraction start")
-    assert_true(found_warning_log, "Should warn about corrupted jokers")
-    assert_true(found_success_log, "Should log successful completion")
+    luaunit.assertTrue(found_start_log, "Should log extraction start")
+    luaunit.assertTrue(found_warning_log, "Should warn about corrupted jokers")
+    luaunit.assertTrue(found_success_log, "Should log successful completion")
     
     tearDown()
 end
@@ -839,10 +800,10 @@ local function TestJokerManagerIntegratesCrashDiagnosticsAcrossAllOperations()
         end
     end
     
-    assert_true(diagnostic_logs > 5, "Should have extensive diagnostic logging across operations")
-    assert_false(reorder_success, "Should reject reordering with corrupted jokers")
-    assert_equal(#info, 3, "Should extract info for all joker slots")
-    assert_equal(#optimization, 2, "Should optimize only valid jokers")
+    luaunit.assertTrue(diagnostic_logs > 5, "Should have extensive diagnostic logging across operations")
+    luaunit.assertFalse(reorder_success, "Should reject reordering with corrupted jokers")
+    luaunit.assertEquals(#info, 3, "Should extract info for all joker slots")
+    luaunit.assertEquals(#optimization, 2, "Should optimize only valid jokers")
     
     tearDown()
 end

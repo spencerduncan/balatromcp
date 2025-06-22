@@ -2,44 +2,8 @@
 -- Tests the "." (current directory) vs subdirectory path logic
 -- Migrated from test_debug_logger_path_handling.lua to use LuaUnit framework
 
+local luaunit = require('libs.luaunit')
 local luaunit_helpers = require('luaunit_helpers')
-
--- Simple assertion wrapper functions that replicate the expected behavior
-local function assert_equal(expected, actual, message)
-    if expected ~= actual then
-        error(string.format("ASSERTION FAILED: %s\nExpected: %s\nActual: %s", 
-            message or "", tostring(expected), tostring(actual)))
-    end
-end
-
-local function assert_true(condition, message)
-    if not condition then
-        error(string.format("ASSERTION FAILED: %s\nExpected: true\nActual: false", message or ""))
-    end
-end
-
-local function assert_nil(value, message)
-    if value ~= nil then
-        error(string.format("ASSERTION FAILED: %s\nExpected: nil\nActual: %s", message or "", tostring(value)))
-    end
-end
-
-local function assert_not_nil(value, message)
-    if value == nil then
-        error(string.format("ASSERTION FAILED: %s\nExpected: not nil\nActual: nil", message or ""))
-    end
-end
-
-local function assert_contains(haystack, needle, message)
-    if type(haystack) == "string" then
-        if not string.find(haystack, needle, 1, true) then
-            error(string.format("ASSERTION FAILED: %s\nExpected string to contain: %s\nActual string: %s", 
-                message or "", needle, haystack))
-        end
-    else
-        error("assert_contains only supports string search")
-    end
-end
 
 -- DebugLogger Path Handling Test Class
 local TestDebugLoggerPathHandling = {}
@@ -94,12 +58,12 @@ function TestDebugLoggerPathHandling:testDebugLoggerInitializationWithSubdirecto
     -- Test initialization with subdirectory
     local logger = DebugLogger.new(nil, "./")
     
-    assert_not_nil(logger, "DebugLogger should initialize with subdirectory")
-    assert_equal("./", logger.base_path, "Base path should be './' for subdirectory")
-    assert_equal(".//debug.log", logger.log_file, "Log file should be './/debug.log'")
+    luaunit.assertNotNil(logger, "DebugLogger should initialize with subdirectory")
+    luaunit.assertEquals("./", logger.base_path, "Base path should be './' for subdirectory")
+    luaunit.assertEquals(".//debug.log", logger.log_file, "Log file should be './/debug.log'")
     
     -- Verify directory creation was attempted for subdirectory
-    assert_true(love.filesystem.directories["./"], "Should create './' directory")
+    luaunit.assertTrue(love.filesystem.directories["./"], "Should create './' directory")
 end
 
 -- Test 2: DebugLogger default initialization
@@ -109,12 +73,12 @@ function TestDebugLoggerPathHandling:testDebugLoggerDefaultInitialization()
     -- Test default initialization (no base_path provided)
     local logger = DebugLogger.new()
     
-    assert_not_nil(logger, "DebugLogger should initialize with defaults")
-    assert_equal("./", logger.base_path, "Default base path should be './'")
-    assert_equal(".//debug.log", logger.log_file, "Default log file should be './/debug.log'")
+    luaunit.assertNotNil(logger, "DebugLogger should initialize with defaults")
+    luaunit.assertEquals("./", logger.base_path, "Default base path should be './'")
+    luaunit.assertEquals(".//debug.log", logger.log_file, "Default log file should be './/debug.log'")
     
     -- Verify default directory creation
-    assert_true(love.filesystem.directories["./"], "Should create default './' directory")
+    luaunit.assertTrue(love.filesystem.directories["./"], "Should create default './' directory")
 end
 
 -- Test 3: DebugLogger custom log file path with current directory
@@ -124,12 +88,12 @@ function TestDebugLoggerPathHandling:testDebugLoggerCustomLogFilePathWithCurrent
     -- Test custom log file path with current directory base path
     local logger = DebugLogger.new("custom.log", ".")
     
-    assert_not_nil(logger, "DebugLogger should initialize with custom log file")
-    assert_equal(".", logger.base_path, "Base path should be current directory")
-    assert_equal("custom.log", logger.log_file, "Should use custom log file path")
+    luaunit.assertNotNil(logger, "DebugLogger should initialize with custom log file")
+    luaunit.assertEquals(".", logger.base_path, "Base path should be current directory")
+    luaunit.assertEquals("custom.log", logger.log_file, "Should use custom log file path")
     
     -- Verify no directory creation for current directory
-    assert_nil(love.filesystem.directories["."], "Should not create '.' directory")
+    luaunit.assertNil(love.filesystem.directories["."], "Should not create '.' directory")
 end
 
 -- Test 4: DebugLogger custom log file path with subdirectory
@@ -139,12 +103,12 @@ function TestDebugLoggerPathHandling:testDebugLoggerCustomLogFilePathWithSubdire
     -- Test custom log file path with subdirectory base path
     local logger = DebugLogger.new("custom.log", "test_logs")
     
-    assert_not_nil(logger, "DebugLogger should initialize with custom log and subdirectory")
-    assert_equal("test_logs", logger.base_path, "Base path should be 'test_logs'")
-    assert_equal("custom.log", logger.log_file, "Should use custom log file path")
+    luaunit.assertNotNil(logger, "DebugLogger should initialize with custom log and subdirectory")
+    luaunit.assertEquals("test_logs", logger.base_path, "Base path should be 'test_logs'")
+    luaunit.assertEquals("custom.log", logger.log_file, "Should use custom log file path")
     
     -- Verify directory creation for subdirectory
-    assert_true(love.filesystem.directories["test_logs"], "Should create 'test_logs' directory")
+    luaunit.assertTrue(love.filesystem.directories["test_logs"], "Should create 'test_logs' directory")
 end
 
 -- Test 5: DebugLogger test_file_communication with current directory
@@ -157,12 +121,12 @@ function TestDebugLoggerPathHandling:testDebugLoggerTestFileCommunicationWithCur
     
     -- Verify test file was created in current directory
     local test_file_content = love.filesystem.read("test_write.json")
-    assert_not_nil(test_file_content, "Should create test file in current directory")
-    assert_contains(test_file_content, "test", "Test file should contain test data")
+    luaunit.assertNotNil(test_file_content, "Should create test file in current directory")
+    luaunit.assertStrContains(test_file_content, "test", "Test file should contain test data")
     
     -- Verify subdirectory test file was NOT created
     local sub_test_file = love.filesystem.read("./test_write.json")
-    assert_nil(sub_test_file, "Should not create test file in './' subdirectory")
+    luaunit.assertNil(sub_test_file, "Should not create test file in './' subdirectory")
 end
 
 -- Test 6: DebugLogger test_file_communication with subdirectory
@@ -175,12 +139,12 @@ function TestDebugLoggerPathHandling:testDebugLoggerTestFileCommunicationWithSub
     
     -- Verify test file was created in subdirectory
     local test_file_content = love.filesystem.read("test_shared/test_write.json")
-    assert_not_nil(test_file_content, "Should create test file in subdirectory")
-    assert_contains(test_file_content, "test", "Test file should contain test data")
+    luaunit.assertNotNil(test_file_content, "Should create test file in subdirectory")
+    luaunit.assertStrContains(test_file_content, "test", "Test file should contain test data")
     
     -- Verify current directory test file was NOT created
     local current_test_file = love.filesystem.read("test_write.json")
-    assert_nil(current_test_file, "Should not create test file in current directory")
+    luaunit.assertNil(current_test_file, "Should not create test file in current directory")
 end
 
 -- Test 7: DebugLogger directory creation behavior comparison
@@ -189,16 +153,16 @@ function TestDebugLoggerPathHandling:testDebugLoggerDirectoryCreationBehaviorCom
     
     -- Test current directory (should not create directory)
     local logger_current = DebugLogger.new(nil, ".")
-    assert_nil(love.filesystem.directories["."], "Should not create '.' directory")
+    luaunit.assertNil(love.filesystem.directories["."], "Should not create '.' directory")
     
     -- Clear and test subdirectory (should create directory)
     love.filesystem.directories = {}
     local logger_sub = DebugLogger.new(nil, "logs")
-    assert_true(love.filesystem.directories["logs"], "Should create 'logs' directory")
+    luaunit.assertTrue(love.filesystem.directories["logs"], "Should create 'logs' directory")
     
     -- Verify both loggers work correctly
-    assert_equal(".", logger_current.base_path, "Current directory logger should have '.' base path")
-    assert_equal("logs", logger_sub.base_path, "Subdirectory logger should have 'logs' base path")
+    luaunit.assertEquals(".", logger_current.base_path, "Current directory logger should have '.' base path")
+    luaunit.assertEquals("logs", logger_sub.base_path, "Subdirectory logger should have 'logs' base path")
 end
 
 -- Standalone test runner function (for compatibility with LuaUnit infrastructure)
