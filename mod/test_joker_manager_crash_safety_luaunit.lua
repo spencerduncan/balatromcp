@@ -40,11 +40,18 @@ function setup_test_environment()
         jokers = {
             cards = {}
         },
-        CARD_W = 100,
+        CARD_W = 71,  -- Standard card width that joker_manager expects
         FUNCS = {
             evaluate_play = function() return true end
         }
     }
+    
+    -- Ensure global G variable references the same object
+    G = _G.G
+    
+    -- Set global graphics constants that other modules might need
+    _G.CARD_W = 71  -- Standard card width in Balatro
+    _G.CARD_H = 95  -- Standard card height in Balatro
     
     -- Mock love.timer for timing tests
     _G.love = _G.love or {}

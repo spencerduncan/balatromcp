@@ -2,7 +2,6 @@
 -- Handles communication through JSON files with the MCP server
 
 local FileIO = {}
-local json = require("libs.json")
 FileIO.__index = FileIO
 
 function FileIO.new(base_path)
@@ -14,6 +13,21 @@ function FileIO.new(base_path)
     
     -- Initialize debug logging for this component
     self.component_name = "FILE_IO"
+    
+    -- Load JSON library via SMODS
+    if not SMODS then
+        error("SMODS not available - required for JSON library loading")
+    end
+    
+    local json_loader = SMODS.load_file("libs/json.lua")
+    if not json_loader then
+        error("Failed to load required JSON library via SMODS")
+    end
+    
+    self.json = json_loader()
+    if not self.json then
+        error("Failed to load required JSON library")
+    end
     
     -- Test and log filesystem availability
     if love and love.filesystem then

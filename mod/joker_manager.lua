@@ -135,9 +135,12 @@ function JokerManager:update_joker_positions()
         return
     end
     
+    -- Use global CARD_W constant with fallback to G.CARD_W or default
+    local card_width = _G.CARD_W or G.CARD_W or 71
+    
     for i, joker in ipairs(G.jokers.cards) do
         if joker.T then
-            joker.T.x = (i - 1) * G.CARD_W * 0.85
+            joker.T.x = (i - 1) * card_width * 0.85
         end
     end
 end

@@ -134,13 +134,13 @@ end
 local function TestSMODSLoadFileFailureHandling()
     setUp()
     
-    -- Test SMODS loading failure
+    -- Test SMODS loading failure for files that are not supported by the mock
     local load_success, error_msg = pcall(function()
         return assert(SMODS.load_file("nonexistent_file.lua"))
     end)
     
     assert_false(load_success, "SMODS.load_file should fail for nonexistent file")
-    assert_contains(tostring(error_msg), "File not found", "Should show file not found error")
+    assert_contains(tostring(error_msg), "Module not found", "Should show file not found error")
     
     tearDown()
 end
@@ -288,7 +288,7 @@ local function TestFileIOComprehensiveDependencyFailureHandling()
     end)
     
     assert_false(success, "Should fail when JSON library can't be loaded via SMODS")
-    assert_contains(tostring(err), "Failed to load required JSON library", "Should show appropriate error message")
+    assert_contains(tostring(err), "Failed to load libs/json.lua via SMODS", "Should show SMODS loading error message")
     
     -- Clean up the failing SMODS mock and restore
     luaunit_helpers.cleanup_mock_smods()

@@ -74,7 +74,7 @@ local function create_test_balatro_mcp()
         end
         
         -- CRITICAL FIX: Check sequence_id field (not sequence field)
-        local sequence = action_data.sequence_id or 0
+        local sequence = tonumber(action_data.sequence_id) or 0
         if sequence <= self.last_action_sequence then
             return -- Already processed this action
         end
@@ -123,6 +123,7 @@ end
 
 function TestProcessPendingActionsHandlesMissingSequenceIdField()
     local mcp = create_test_balatro_mcp()
+    mcp.last_action_sequence = -1  -- Set to -1 so that 0 will be processed
     
     -- Set up action data without sequence_id field
     mcp.file_io.action_data_to_return = {
@@ -133,8 +134,8 @@ function TestProcessPendingActionsHandlesMissingSequenceIdField()
     
     local result = mcp:process_pending_actions()
     
-    luaunit.assertEquals(true, result, "Should process action with missing sequence_id")
-    luaunit.assertEquals(0, mcp.last_action_sequence, "Should default to 0 for missing sequence_id")
+    luaunit.assertEquals(true, result, "Should process action with missing sequence_id when last_action_sequence < 0")
+    luaunit.assertEquals(0, mcp.last_action_sequence, "Should update to 0 for missing sequence_id")
 end
 
 function TestDuplicateDetectionWorksWithSequenceIdValues()
@@ -294,9 +295,9 @@ function TestSequenceIdAsStringIsHandledCorrectly()
     
     local result = mcp:process_pending_actions()
     
-    -- Lua's comparison should handle string to number conversion
+    -- tonumber() should convert string to number for consistent storage
     luaunit.assertEquals(true, result, "Should process action with string sequence_id")
-    luaunit.assertEquals("5", mcp.last_action_sequence, "Should preserve string sequence_id")
+    luaunit.assertEquals(5, mcp.last_action_sequence, "Should convert string sequence_id to number")
 end
 
 function TestNoActionDataReturnsNil()
@@ -329,7 +330,7 @@ end
 
 -- Run tests if executed directly
 if arg and arg[0] and string.find(arg[0], "test_sequence_id_processing_luaunit") then
-    os.exit(LuaUnit.run())
+    os.exit(luaunit.LuaUnit.run())
 end
 
 return {

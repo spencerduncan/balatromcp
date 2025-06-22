@@ -142,7 +142,7 @@ end
 
 -- Run tests if executed directly
 if arg and arg[0] and string.find(arg[0], "test_api_method_fixes_luaunit") then
-    os.exit(LuaUnit.run())
+    os.exit(luaunit.LuaUnit.run())
 end
 
 return {
