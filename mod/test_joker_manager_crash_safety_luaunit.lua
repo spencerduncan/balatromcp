@@ -1,6 +1,6 @@
 -- LuaUnit migration of JokerManager crash safety tests
 -- Tests safe joker validation, protected config access, Blueprint/Brainstorm optimization with corruption scenarios
--- Migrated from test_joker_manager_crash_safety.lua to use LuaUnit framework with compatibility layer
+-- Migrated from test_joker_manager_crash_safety.lua to use LuaUnit framework with individual function exports
 
 local luaunit_helpers = require('luaunit_helpers')
 
@@ -8,31 +8,24 @@ local luaunit_helpers = require('luaunit_helpers')
 dofile("joker_manager.lua")
 local JokerManager = _G.JokerManager or require("joker_manager")
 
--- JokerManager Test Class with LuaUnit setUp/tearDown integration
-local TestJokerManagerCrashSafety = {}
-TestJokerManagerCrashSafety.__index = TestJokerManagerCrashSafety
-setmetatable(TestJokerManagerCrashSafety, {__index = luaunit_helpers.LuaUnitTestBase})
+-- Set up test environment once
+local test_env = luaunit_helpers.LuaUnitTestBase:new()
 
-function TestJokerManagerCrashSafety:new()
-    local self = luaunit_helpers.LuaUnitTestBase:new()
-    setmetatable(self, TestJokerManagerCrashSafety)
-    self.mock_crash_diagnostics = nil
-    return self
-end
-
-function TestJokerManagerCrashSafety:setUp()
-    luaunit_helpers.LuaUnitTestBase.setUp(self)
+-- Helper function to set up before each test
+local function setUp()
+    test_env:setUp()
     
     -- Setup test environment with mock G object and love.timer
-    self:setup_test_environment()
+    setup_test_environment()
     
     -- Create mock CrashDiagnostics
-    self.mock_crash_diagnostics = self:create_mock_crash_diagnostics()
+    test_env.mock_crash_diagnostics = create_mock_crash_diagnostics()
 end
 
-function TestJokerManagerCrashSafety:tearDown()
-    self.mock_crash_diagnostics = nil
-    luaunit_helpers.LuaUnitTestBase.tearDown(self)
+-- Helper function to tear down after each test
+local function tearDown()
+    test_env.mock_crash_diagnostics = nil
+    test_env:tearDown()
 end
 
 -- =============================================================================
@@ -40,7 +33,7 @@ end
 -- =============================================================================
 
 -- Setup function to create clean test environment
-function TestJokerManagerCrashSafety:setup_test_environment()
+function setup_test_environment()
     -- Mock global G object with joker management structure
     _G.G = {
         STATE = 1,
@@ -60,7 +53,7 @@ function TestJokerManagerCrashSafety:setup_test_environment()
 end
 
 -- Mock CrashDiagnostics for testing
-function TestJokerManagerCrashSafety:create_mock_crash_diagnostics()
+function create_mock_crash_diagnostics()
     local CrashDiagnostics = {}
     CrashDiagnostics.__index = CrashDiagnostics
     
@@ -93,7 +86,7 @@ function TestJokerManagerCrashSafety:create_mock_crash_diagnostics()
 end
 
 -- Helper functions to create test joker objects
-function TestJokerManagerCrashSafety:create_valid_joker(key, name, unique_val)
+local function create_valid_joker(key, name, unique_val)
     return {
         config = {
             center = {
@@ -109,15 +102,15 @@ function TestJokerManagerCrashSafety:create_valid_joker(key, name, unique_val)
     }
 end
 
-function TestJokerManagerCrashSafety:create_blueprint_joker(unique_val)
-    return self:create_valid_joker("j_blueprint", "Blueprint", unique_val)
+local function create_blueprint_joker(unique_val)
+    return create_valid_joker("j_blueprint", "Blueprint", unique_val)
 end
 
-function TestJokerManagerCrashSafety:create_brainstorm_joker(unique_val)
-    return self:create_valid_joker("j_brainstorm", "Brainstorm", unique_val)
+local function create_brainstorm_joker(unique_val)
+    return create_valid_joker("j_brainstorm", "Brainstorm", unique_val)
 end
 
-function TestJokerManagerCrashSafety:create_corrupted_joker_no_config(unique_val)
+local function create_corrupted_joker_no_config(unique_val)
     return {
         unique_val = unique_val or math.random(1000, 9999),
         sell_cost = 3,
@@ -126,7 +119,7 @@ function TestJokerManagerCrashSafety:create_corrupted_joker_no_config(unique_val
     }
 end
 
-function TestJokerManagerCrashSafety:create_corrupted_joker_no_center(unique_val)
+local function create_corrupted_joker_no_center(unique_val)
     return {
         config = {
             -- Missing center field
@@ -136,7 +129,7 @@ function TestJokerManagerCrashSafety:create_corrupted_joker_no_center(unique_val
     }
 end
 
-function TestJokerManagerCrashSafety:create_corrupted_joker_no_key(unique_val)
+local function create_corrupted_joker_no_key(unique_val)
     return {
         config = {
             center = {
@@ -154,38 +147,38 @@ end
 -- ASSERTION HELPERS (preserve original behavior)
 -- =============================================================================
 
-function TestJokerManagerCrashSafety:assert_equal(expected, actual, message)
+local function assert_equal(expected, actual, message)
     if expected ~= actual then
         error(string.format("ASSERTION FAILED: %s\nExpected: %s\nActual: %s",
             message or "", tostring(expected), tostring(actual)))
     end
 end
 
-function TestJokerManagerCrashSafety:assert_true(condition, message)
+local function assert_true(condition, message)
     if not condition then
         error(string.format("ASSERTION FAILED: %s\nExpected: true\nActual: false", message or ""))
     end
 end
 
-function TestJokerManagerCrashSafety:assert_false(condition, message)
+local function assert_false(condition, message)
     if condition then
         error(string.format("ASSERTION FAILED: %s\nExpected: false\nActual: true", message or ""))
     end
 end
 
-function TestJokerManagerCrashSafety:assert_nil(value, message)
+local function assert_nil(value, message)
     if value ~= nil then
         error(string.format("ASSERTION FAILED: %s\nExpected: nil\nActual: %s", message or "", tostring(value)))
     end
 end
 
-function TestJokerManagerCrashSafety:assert_not_nil(value, message)
+local function assert_not_nil(value, message)
     if value == nil then
         error(string.format("ASSERTION FAILED: %s\nExpected: not nil\nActual: nil", message or ""))
     end
 end
 
-function TestJokerManagerCrashSafety:assert_type(expected_type, value, message)
+local function assert_type(expected_type, value, message)
     local actual_type = type(value)
     if actual_type ~= expected_type then
         error(string.format("ASSERTION FAILED: %s\nExpected type: %s\nActual type: %s",
@@ -193,14 +186,14 @@ function TestJokerManagerCrashSafety:assert_type(expected_type, value, message)
     end
 end
 
-function TestJokerManagerCrashSafety:assert_match(text, pattern, message)
+local function assert_match(text, pattern, message)
     if not string.find(tostring(text), pattern) then
         error(string.format("ASSERTION FAILED: %s\nText '%s' does not match pattern '%s'",
             message or "", tostring(text), tostring(pattern)))
     end
 end
 
-function TestJokerManagerCrashSafety:assert_table(value, message)
+local function assert_table(value, message)
     if type(value) ~= "table" then
         error(string.format("ASSERTION FAILED: %s\nExpected: table\nActual: %s",
             message or "", type(value)))
@@ -211,75 +204,101 @@ end
 -- INITIALIZATION AND CRASH DIAGNOSTICS INJECTION TESTS
 -- =============================================================================
 
-function TestJokerManagerCrashSafety:testJokerManagerNewCreatesInstanceWithCorrectInitialState()
+local function TestJokerManagerNewCreatesInstanceWithCorrectInitialState()
+    setUp()
+    
     local manager = JokerManager.new()
     
-    self:assert_not_nil(manager, "JokerManager instance should be created")
-    self:assert_false(manager.reorder_pending, "Initial reorder_pending should be false")
-    self:assert_nil(manager.pending_order, "Initial pending_order should be nil")
-    self:assert_false(manager.post_hand_hook_active, "Initial post_hand_hook_active should be false")
-    self:assert_nil(manager.crash_diagnostics, "Initial crash_diagnostics should be nil")
+    assert_not_nil(manager, "JokerManager instance should be created")
+    assert_false(manager.reorder_pending, "Initial reorder_pending should be false")
+    assert_nil(manager.pending_order, "Initial pending_order should be nil")
+    assert_false(manager.post_hand_hook_active, "Initial post_hand_hook_active should be false")
+    assert_nil(manager.crash_diagnostics, "Initial crash_diagnostics should be nil")
+    
+    tearDown()
 end
 
-function TestJokerManagerCrashSafety:testSetCrashDiagnosticsInjectsDiagnosticsCorrectly()
+local function TestSetCrashDiagnosticsInjectsDiagnosticsCorrectly()
+    setUp()
+    
     local manager = JokerManager.new()
-    local diagnostics = self.mock_crash_diagnostics.new()
+    local diagnostics = test_env.mock_crash_diagnostics.new()
     
     manager:set_crash_diagnostics(diagnostics)
     
-    self:assert_equal(manager.crash_diagnostics, diagnostics, "Should inject crash diagnostics correctly")
+    assert_equal(manager.crash_diagnostics, diagnostics, "Should inject crash diagnostics correctly")
+    
+    tearDown()
 end
 
 -- =============================================================================
 -- SAFE JOKER VALIDATION TESTS
 -- =============================================================================
 
-function TestJokerManagerCrashSafety:testSafeValidateJokerDetectsNilJoker()
+local function TestSafeValidateJokerDetectsNilJoker()
+    setUp()
+    
     local manager = JokerManager.new()
-    local diagnostics = self.mock_crash_diagnostics.new()
+    local diagnostics = test_env.mock_crash_diagnostics.new()
     manager:set_crash_diagnostics(diagnostics)
     
     local result = manager:safe_validate_joker(nil, 1, "test_operation")
     
-    self:assert_false(result, "Should return false for nil joker")
+    assert_false(result, "Should return false for nil joker")
+    
+    tearDown()
 end
 
-function TestJokerManagerCrashSafety:testSafeValidateJokerDetectsNilConfig()
+local function TestSafeValidateJokerDetectsNilConfig()
+    setUp()
+    
     local manager = JokerManager.new()
-    local diagnostics = self.mock_crash_diagnostics.new()
+    local diagnostics = test_env.mock_crash_diagnostics.new()
     manager:set_crash_diagnostics(diagnostics)
     
-    local corrupted_joker = self:create_corrupted_joker_no_config()
+    local corrupted_joker = create_corrupted_joker_no_config()
     local result = manager:safe_validate_joker(corrupted_joker, 1, "test_operation")
     
-    self:assert_false(result, "Should return false for joker with nil config")
+    assert_false(result, "Should return false for joker with nil config")
+    
+    tearDown()
 end
 
-function TestJokerManagerCrashSafety:testSafeValidateJokerDetectsNilConfigCenter()
+local function TestSafeValidateJokerDetectsNilConfigCenter()
+    setUp()
+    
     local manager = JokerManager.new()
-    local diagnostics = self.mock_crash_diagnostics.new()
+    local diagnostics = test_env.mock_crash_diagnostics.new()
     manager:set_crash_diagnostics(diagnostics)
     
-    local corrupted_joker = self:create_corrupted_joker_no_center()
+    local corrupted_joker = create_corrupted_joker_no_center()
     local result = manager:safe_validate_joker(corrupted_joker, 1, "test_operation")
     
-    self:assert_false(result, "Should return false for joker with nil config.center")
+    assert_false(result, "Should return false for joker with nil config.center")
+    
+    tearDown()
 end
 
-function TestJokerManagerCrashSafety:testSafeValidateJokerPassesForValidJoker()
+local function TestSafeValidateJokerPassesForValidJoker()
+    setUp()
+    
     local manager = JokerManager.new()
-    local diagnostics = self.mock_crash_diagnostics.new()
+    local diagnostics = test_env.mock_crash_diagnostics.new()
     manager:set_crash_diagnostics(diagnostics)
     
-    local valid_joker = self:create_valid_joker("j_joker", "Test Joker")
+    local valid_joker = create_valid_joker("j_joker", "Test Joker")
     local result = manager:safe_validate_joker(valid_joker, 1, "test_operation")
     
-    self:assert_true(result, "Should return true for valid joker")
+    assert_true(result, "Should return true for valid joker")
+    
+    tearDown()
 end
 
-function TestJokerManagerCrashSafety:testSafeValidateJokerLogsErrorsWithCrashDiagnostics()
+local function TestSafeValidateJokerLogsErrorsWithCrashDiagnostics()
+    setUp()
+    
     local manager = JokerManager.new()
-    local diagnostics = self.mock_crash_diagnostics.new()
+    local diagnostics = test_env.mock_crash_diagnostics.new()
     manager:set_crash_diagnostics(diagnostics)
     
     -- Capture print output to verify logging
@@ -287,7 +306,7 @@ function TestJokerManagerCrashSafety:testSafeValidateJokerLogsErrorsWithCrashDia
     local original_print = print
     _G.print = function(msg) table.insert(print_calls, msg) end
     
-    local corrupted_joker = self:create_corrupted_joker_no_config()
+    local corrupted_joker = create_corrupted_joker_no_config()
     manager:safe_validate_joker(corrupted_joker, 2, "logging_test")
     
     _G.print = original_print
@@ -299,160 +318,208 @@ function TestJokerManagerCrashSafety:testSafeValidateJokerLogsErrorsWithCrashDia
             break
         end
     end
-    self:assert_true(found_error_log, "Should log validation errors through crash diagnostics")
+    assert_true(found_error_log, "Should log validation errors through crash diagnostics")
+    
+    tearDown()
 end
 
-function TestJokerManagerCrashSafety:testSafeValidateJokerWorksWithoutCrashDiagnostics()
+local function TestSafeValidateJokerWorksWithoutCrashDiagnostics()
+    setUp()
+    
     local manager = JokerManager.new()
     -- Don't inject crash diagnostics
     
-    local corrupted_joker = self:create_corrupted_joker_no_config()
+    local corrupted_joker = create_corrupted_joker_no_config()
     local result = manager:safe_validate_joker(corrupted_joker, 1, "no_diagnostics_test")
     
-    self:assert_false(result, "Should still validate correctly without crash diagnostics")
+    assert_false(result, "Should still validate correctly without crash diagnostics")
+    
+    tearDown()
 end
 
 -- =============================================================================
 -- SAFE JOKER KEY EXTRACTION TESTS
 -- =============================================================================
 
-function TestJokerManagerCrashSafety:testSafeGetJokerKeyReturnsNilForInvalidJoker()
+local function TestSafeGetJokerKeyReturnsNilForInvalidJoker()
+    setUp()
+    
     local manager = JokerManager.new()
-    local corrupted_joker = self:create_corrupted_joker_no_config()
+    local corrupted_joker = create_corrupted_joker_no_config()
     
     local key = manager:safe_get_joker_key(corrupted_joker, 1, "key_test")
     
-    self:assert_nil(key, "Should return nil for corrupted joker")
+    assert_nil(key, "Should return nil for corrupted joker")
+    
+    tearDown()
 end
 
-function TestJokerManagerCrashSafety:testSafeGetJokerKeyReturnsNilForMissingKey()
+local function TestSafeGetJokerKeyReturnsNilForMissingKey()
+    setUp()
+    
     local manager = JokerManager.new()
-    local corrupted_joker = self:create_corrupted_joker_no_key()
+    local corrupted_joker = create_corrupted_joker_no_key()
     
     local key = manager:safe_get_joker_key(corrupted_joker, 1, "key_test")
     
-    self:assert_nil(key, "Should return nil for joker with missing key")
+    assert_nil(key, "Should return nil for joker with missing key")
+    
+    tearDown()
 end
 
-function TestJokerManagerCrashSafety:testSafeGetJokerKeyReturnsCorrectKeyForValidJoker()
+local function TestSafeGetJokerKeyReturnsCorrectKeyForValidJoker()
+    setUp()
+    
     local manager = JokerManager.new()
-    local valid_joker = self:create_valid_joker("j_blueprint", "Blueprint")
+    local valid_joker = create_valid_joker("j_blueprint", "Blueprint")
     
     local key = manager:safe_get_joker_key(valid_joker, 1, "key_test")
     
-    self:assert_equal(key, "j_blueprint", "Should return correct key for valid joker")
+    assert_equal(key, "j_blueprint", "Should return correct key for valid joker")
+    
+    tearDown()
 end
 
 -- =============================================================================
 -- DEFENSIVE JOKER REORDERING TESTS
 -- =============================================================================
 
-function TestJokerManagerCrashSafety:testReorderJokersValidatesInputParameters()
+local function TestReorderJokersValidatesInputParameters()
+    setUp()
+    
     local manager = JokerManager.new()
-    G.jokers.cards = { self:create_valid_joker() }
+    G.jokers.cards = { create_valid_joker() }
     
     -- Test nil order
     local success, error = manager:reorder_jokers(nil)
-    self:assert_false(success, "Should reject nil order")
-    self:assert_match(error, "No new order specified", "Should provide appropriate error message")
+    assert_false(success, "Should reject nil order")
+    assert_match(error, "No new order specified", "Should provide appropriate error message")
     
     -- Test empty order
     success, error = manager:reorder_jokers({})
-    self:assert_false(success, "Should reject empty order")
-    self:assert_match(error, "No new order specified", "Should provide appropriate error message")
+    assert_false(success, "Should reject empty order")
+    assert_match(error, "No new order specified", "Should provide appropriate error message")
+    
+    tearDown()
 end
 
-function TestJokerManagerCrashSafety:testReorderJokersValidatesGJokersCardsAvailability()
+local function TestReorderJokersValidatesGJokersCardsAvailability()
+    setUp()
+    
     local manager = JokerManager.new()
-    local diagnostics = self.mock_crash_diagnostics.new()
+    local diagnostics = test_env.mock_crash_diagnostics.new()
     manager:set_crash_diagnostics(diagnostics)
     
     -- Test missing G.jokers.cards
     G.jokers.cards = nil
     
     local success, error = manager:reorder_jokers({0})
-    self:assert_false(success, "Should reject when G.jokers.cards is nil")
-    self:assert_match(error, "No jokers available", "Should provide appropriate error message")
+    assert_false(success, "Should reject when G.jokers.cards is nil")
+    assert_match(error, "No jokers available", "Should provide appropriate error message")
+    
+    tearDown()
 end
 
-function TestJokerManagerCrashSafety:testReorderJokersValidatesAllJokersBeforeReordering()
+local function TestReorderJokersValidatesAllJokersBeforeReordering()
+    setUp()
+    
     local manager = JokerManager.new()
-    local diagnostics = self.mock_crash_diagnostics.new()
+    local diagnostics = test_env.mock_crash_diagnostics.new()
     manager:set_crash_diagnostics(diagnostics)
     
     -- Setup jokers with one corrupted
     G.jokers.cards = {
-        self:create_valid_joker("j_joker", "Good Joker"),
-        self:create_corrupted_joker_no_config(),  -- This should cause failure
-        self:create_valid_joker("j_blueprint", "Blueprint")
+        create_valid_joker("j_joker", "Good Joker"),
+        create_corrupted_joker_no_config(),  -- This should cause failure
+        create_valid_joker("j_blueprint", "Blueprint")
     }
     
     local success, error = manager:reorder_jokers({0, 1, 2})
-    self:assert_false(success, "Should reject reordering when jokers are corrupted")
-    self:assert_match(error, "corrupted", "Should indicate corruption in error message")
+    assert_false(success, "Should reject reordering when jokers are corrupted")
+    assert_match(error, "corrupted", "Should indicate corruption in error message")
+    
+    tearDown()
 end
 
-function TestJokerManagerCrashSafety:testReorderJokersValidatesOrderLengthMatchesJokerCount()
+local function TestReorderJokersValidatesOrderLengthMatchesJokerCount()
+    setUp()
+    
     local manager = JokerManager.new()
     G.jokers.cards = {
-        self:create_valid_joker("j_joker1"),
-        self:create_valid_joker("j_joker2")
+        create_valid_joker("j_joker1"),
+        create_valid_joker("j_joker2")
     }
     
     local success, error = manager:reorder_jokers({0})  -- Wrong length
-    self:assert_false(success, "Should reject order with wrong length")
-    self:assert_match(error, "length doesn't match", "Should indicate length mismatch")
+    assert_false(success, "Should reject order with wrong length")
+    assert_match(error, "length doesn't match", "Should indicate length mismatch")
+    
+    tearDown()
 end
 
-function TestJokerManagerCrashSafety:testReorderJokersValidatesIndicesAreInRange()
+local function TestReorderJokersValidatesIndicesAreInRange()
+    setUp()
+    
     local manager = JokerManager.new()
     G.jokers.cards = {
-        self:create_valid_joker("j_joker1"),
-        self:create_valid_joker("j_joker2")
+        create_valid_joker("j_joker1"),
+        create_valid_joker("j_joker2")
     }
     
     local success, error = manager:reorder_jokers({0, 5})  -- Index 5 out of range
-    self:assert_false(success, "Should reject out-of-range indices")
-    self:assert_match(error, "Invalid joker index", "Should indicate invalid index")
+    assert_false(success, "Should reject out-of-range indices")
+    assert_match(error, "Invalid joker index", "Should indicate invalid index")
+    
+    tearDown()
 end
 
-function TestJokerManagerCrashSafety:testReorderJokersDetectsDuplicateIndices()
+local function TestReorderJokersDetectsDuplicateIndices()
+    setUp()
+    
     local manager = JokerManager.new()
     G.jokers.cards = {
-        self:create_valid_joker("j_joker1"),
-        self:create_valid_joker("j_joker2")
+        create_valid_joker("j_joker1"),
+        create_valid_joker("j_joker2")
     }
     
     local success, error = manager:reorder_jokers({0, 0})  -- Duplicate index
-    self:assert_false(success, "Should reject duplicate indices")
-    self:assert_match(error, "Duplicate index", "Should indicate duplicate index")
+    assert_false(success, "Should reject duplicate indices")
+    assert_match(error, "Duplicate index", "Should indicate duplicate index")
+    
+    tearDown()
 end
 
-function TestJokerManagerCrashSafety:testReorderJokersPerformsSuccessfulReordering()
+local function TestReorderJokersPerformsSuccessfulReordering()
+    setUp()
+    
     local manager = JokerManager.new()
-    local diagnostics = self.mock_crash_diagnostics.new()
+    local diagnostics = test_env.mock_crash_diagnostics.new()
     manager:set_crash_diagnostics(diagnostics)
     
-    local joker1 = self:create_valid_joker("j_joker1", "First")
-    local joker2 = self:create_valid_joker("j_joker2", "Second")
+    local joker1 = create_valid_joker("j_joker1", "First")
+    local joker2 = create_valid_joker("j_joker2", "Second")
     G.jokers.cards = { joker1, joker2 }
     
     local success, error = manager:reorder_jokers({1, 0})  -- Reverse order
     
-    self:assert_true(success, "Should successfully reorder valid jokers")
-    self:assert_nil(error, "Should not return error on success")
-    self:assert_equal(G.jokers.cards[1], joker2, "Should place second joker first")
-    self:assert_equal(G.jokers.cards[2], joker1, "Should place first joker second")
+    assert_true(success, "Should successfully reorder valid jokers")
+    assert_nil(error, "Should not return error on success")
+    assert_equal(G.jokers.cards[1], joker2, "Should place second joker first")
+    assert_equal(G.jokers.cards[2], joker1, "Should place first joker second")
+    
+    tearDown()
 end
 
-function TestJokerManagerCrashSafety:testReorderJokersValidatesJokersDuringReordering()
+local function TestReorderJokersValidatesJokersDuringReordering()
+    setUp()
+    
     local manager = JokerManager.new()
-    local diagnostics = self.mock_crash_diagnostics.new()
+    local diagnostics = test_env.mock_crash_diagnostics.new()
     manager:set_crash_diagnostics(diagnostics)
     
     -- Create jokers that will become corrupted during access
-    local joker1 = self:create_valid_joker("j_joker1", "First")
-    local joker2 = self:create_valid_joker("j_joker2", "Second")
+    local joker1 = create_valid_joker("j_joker1", "First")
+    local joker2 = create_valid_joker("j_joker2", "Second")
     G.jokers.cards = { joker1, joker2 }
     
     -- Corrupt joker2 after initial validation passes
@@ -468,37 +535,45 @@ function TestJokerManagerCrashSafety:testReorderJokersValidatesJokersDuringReord
     
     local success, error = manager:reorder_jokers({1, 0})
     
-    self:assert_false(success, "Should detect corruption during reordering")
-    self:assert_match(error, "became corrupted", "Should indicate corruption during reorder")
+    assert_false(success, "Should detect corruption during reordering")
+    assert_match(error, "became corrupted", "Should indicate corruption during reorder")
+    
+    tearDown()
 end
 
 -- =============================================================================
 -- BLUEPRINT/BRAINSTORM OPTIMIZATION TESTS
 -- =============================================================================
 
-function TestJokerManagerCrashSafety:testGetBlueprintBrainstormOptimizationHandlesMissingJokers()
+local function TestGetBlueprintBrainstormOptimizationHandlesMissingJokers()
+    setUp()
+    
     local manager = JokerManager.new()
-    local diagnostics = self.mock_crash_diagnostics.new()
+    local diagnostics = test_env.mock_crash_diagnostics.new()
     manager:set_crash_diagnostics(diagnostics)
     
     G.jokers.cards = nil
     
     local optimization = manager:get_blueprint_brainstorm_optimization()
     
-    self:assert_table(optimization, "Should return empty table when no jokers available")
-    self:assert_equal(#optimization, 0, "Should return empty optimization")
+    assert_table(optimization, "Should return empty table when no jokers available")
+    assert_equal(#optimization, 0, "Should return empty optimization")
+    
+    tearDown()
 end
 
-function TestJokerManagerCrashSafety:testGetBlueprintBrainstormOptimizationSafelyHandlesCorruptedJokers()
+local function TestGetBlueprintBrainstormOptimizationSafelyHandlesCorruptedJokers()
+    setUp()
+    
     local manager = JokerManager.new()
-    local diagnostics = self.mock_crash_diagnostics.new()
+    local diagnostics = test_env.mock_crash_diagnostics.new()
     manager:set_crash_diagnostics(diagnostics)
     
     G.jokers.cards = {
-        self:create_valid_joker("j_joker", "Good Joker"),
-        self:create_corrupted_joker_no_config(),  -- Should be skipped
-        self:create_blueprint_joker(),
-        self:create_corrupted_joker_no_key()  -- Should be skipped
+        create_valid_joker("j_joker", "Good Joker"),
+        create_corrupted_joker_no_config(),  -- Should be skipped
+        create_blueprint_joker(),
+        create_corrupted_joker_no_key()  -- Should be skipped
     }
     
     -- Capture print output to verify warnings
@@ -510,8 +585,8 @@ function TestJokerManagerCrashSafety:testGetBlueprintBrainstormOptimizationSafel
     
     _G.print = original_print
     
-    self:assert_table(optimization, "Should return optimization despite corrupted jokers")
-    self:assert_equal(#optimization, 2, "Should include only valid jokers")
+    assert_table(optimization, "Should return optimization despite corrupted jokers")
+    assert_equal(#optimization, 2, "Should include only valid jokers")
     
     -- Check that warnings were logged for corrupted jokers
     local found_warning = false
@@ -521,40 +596,48 @@ function TestJokerManagerCrashSafety:testGetBlueprintBrainstormOptimizationSafel
             break
         end
     end
-    self:assert_true(found_warning, "Should warn about corrupted jokers being skipped")
+    assert_true(found_warning, "Should warn about corrupted jokers being skipped")
+    
+    tearDown()
 end
 
-function TestJokerManagerCrashSafety:testGetBlueprintBrainstormOptimizationCreatesOptimalOrder()
+local function TestGetBlueprintBrainstormOptimizationCreatesOptimalOrder()
+    setUp()
+    
     local manager = JokerManager.new()
-    local diagnostics = self.mock_crash_diagnostics.new()
+    local diagnostics = test_env.mock_crash_diagnostics.new()
     manager:set_crash_diagnostics(diagnostics)
     
     G.jokers.cards = {
-        self:create_blueprint_joker(),      -- Index 0 - should go near end
-        self:create_valid_joker("j_high_value", "High Value"),  -- Index 1 - should go first
-        self:create_brainstorm_joker(),     -- Index 2 - should go at end
-        self:create_valid_joker("j_another", "Another")  -- Index 3 - should go early
+        create_blueprint_joker(),      -- Index 0 - should go near end
+        create_valid_joker("j_high_value", "High Value"),  -- Index 1 - should go first
+        create_brainstorm_joker(),     -- Index 2 - should go at end
+        create_valid_joker("j_another", "Another")  -- Index 3 - should go early
     }
     
     local optimization = manager:get_blueprint_brainstorm_optimization()
     
-    self:assert_equal(#optimization, 4, "Should include all valid jokers")
+    assert_equal(#optimization, 4, "Should include all valid jokers")
     
     -- Verify order: high-value jokers first, then Blueprint/Brainstorm
-    self:assert_equal(optimization[1], 1, "High value joker should be first")
-    self:assert_equal(optimization[2], 3, "Another joker should be second")
-    self:assert_equal(optimization[3], 0, "Blueprint should be near end")
-    self:assert_equal(optimization[4], 2, "Brainstorm should be at end")
+    assert_equal(optimization[1], 1, "High value joker should be first")
+    assert_equal(optimization[2], 3, "Another joker should be second")
+    assert_equal(optimization[3], 0, "Blueprint should be near end")
+    assert_equal(optimization[4], 2, "Brainstorm should be at end")
+    
+    tearDown()
 end
 
-function TestJokerManagerCrashSafety:testGetBlueprintBrainstormOptimizationLogsAnalysisProgress()
+local function TestGetBlueprintBrainstormOptimizationLogsAnalysisProgress()
+    setUp()
+    
     local manager = JokerManager.new()
-    local diagnostics = self.mock_crash_diagnostics.new()
+    local diagnostics = test_env.mock_crash_diagnostics.new()
     manager:set_crash_diagnostics(diagnostics)
     
     G.jokers.cards = {
-        self:create_blueprint_joker(),
-        self:create_brainstorm_joker()
+        create_blueprint_joker(),
+        create_brainstorm_joker()
     }
     
     -- Capture print output
@@ -580,61 +663,73 @@ function TestJokerManagerCrashSafety:testGetBlueprintBrainstormOptimizationLogsA
         end
     end
     
-    self:assert_true(found_analysis_log, "Should log analysis start")
-    self:assert_true(found_blueprint_log, "Should log Blueprint detection")
-    self:assert_true(found_brainstorm_log, "Should log Brainstorm detection")
+    assert_true(found_analysis_log, "Should log analysis start")
+    assert_true(found_blueprint_log, "Should log Blueprint detection")
+    assert_true(found_brainstorm_log, "Should log Brainstorm detection")
+    
+    tearDown()
 end
 
 -- =============================================================================
 -- SAFE JOKER INFO EXTRACTION TESTS
 -- =============================================================================
 
-function TestJokerManagerCrashSafety:testGetJokerInfoHandlesMissingJokersGracefully()
+local function TestGetJokerInfoHandlesMissingJokersGracefully()
+    setUp()
+    
     local manager = JokerManager.new()
-    local diagnostics = self.mock_crash_diagnostics.new()
+    local diagnostics = test_env.mock_crash_diagnostics.new()
     manager:set_crash_diagnostics(diagnostics)
     
     G.jokers.cards = nil
     
     local info = manager:get_joker_info()
     
-    self:assert_table(info, "Should return empty table when no jokers available")
-    self:assert_equal(#info, 0, "Should return empty info array")
+    assert_table(info, "Should return empty table when no jokers available")
+    assert_equal(#info, 0, "Should return empty info array")
+    
+    tearDown()
 end
 
-function TestJokerManagerCrashSafety:testGetJokerInfoExtractsInfoSafelyFromCorruptedJokers()
+local function TestGetJokerInfoExtractsInfoSafelyFromCorruptedJokers()
+    setUp()
+    
     local manager = JokerManager.new()
-    local diagnostics = self.mock_crash_diagnostics.new()
+    local diagnostics = test_env.mock_crash_diagnostics.new()
     manager:set_crash_diagnostics(diagnostics)
     
     G.jokers.cards = {
-        self:create_valid_joker("j_joker", "Good Joker"),
-        self:create_corrupted_joker_no_config()
+        create_valid_joker("j_joker", "Good Joker"),
+        create_corrupted_joker_no_config()
         -- Only 2 jokers, not 3
     }
     
     local info = manager:get_joker_info()
     
-    self:assert_equal(#info, 2, "Should extract info for actual joker slots")
+    assert_equal(#info, 2, "Should extract info for actual joker slots")
     
     -- Check valid joker info
-    self:assert_equal(info[1].key, "j_joker", "Should extract key from valid joker")
-    self:assert_equal(info[1].name, "Good Joker", "Should extract name from valid joker")
+    assert_equal(info[1].key, "j_joker", "Should extract key from valid joker")
+    assert_equal(info[1].name, "Good Joker", "Should extract name from valid joker")
     
     -- Check corrupted joker info uses safe defaults
-    self:assert_equal(info[2].key, "unknown", "Should use safe default for corrupted joker key")
-    self:assert_equal(info[2].name, "Corrupted Joker", "Should use safe default for corrupted joker name")
+    assert_equal(info[2].key, "unknown", "Should use safe default for corrupted joker key")
+    assert_equal(info[2].name, "Corrupted Joker", "Should use safe default for corrupted joker name")
     
     -- Check nil joker info - adjust expectations based on actual implementation
     if info[3] then
-        self:assert_equal(info[3].cost, 0, "Should use safe default for nil joker cost")
+        assert_equal(info[3].cost, 0, "Should use safe default for nil joker cost")
     end
+    
+    tearDown()
 end
 
-function TestJokerManagerCrashSafety:testGetJokerInfoExtractsCompleteInfoFromValidJokers()
+local function TestGetJokerInfoExtractsCompleteInfoFromValidJokers()
+    setUp()
+    
     local manager = JokerManager.new()
     
-    local test_joker = self:create_valid_joker("j_blueprint", "Blueprint", 1234)
+    local test_joker = create_valid_joker("j_blueprint", "Blueprint", 1234)
     test_joker.sell_cost = 5
     test_joker.edition = { type = "foil" }
     
@@ -642,26 +737,30 @@ function TestJokerManagerCrashSafety:testGetJokerInfoExtractsCompleteInfoFromVal
     
     local info = manager:get_joker_info()
     
-    self:assert_equal(#info, 1, "Should extract info for one joker")
+    assert_equal(#info, 1, "Should extract info for one joker")
     
     local joker_info = info[1]
-    self:assert_equal(joker_info.index, 0, "Should use 0-based index")
-    self:assert_equal(joker_info.id, 1234, "Should extract unique ID")
-    self:assert_equal(joker_info.key, "j_blueprint", "Should extract joker key")
-    self:assert_equal(joker_info.name, "Blueprint", "Should extract joker name")
-    self:assert_equal(joker_info.rarity, 1, "Should extract joker rarity")
-    self:assert_equal(joker_info.cost, 5, "Should extract sell cost")
-    self:assert_equal(joker_info.edition, "foil", "Should extract edition type")
+    assert_equal(joker_info.index, 0, "Should use 0-based index")
+    assert_equal(joker_info.id, 1234, "Should extract unique ID")
+    assert_equal(joker_info.key, "j_blueprint", "Should extract joker key")
+    assert_equal(joker_info.name, "Blueprint", "Should extract joker name")
+    assert_equal(joker_info.rarity, 1, "Should extract joker rarity")
+    assert_equal(joker_info.cost, 5, "Should extract sell cost")
+    assert_equal(joker_info.edition, "foil", "Should extract edition type")
+    
+    tearDown()
 end
 
-function TestJokerManagerCrashSafety:testGetJokerInfoLogsExtractionProgress()
+local function TestGetJokerInfoLogsExtractionProgress()
+    setUp()
+    
     local manager = JokerManager.new()
-    local diagnostics = self.mock_crash_diagnostics.new()
+    local diagnostics = test_env.mock_crash_diagnostics.new()
     manager:set_crash_diagnostics(diagnostics)
     
     G.jokers.cards = {
-        self:create_valid_joker(),
-        self:create_corrupted_joker_no_config()
+        create_valid_joker(),
+        create_corrupted_joker_no_config()
     }
     
     -- Capture print output
@@ -687,25 +786,29 @@ function TestJokerManagerCrashSafety:testGetJokerInfoLogsExtractionProgress()
         end
     end
     
-    self:assert_true(found_start_log, "Should log extraction start")
-    self:assert_true(found_warning_log, "Should warn about corrupted jokers")
-    self:assert_true(found_success_log, "Should log successful completion")
+    assert_true(found_start_log, "Should log extraction start")
+    assert_true(found_warning_log, "Should warn about corrupted jokers")
+    assert_true(found_success_log, "Should log successful completion")
+    
+    tearDown()
 end
 
 -- =============================================================================
 -- INTEGRATION TESTS
 -- =============================================================================
 
-function TestJokerManagerCrashSafety:testJokerManagerIntegratesCrashDiagnosticsAcrossAllOperations()
+local function TestJokerManagerIntegratesCrashDiagnosticsAcrossAllOperations()
+    setUp()
+    
     local manager = JokerManager.new()
-    local diagnostics = self.mock_crash_diagnostics.new()
+    local diagnostics = test_env.mock_crash_diagnostics.new()
     manager:set_crash_diagnostics(diagnostics)
     
     -- Setup mixed joker state
     G.jokers.cards = {
-        self:create_valid_joker("j_joker", "Good"),
-        self:create_corrupted_joker_no_config(),
-        self:create_blueprint_joker()
+        create_valid_joker("j_joker", "Good"),
+        create_corrupted_joker_no_config(),
+        create_blueprint_joker()
     }
     
     -- Capture all print output
@@ -729,94 +832,42 @@ function TestJokerManagerCrashSafety:testJokerManagerIntegratesCrashDiagnosticsA
         end
     end
     
-    self:assert_true(diagnostic_logs > 5, "Should have extensive diagnostic logging across operations")
-    self:assert_false(reorder_success, "Should reject reordering with corrupted jokers")
-    self:assert_equal(#info, 3, "Should extract info for all joker slots")
-    self:assert_equal(#optimization, 2, "Should optimize only valid jokers")
+    assert_true(diagnostic_logs > 5, "Should have extensive diagnostic logging across operations")
+    assert_false(reorder_success, "Should reject reordering with corrupted jokers")
+    assert_equal(#info, 3, "Should extract info for all joker slots")
+    assert_equal(#optimization, 2, "Should optimize only valid jokers")
+    
+    tearDown()
 end
 
--- Standalone test runner function (for compatibility with existing infrastructure)
-local function run_joker_manager_crash_safety_tests_luaunit()
-    print("Starting JokerManager crash safety tests (LuaUnit)...")
-    
-    local test_instance = TestJokerManagerCrashSafety:new()
-    local passed = 0
-    local failed = 0
-    
-    local tests = {
-        {"testJokerManagerNewCreatesInstanceWithCorrectInitialState", "JokerManager.new creates instance with correct initial state"},
-        {"testSetCrashDiagnosticsInjectsDiagnosticsCorrectly", "set_crash_diagnostics injects diagnostics correctly"},
-        {"testSafeValidateJokerDetectsNilJoker", "safe_validate_joker detects nil joker"},
-        {"testSafeValidateJokerDetectsNilConfig", "safe_validate_joker detects nil config"},
-        {"testSafeValidateJokerDetectsNilConfigCenter", "safe_validate_joker detects nil config.center"},
-        {"testSafeValidateJokerPassesForValidJoker", "safe_validate_joker passes for valid joker"},
-        {"testSafeValidateJokerLogsErrorsWithCrashDiagnostics", "safe_validate_joker logs errors with crash diagnostics"},
-        {"testSafeValidateJokerWorksWithoutCrashDiagnostics", "safe_validate_joker works without crash diagnostics"},
-        {"testSafeGetJokerKeyReturnsNilForInvalidJoker", "safe_get_joker_key returns nil for invalid joker"},
-        {"testSafeGetJokerKeyReturnsNilForMissingKey", "safe_get_joker_key returns nil for missing key"},
-        {"testSafeGetJokerKeyReturnsCorrectKeyForValidJoker", "safe_get_joker_key returns correct key for valid joker"},
-        {"testReorderJokersValidatesInputParameters", "reorder_jokers validates input parameters"},
-        {"testReorderJokersValidatesGJokersCardsAvailability", "reorder_jokers validates G.jokers.cards availability"},
-        {"testReorderJokersValidatesAllJokersBeforeReordering", "reorder_jokers validates all jokers before reordering"},
-        {"testReorderJokersValidatesOrderLengthMatchesJokerCount", "reorder_jokers validates order length matches joker count"},
-        {"testReorderJokersValidatesIndicesAreInRange", "reorder_jokers validates indices are in range"},
-        {"testReorderJokersDetectsDuplicateIndices", "reorder_jokers detects duplicate indices"},
-        {"testReorderJokersPerformsSuccessfulReordering", "reorder_jokers performs successful reordering"},
-        {"testReorderJokersValidatesJokersDuringReordering", "reorder_jokers validates jokers during reordering"},
-        {"testGetBlueprintBrainstormOptimizationHandlesMissingJokers", "get_blueprint_brainstorm_optimization handles missing jokers"},
-        {"testGetBlueprintBrainstormOptimizationSafelyHandlesCorruptedJokers", "get_blueprint_brainstorm_optimization safely handles corrupted jokers"},
-        {"testGetBlueprintBrainstormOptimizationCreatesOptimalOrder", "get_blueprint_brainstorm_optimization creates optimal order"},
-        {"testGetBlueprintBrainstormOptimizationLogsAnalysisProgress", "get_blueprint_brainstorm_optimization logs analysis progress"},
-        {"testGetJokerInfoHandlesMissingJokersGracefully", "get_joker_info handles missing jokers gracefully"},
-        {"testGetJokerInfoExtractsInfoSafelyFromCorruptedJokers", "get_joker_info extracts info safely from corrupted jokers"},
-        {"testGetJokerInfoExtractsCompleteInfoFromValidJokers", "get_joker_info extracts complete info from valid jokers"},
-        {"testGetJokerInfoLogsExtractionProgress", "get_joker_info logs extraction progress"},
-        {"testJokerManagerIntegratesCrashDiagnosticsAcrossAllOperations", "JokerManager integrates crash diagnostics across all operations"}
-    }
-    
-    for _, test_info in ipairs(tests) do
-        local test_method = test_info[1]
-        local test_description = test_info[2]
-        
-        -- Run setUp
-        test_instance:setUp()
-        
-        local success, error_msg = pcall(function()
-            test_instance[test_method](test_instance)
-        end)
-        
-        -- Run tearDown
-        test_instance:tearDown()
-        
-        if success then
-            print("✓ " .. test_description)
-            passed = passed + 1
-        else
-            print("✗ " .. test_description .. " - " .. tostring(error_msg))
-            failed = failed + 1
-        end
-    end
-    
-    print(string.format("\n=== LuaUnit TEST RESULTS ===\nPassed: %d\nFailed: %d\nTotal: %d", 
-        passed, failed, passed + failed))
-    
-    local success = (failed == 0)
-    if success then
-        print("\n🎉 All JokerManager crash safety tests passed! (LuaUnit)")
-        print("✅ Safe joker validation working properly")
-        print("✅ Defensive reordering with corruption detection active")
-        print("✅ Blueprint/Brainstorm optimization resilient to corruption")
-        print("✅ Safe info extraction with graceful degradation")
-        print("✅ Integrated crash diagnostics logging operational")
-    else
-        print("\n❌ Some JokerManager crash safety tests failed. Please review the implementation.")
-    end
-    
-    return success
-end
-
--- Export the test class and runner
+-- Export all test functions for LuaUnit registration
 return {
-    TestJokerManagerCrashSafety = TestJokerManagerCrashSafety,
-    run_tests = run_joker_manager_crash_safety_tests_luaunit
+    TestJokerManagerNewCreatesInstanceWithCorrectInitialState = TestJokerManagerNewCreatesInstanceWithCorrectInitialState,
+    TestSetCrashDiagnosticsInjectsDiagnosticsCorrectly = TestSetCrashDiagnosticsInjectsDiagnosticsCorrectly,
+    TestSafeValidateJokerDetectsNilJoker = TestSafeValidateJokerDetectsNilJoker,
+    TestSafeValidateJokerDetectsNilConfig = TestSafeValidateJokerDetectsNilConfig,
+    TestSafeValidateJokerDetectsNilConfigCenter = TestSafeValidateJokerDetectsNilConfigCenter,
+    TestSafeValidateJokerPassesForValidJoker = TestSafeValidateJokerPassesForValidJoker,
+    TestSafeValidateJokerLogsErrorsWithCrashDiagnostics = TestSafeValidateJokerLogsErrorsWithCrashDiagnostics,
+    TestSafeValidateJokerWorksWithoutCrashDiagnostics = TestSafeValidateJokerWorksWithoutCrashDiagnostics,
+    TestSafeGetJokerKeyReturnsNilForInvalidJoker = TestSafeGetJokerKeyReturnsNilForInvalidJoker,
+    TestSafeGetJokerKeyReturnsNilForMissingKey = TestSafeGetJokerKeyReturnsNilForMissingKey,
+    TestSafeGetJokerKeyReturnsCorrectKeyForValidJoker = TestSafeGetJokerKeyReturnsCorrectKeyForValidJoker,
+    TestReorderJokersValidatesInputParameters = TestReorderJokersValidatesInputParameters,
+    TestReorderJokersValidatesGJokersCardsAvailability = TestReorderJokersValidatesGJokersCardsAvailability,
+    TestReorderJokersValidatesAllJokersBeforeReordering = TestReorderJokersValidatesAllJokersBeforeReordering,
+    TestReorderJokersValidatesOrderLengthMatchesJokerCount = TestReorderJokersValidatesOrderLengthMatchesJokerCount,
+    TestReorderJokersValidatesIndicesAreInRange = TestReorderJokersValidatesIndicesAreInRange,
+    TestReorderJokersDetectsDuplicateIndices = TestReorderJokersDetectsDuplicateIndices,
+    TestReorderJokersPerformsSuccessfulReordering = TestReorderJokersPerformsSuccessfulReordering,
+    TestReorderJokersValidatesJokersDuringReordering = TestReorderJokersValidatesJokersDuringReordering,
+    TestGetBlueprintBrainstormOptimizationHandlesMissingJokers = TestGetBlueprintBrainstormOptimizationHandlesMissingJokers,
+    TestGetBlueprintBrainstormOptimizationSafelyHandlesCorruptedJokers = TestGetBlueprintBrainstormOptimizationSafelyHandlesCorruptedJokers,
+    TestGetBlueprintBrainstormOptimizationCreatesOptimalOrder = TestGetBlueprintBrainstormOptimizationCreatesOptimalOrder,
+    TestGetBlueprintBrainstormOptimizationLogsAnalysisProgress = TestGetBlueprintBrainstormOptimizationLogsAnalysisProgress,
+    TestGetJokerInfoHandlesMissingJokersGracefully = TestGetJokerInfoHandlesMissingJokersGracefully,
+    TestGetJokerInfoExtractsInfoSafelyFromCorruptedJokers = TestGetJokerInfoExtractsInfoSafelyFromCorruptedJokers,
+    TestGetJokerInfoExtractsCompleteInfoFromValidJokers = TestGetJokerInfoExtractsCompleteInfoFromValidJokers,
+    TestGetJokerInfoLogsExtractionProgress = TestGetJokerInfoLogsExtractionProgress,
+    TestJokerManagerIntegratesCrashDiagnosticsAcrossAllOperations = TestJokerManagerIntegratesCrashDiagnosticsAcrossAllOperations
 }

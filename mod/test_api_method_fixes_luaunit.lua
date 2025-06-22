@@ -2,7 +2,7 @@
 -- Tests that BalatroMCP.lua uses the correct FileIO API method names
 -- Migrated from custom test framework to LuaUnit
 
-local luaunit = require('luaunit')
+local luaunit = require('libs.luaunit')
 
 -- Test helper functions
 local function create_mock_file_io()
@@ -76,11 +76,11 @@ local function assert_contains(haystack, needle, message)
                 return -- Found it
             end
         end
-        luaunit.fail(string.format("Expected table to contain: %s\n%s", tostring(needle), message or ""))
+        error(string.format("Expected table to contain: %s\n%s", tostring(needle), message or ""))
     elseif type(haystack) == "string" then
-        luaunit.assertStrContains(haystack, needle, message)
+        luaunit.assertNotNil(string.find(haystack,  needle),  message)
     else
-        luaunit.fail("assert_contains only supports string and table search")
+        error("assert_contains only supports string and table search")
     end
 end
 
@@ -99,7 +99,7 @@ function TestAPIMethodCallsValidation()
         state = {test = "data"}
     }
     
-    assertEquals(state_message.sequence, 1, "get_next_sequence_id should return 1")
+    luaunit.assertEquals(state_message.sequence, 1, "get_next_sequence_id should return 1")
     assert_contains(balatro_mcp.file_io.call_log, "get_next_sequence_id", "get_next_sequence_id should be called")
     
     -- Test 2: Validate write_game_state is called correctly
@@ -128,21 +128,21 @@ function TestAPIMethodNameConsistencyValidation()
     local file_io = MockFileIO.new()
     
     -- Verify deprecated method names are absent
-    assertNil(file_io.get_next_sequence, "get_next_sequence should not exist")
-    assertNil(file_io.read_action, "read_action should not exist")
-    assertNil(file_io.write_response, "write_response should not exist")
-    assertNil(file_io.write_state, "write_state should not exist")
+    luaunit.assertNil(file_io.get_next_sequence, "get_next_sequence should not exist")
+    luaunit.assertNil(file_io.read_action, "read_action should not exist")
+    luaunit.assertNil(file_io.write_response, "write_response should not exist")
+    luaunit.assertNil(file_io.write_state, "write_state should not exist")
     
     -- Verify correct method names exist
-    assertNotNil(file_io.get_next_sequence_id, "get_next_sequence_id should exist")
-    assertNotNil(file_io.read_actions, "read_actions should exist")
-    assertNotNil(file_io.write_action_result, "write_action_result should exist")
-    assertNotNil(file_io.write_game_state, "write_game_state should exist")
+    luaunit.assertNotNil(file_io.get_next_sequence_id, "get_next_sequence_id should exist")
+    luaunit.assertNotNil(file_io.read_actions, "read_actions should exist")
+    luaunit.assertNotNil(file_io.write_action_result, "write_action_result should exist")
+    luaunit.assertNotNil(file_io.write_game_state, "write_game_state should exist")
 end
 
 -- Run tests if executed directly
 if arg and arg[0] and string.find(arg[0], "test_api_method_fixes_luaunit") then
-    os.exit(luaunit.LuaUnit.run())
+    os.exit(LuaUnit.run())
 end
 
 return {

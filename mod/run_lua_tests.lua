@@ -95,7 +95,7 @@ if run_luaunit_tests and #luaunit_test_modules > 0 then
     print("RUNNING LUAUNIT TESTS")
     print(string.rep("=", 60))
     
-    local luaunit = require('luaunit')
+    local luaunit = require('lib.luaunit')
     local luaunit_passed = 0
     local luaunit_failed = 0
     

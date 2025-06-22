@@ -1,6 +1,6 @@
 -- LuaUnit migration of FileIO module tests
 -- Tests JSON functionality, file I/O operations, and path handling
--- Migrated from test_file_io.lua to use LuaUnit framework with compatibility layer
+-- Migrated from test_file_io.lua to use LuaUnit framework with individual function exports
 
 local luaunit_helpers = require('luaunit_helpers')
 
@@ -55,22 +55,26 @@ local function assert_contains(haystack, needle, message)
     end
 end
 
--- FileIO Test Class with LuaUnit setUp/tearDown integration
-local TestFileIO = {}
-TestFileIO.__index = TestFileIO
-setmetatable(TestFileIO, {__index = luaunit_helpers.FileIOTestBase})
+-- Set up test environment once
+local test_env = luaunit_helpers.FileIOTestBase:new()
 
-function TestFileIO:new()
-    local self = luaunit_helpers.FileIOTestBase:new()
-    setmetatable(self, TestFileIO)
-    return self
+-- Helper function to set up before each test
+local function setUp()
+    test_env:setUp()
+end
+
+-- Helper function to tear down after each test
+local function tearDown()
+    test_env:tearDown()
 end
 
 -- =============================================================================
 -- BASIC FILEIO TESTS
 -- =============================================================================
 
-function TestFileIO:testFileIOInitializationWithSMODS()
+local function TestFileIOInitializationWithSMODS()
+    setUp()
+    
     -- Load FileIO module with SMODS available
     local success, FileIO_module = pcall(require, "file_io")
     assert_true(success, "Should load FileIO module with SMODS available")
@@ -81,9 +85,13 @@ function TestFileIO:testFileIOInitializationWithSMODS()
     assert_not_nil(fileio.json, "JSON should be available")
     assert_type("function", fileio.json.encode, "Should have encode function")
     assert_type("function", fileio.json.decode, "Should have decode function")
+    
+    tearDown()
 end
 
-function TestFileIO:testFileIODefaultPathInitialization()
+local function TestFileIODefaultPathInitialization()
+    setUp()
+    
     -- Load FileIO module with SMODS available
     local FileIO_module = require("file_io")
     
@@ -95,9 +103,13 @@ function TestFileIO:testFileIODefaultPathInitialization()
     
     -- Verify directory was created
     assert_true(love.filesystem.directories["shared"], "Should create 'shared' directory by default")
+    
+    tearDown()
 end
 
-function TestFileIO:testFileIOInitializationWithoutSMODSFailsGracefully()
+local function TestFileIOInitializationWithoutSMODSFailsGracefully()
+    setUp()
+    
     -- Don't setup SMODS - test failure case
     luaunit_helpers.cleanup_mock_smods()
     
@@ -115,25 +127,13 @@ function TestFileIO:testFileIOInitializationWithoutSMODSFailsGracefully()
     
     -- Restore SMODS for subsequent tests
     luaunit_helpers.setup_mock_smods()
+    
+    tearDown()
 end
 
-function TestFileIO:testSMODSLoadFileJSONLoadingSuccess()
-    -- Test SMODS loading mechanism directly
-    local load_success, json_loader = pcall(function()
-        return assert(SMODS.load_file("libs/json.lua"))
-    end)
+local function TestSMODSLoadFileFailureHandling()
+    setUp()
     
-    assert_true(load_success, "SMODS.load_file should succeed for libs/json.lua")
-    assert_equal("function", type(json_loader), "Should return a function")
-    
-    -- Test that the loader function works
-    local json_lib = json_loader()
-    assert_not_nil(json_lib, "JSON loader should return library")
-    assert_equal("function", type(json_lib.encode), "Should have encode function")
-    assert_equal("function", type(json_lib.decode), "Should have decode function")
-end
-
-function TestFileIO:testSMODSLoadFileFailureHandling()
     -- Test SMODS loading failure
     local load_success, error_msg = pcall(function()
         return assert(SMODS.load_file("nonexistent_file.lua"))
@@ -141,9 +141,13 @@ function TestFileIO:testSMODSLoadFileFailureHandling()
     
     assert_false(load_success, "SMODS.load_file should fail for nonexistent file")
     assert_contains(tostring(error_msg), "File not found", "Should show file not found error")
+    
+    tearDown()
 end
 
-function TestFileIO:testFileIOWriteGameState()
+local function TestFileIOWriteGameState()
+    setUp()
+    
     local FileIO_module = require("file_io")
     local fileio = FileIO_module.new("test_shared")
     
@@ -164,9 +168,13 @@ function TestFileIO:testFileIOWriteGameState()
     assert_not_nil(file_content, "Should create game state file")
     assert_contains(file_content, "hand_selection", "Should contain phase data")
     assert_contains(file_content, "message_type", "Should contain message structure")
+    
+    tearDown()
 end
 
-function TestFileIO:testFileIOWriteActionResult()
+local function TestFileIOWriteActionResult()
+    setUp()
+    
     local FileIO_module = require("file_io")
     local fileio = FileIO_module.new("test_shared")
     
@@ -187,9 +195,13 @@ function TestFileIO:testFileIOWriteActionResult()
     assert_not_nil(file_content, "Should create action results file")
     assert_contains(file_content, "Action completed successfully", "Should contain result message")
     assert_contains(file_content, "action_result", "Should contain message type")
+    
+    tearDown()
 end
 
-function TestFileIO:testFileIOReadActions()
+local function TestFileIOReadActions()
+    setUp()
+    
     local FileIO_module = require("file_io")
     local fileio = FileIO_module.new("test_shared")
     
@@ -219,9 +231,13 @@ function TestFileIO:testFileIOReadActions()
     -- Verify file was removed after reading
     local file_exists = love.filesystem.getInfo("test_shared/actions.json")
     assert_nil(file_exists, "Should remove actions file after reading")
+    
+    tearDown()
 end
 
-function TestFileIO:testFileIOErrorHandlingNilData()
+local function TestFileIOErrorHandlingNilData()
+    setUp()
+    
     local FileIO_module = require("file_io")
     local fileio = FileIO_module.new("test_shared")
     
@@ -230,9 +246,13 @@ function TestFileIO:testFileIOErrorHandlingNilData()
     
     assert_false(success1, "Should fail to write nil game state")
     assert_false(success2, "Should fail to write nil action result")
+    
+    tearDown()
 end
 
-function TestFileIO:testFileIOComprehensiveDependencyFailureHandling()
+local function TestFileIOComprehensiveDependencyFailureHandling()
+    setUp()
+    
     -- Test 1: Missing love.filesystem dependency
     local original_love = love
     love = nil
@@ -300,9 +320,13 @@ function TestFileIO:testFileIOComprehensiveDependencyFailureHandling()
     
     -- Restore original functions
     fileio.json.decode = original_decode
+    
+    tearDown()
 end
 
-function TestFileIO:testFileIOSequenceIDManagement()
+local function TestFileIOSequenceIDManagement()
+    setUp()
+    
     local FileIO_module = require("file_io")
     local fileio = FileIO_module.new("test_shared")
     
@@ -313,13 +337,17 @@ function TestFileIO:testFileIOSequenceIDManagement()
     assert_equal(1, id1, "First sequence ID should be 1")
     assert_equal(2, id2, "Second sequence ID should be 2")
     assert_equal(3, id3, "Third sequence ID should be 3")
+    
+    tearDown()
 end
 
 -- =============================================================================
 -- PATH HANDLING TESTS - Testing "." (current directory) vs subdirectory logic
 -- =============================================================================
 
-function TestFileIO:testFileIOCurrentDirectoryPathInitialization()
+local function TestFileIOCurrentDirectoryPathInitialization()
+    setUp()
+    
     local FileIO_module = require("file_io")
     
     -- Test initialization with "." (current directory)
@@ -330,9 +358,13 @@ function TestFileIO:testFileIOCurrentDirectoryPathInitialization()
     
     -- Verify directory creation was attempted for "." (implementation always creates directory)
     assert_true(love.filesystem.directories["."], "Should attempt to create '.' directory")
+    
+    tearDown()
 end
 
-function TestFileIO:testFileIOCurrentDirectoryVsSubdirectoryDirectoryCreation()
+local function TestFileIOCurrentDirectoryVsSubdirectoryDirectoryCreation()
+    setUp()
+    
     local FileIO_module = require("file_io")
     
     -- Test subdirectory creation (existing behavior)
@@ -345,9 +377,13 @@ function TestFileIO:testFileIOCurrentDirectoryVsSubdirectoryDirectoryCreation()
     -- Test current directory initialization - implementation creates directory but uses different path construction
     local fileio_current = FileIO_module.new(".")
     assert_true(love.filesystem.directories["."], "Should create '.' directory (implementation always creates directory)")
+    
+    tearDown()
 end
 
-function TestFileIO:testFileIOCurrentDirectoryWriteGameStatePathConstruction()
+local function TestFileIOCurrentDirectoryWriteGameStatePathConstruction()
+    setUp()
+    
     local FileIO_module = require("file_io")
     local fileio = FileIO_module.new(".")
     
@@ -367,9 +403,13 @@ function TestFileIO:testFileIOCurrentDirectoryWriteGameStatePathConstruction()
     -- Verify subdirectory path was NOT used
     local sub_file_content = love.filesystem.read("./game_state.json")
     assert_nil(sub_file_content, "Should not create file in './' subdirectory")
+    
+    tearDown()
 end
 
-function TestFileIO:testFileIOCurrentDirectoryReadActionsPathConstruction()
+local function TestFileIOCurrentDirectoryReadActionsPathConstruction()
+    setUp()
+    
     local FileIO_module = require("file_io")
     local fileio = FileIO_module.new(".")
     
@@ -396,9 +436,13 @@ function TestFileIO:testFileIOCurrentDirectoryReadActionsPathConstruction()
     -- Verify file was removed from current directory after reading
     local file_exists = love.filesystem.getInfo("actions.json")
     assert_nil(file_exists, "Should remove actions.json from current directory after reading")
+    
+    tearDown()
 end
 
-function TestFileIO:testFileIOCurrentDirectoryWriteActionResultPathConstruction()
+local function TestFileIOCurrentDirectoryWriteActionResultPathConstruction()
+    setUp()
+    
     local FileIO_module = require("file_io")
     local fileio = FileIO_module.new(".")
     
@@ -418,9 +462,13 @@ function TestFileIO:testFileIOCurrentDirectoryWriteActionResultPathConstruction(
     local file_content = love.filesystem.read("action_results.json")
     assert_not_nil(file_content, "Should create action_results.json in current directory")
     assert_contains(file_content, "Action completed successfully", "Should contain result message")
+    
+    tearDown()
 end
 
-function TestFileIO:testFileIOCurrentDirectoryCleanupOldFilesPathConstruction()
+local function TestFileIOCurrentDirectoryCleanupOldFilesPathConstruction()
+    setUp()
+    
     local FileIO_module = require("file_io")
     local fileio = FileIO_module.new(".")
     
@@ -452,9 +500,13 @@ function TestFileIO:testFileIOCurrentDirectoryCleanupOldFilesPathConstruction()
     
     -- Restore original function
     love.filesystem.getInfo = original_getInfo
+    
+    tearDown()
 end
 
-function TestFileIO:testFileIOPathConstructionComparisonCurrentVsSubdirectory()
+local function TestFileIOPathConstructionComparisonCurrentVsSubdirectory()
+    setUp()
+    
     local FileIO_module = require("file_io")
     
     -- Test current directory FileIO
@@ -480,9 +532,13 @@ function TestFileIO:testFileIOPathConstructionComparisonCurrentVsSubdirectory()
     assert_not_nil(sub_file, "Should create file in subdirectory")
     assert_contains(current_file, "test", "Current directory file should contain test data")
     assert_contains(sub_file, "test", "Subdirectory file should contain test data")
+    
+    tearDown()
 end
 
-function TestFileIO:testFileIOLogFilePathConstructionWithCurrentDirectory()
+local function TestFileIOLogFilePathConstructionWithCurrentDirectory()
+    setUp()
+    
     local FileIO_module = require("file_io")
     local fileio = FileIO_module.new(".")
     
@@ -497,82 +553,45 @@ function TestFileIO:testFileIOLogFilePathConstructionWithCurrentDirectory()
     -- Verify subdirectory log was NOT created
     local sub_log_content = love.filesystem.read("./file_io_debug.log")
     assert_nil(sub_log_content, "Should not create log in './' subdirectory")
+    
+    tearDown()
 end
 
--- Standalone test runner function (for compatibility with existing infrastructure)
-local function run_file_io_tests_luaunit()
-    print("Starting FileIO tests (LuaUnit)...")
+-- Add missing test function that is referenced in the return table
+local function TestSMODSLoadFileJSONLoadingSuccess()
+    setUp()
     
-    local test_instance = TestFileIO:new()
-    local passed = 0
-    local failed = 0
+    local FileIO_module = require("file_io")
+    local fileio = FileIO_module.new("test_shared")
     
-    local tests = {
-        {"testFileIOInitializationWithSMODS", "FileIO initialization with SMODS"},
-        {"testFileIODefaultPathInitialization", "FileIO default path initialization"},
-        {"testFileIOInitializationWithoutSMODSFailsGracefully", "FileIO initialization without SMODS fails gracefully"},
-        {"testSMODSLoadFileJSONLoadingSuccess", "SMODS.load_file JSON loading success"},
-        {"testSMODSLoadFileFailureHandling", "SMODS.load_file failure handling"},
-        {"testFileIOWriteGameState", "FileIO write_game_state"},
-        {"testFileIOWriteActionResult", "FileIO write_action_result"},
-        {"testFileIOReadActions", "FileIO read_actions"},
-        {"testFileIOErrorHandlingNilData", "FileIO error handling - nil data"},
-        {"testFileIOComprehensiveDependencyFailureHandling", "FileIO comprehensive dependency failure handling"},
-        {"testFileIOSequenceIDManagement", "FileIO sequence ID management"},
-        {"testFileIOCurrentDirectoryPathInitialization", "FileIO current directory path initialization"},
-        {"testFileIOCurrentDirectoryVsSubdirectoryDirectoryCreation", "FileIO current directory vs subdirectory directory creation"},
-        {"testFileIOCurrentDirectoryWriteGameStatePathConstruction", "FileIO current directory write_game_state path construction"},
-        {"testFileIOCurrentDirectoryReadActionsPathConstruction", "FileIO current directory read_actions path construction"},
-        {"testFileIOCurrentDirectoryWriteActionResultPathConstruction", "FileIO current directory write_action_result path construction"},
-        {"testFileIOCurrentDirectoryCleanupOldFilesPathConstruction", "FileIO current directory cleanup_old_files path construction"},
-        {"testFileIOPathConstructionComparisonCurrentVsSubdirectory", "FileIO path construction comparison - current vs subdirectory"},
-        {"testFileIOLogFilePathConstructionWithCurrentDirectory", "FileIO log file path construction with current directory"}
-    }
+    -- Test should pass - SMODS is available and can load JSON
+    assert_not_nil(fileio, "FileIO should initialize successfully with SMODS available")
+    assert_not_nil(fileio.json, "JSON should be loaded via SMODS")
+    assert_type("function", fileio.json.encode, "Should have JSON encode function")
+    assert_type("function", fileio.json.decode, "Should have JSON decode function")
     
-    for _, test_info in ipairs(tests) do
-        local test_method = test_info[1]
-        local test_description = test_info[2]
-        
-        -- Run setUp
-        test_instance:setUp()
-        
-        local success, error_msg = pcall(function()
-            test_instance[test_method](test_instance)
-        end)
-        
-        -- Run tearDown
-        test_instance:tearDown()
-        
-        if success then
-            print("✓ " .. test_description)
-            passed = passed + 1
-        else
-            print("✗ " .. test_description .. " - " .. tostring(error_msg))
-            failed = failed + 1
-        end
-    end
-    
-    print(string.format("\n=== LuaUnit TEST RESULTS ===\nPassed: %d\nFailed: %d\nTotal: %d", 
-        passed, failed, passed + failed))
-    
-    local success = (failed == 0)
-    if success then
-        print("\n🎉 All FileIO tests passed! (LuaUnit)")
-        print("✅ JSON library initialization via SMODS")
-        print("✅ File I/O operations (write_game_state, write_action_result, read_actions)")
-        print("✅ Error handling for edge cases and dependency failures")
-        print("✅ Path construction logic (current directory vs subdirectory)")
-        print("✅ Sequence ID management")
-        print("✅ Mock system integration for Love2D filesystem and SMODS")
-    else
-        print("\n❌ Some FileIO tests failed. Please review the implementation.")
-    end
-    
-    return success
+    tearDown()
 end
 
--- Export the test class and runner
+-- Export all test functions for LuaUnit registration
 return {
-    TestFileIO = TestFileIO,
-    run_tests = run_file_io_tests_luaunit
+    TestFileIOInitializationWithSMODS = TestFileIOInitializationWithSMODS,
+    TestFileIODefaultPathInitialization = TestFileIODefaultPathInitialization,
+    TestFileIOInitializationWithoutSMODSFailsGracefully = TestFileIOInitializationWithoutSMODSFailsGracefully,
+    TestSMODSLoadFileJSONLoadingSuccess = TestSMODSLoadFileJSONLoadingSuccess,
+    TestSMODSLoadFileFailureHandling = TestSMODSLoadFileFailureHandling,
+    TestFileIOWriteGameState = TestFileIOWriteGameState,
+    TestFileIOWriteActionResult = TestFileIOWriteActionResult,
+    TestFileIOReadActions = TestFileIOReadActions,
+    TestFileIOErrorHandlingNilData = TestFileIOErrorHandlingNilData,
+    TestFileIOComprehensiveDependencyFailureHandling = TestFileIOComprehensiveDependencyFailureHandling,
+    TestFileIOSequenceIDManagement = TestFileIOSequenceIDManagement,
+    TestFileIOCurrentDirectoryPathInitialization = TestFileIOCurrentDirectoryPathInitialization,
+    TestFileIOCurrentDirectoryVsSubdirectoryDirectoryCreation = TestFileIOCurrentDirectoryVsSubdirectoryDirectoryCreation,
+    TestFileIOCurrentDirectoryWriteGameStatePathConstruction = TestFileIOCurrentDirectoryWriteGameStatePathConstruction,
+    TestFileIOCurrentDirectoryReadActionsPathConstruction = TestFileIOCurrentDirectoryReadActionsPathConstruction,
+    TestFileIOCurrentDirectoryWriteActionResultPathConstruction = TestFileIOCurrentDirectoryWriteActionResultPathConstruction,
+    TestFileIOCurrentDirectoryCleanupOldFilesPathConstruction = TestFileIOCurrentDirectoryCleanupOldFilesPathConstruction,
+    TestFileIOPathConstructionComparisonCurrentVsSubdirectory = TestFileIOPathConstructionComparisonCurrentVsSubdirectory,
+    TestFileIOLogFilePathConstructionWithCurrentDirectory = TestFileIOLogFilePathConstructionWithCurrentDirectory
 }

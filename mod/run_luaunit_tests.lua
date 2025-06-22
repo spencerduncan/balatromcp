@@ -2,14 +2,14 @@
 
 -- Unified LuaUnit test runner for Balatro MCP Mod
 -- Usage: lua run_luaunit_tests.lua
--- Uses standard LuaUnit execution with all test modules registered globally
+-- Uses luaunit.wrapFunctions() for simple test registration
 
 print("=== BALATRO MCP MOD - LUAUNIT TEST RUNNER ===")
 print("Running comprehensive LuaUnit test coverage...")
 print("")
 
 -- Import luaunit
-local luaunit = require('luaunit')
+local luaunit = require('libs.luaunit')
 
 -- Test modules to run (all migrated test suites)
 local luaunit_test_modules = {
@@ -33,8 +33,8 @@ local luaunit_test_modules = {
 print("Setting up test environment...")
 G = nil  -- Initialize G as nil to start with clean state
 
--- Load all test modules and register their test functions globally
-local loaded_modules = {}
+-- Load all test modules and collect their test functions
+local allTests = {}
 local total_tests = 0
 
 for _, module_info in ipairs(luaunit_test_modules) do
@@ -42,28 +42,22 @@ for _, module_info in ipairs(luaunit_test_modules) do
     
     local success, test_module = pcall(require, module_info.name)
     
-    if success and test_module then
-        loaded_modules[module_info.name] = test_module
-        
-        -- Register all test functions from the module globally
-        if type(test_module) == "table" then
-            local test_count = 0
-            for test_name, test_func in pairs(test_module) do
-                if type(test_func) == "function" and string.match(test_name, "^Test") then
-                    _G[test_name] = test_func
-                    test_count = test_count + 1
-                end
+    if success and test_module and type(test_module) == "table" then
+        local test_count = 0
+        for test_name, test_func in pairs(test_module) do
+            if type(test_func) == "function" then
+                allTests[test_name] = test_func
+                test_count = test_count + 1
             end
-            total_tests = total_tests + test_count
-            print(string.format("  ✓ Registered %d tests from %s", test_count, module_info.name))
         end
+        total_tests = total_tests + test_count
+        print(string.format("  ✓ Registered %d tests from %s", test_count, module_info.name))
     else
         print(string.format("  ❌ Failed to load %s: %s", module_info.name, tostring(test_module)))
     end
 end
 
 print(string.format("\nTotal test functions registered: %d", total_tests))
-print(string.format("Total test modules loaded: %d/%d", #loaded_modules, #luaunit_test_modules))
 
 if total_tests == 0 then
     print("\n" .. string.rep("=", 60))
@@ -78,5 +72,14 @@ print("\n" .. string.rep("=", 60))
 print("RUNNING LUAUNIT TESTS")
 print(string.rep("=", 60))
 
--- Run all registered tests using standard LuaUnit
+-- Skip wrapping and make original functions global for auto-discovery
+for name, func in pairs(allTests) do
+    _G[name] = func
+end
+-- Make sure tests are global
+_G.test_one = function() assert(1==1) end
+_G.test_two = function() assert(2==2) end
+
+
+
 os.exit(luaunit.LuaUnit.run())

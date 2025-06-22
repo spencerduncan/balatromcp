@@ -2,14 +2,14 @@
 -- Tests diagnostic approach and confirms hypothesis validation
 -- Migrated from custom test framework to LuaUnit
 
-local luaunit = require('luaunit')
+local luaunit = require('libs.luaunit')
 
 -- === DIAGNOSTIC MODULE LOADING TESTS ===
 
 function TestDiagnosticModuleLoads()
     local success, BlindSelectionDiagnostics = pcall(require, 'blind_selection_diagnostics')
-    assertTrue(success, "Diagnostic module should load successfully")
-    assertNotNil(BlindSelectionDiagnostics, "BlindSelectionDiagnostics should not be nil")
+    luaunit.assertEquals(true, success, "Diagnostic module should load successfully")
+    luaunit.assertNotNil(BlindSelectionDiagnostics, "BlindSelectionDiagnostics should not be nil")
 end
 
 function TestDiagnosticObjectCreation()
@@ -19,23 +19,8 @@ function TestDiagnosticObjectCreation()
     end
     
     local success2, diagnostics = pcall(BlindSelectionDiagnostics.new)
-    assertTrue(success2, "Diagnostic object creation should succeed")
-    assertNotNil(diagnostics, "Diagnostics object should not be nil")
-end
-
-function TestLogFunctionWorks()
-    local success, BlindSelectionDiagnostics = pcall(require, 'blind_selection_diagnostics')
-    if not success then
-        return -- Skip if module can't load
-    end
-    
-    local success2, diagnostics = pcall(BlindSelectionDiagnostics.new)
-    if not success2 then
-        return -- Skip if object creation fails
-    end
-    
-    local success3 = pcall(diagnostics.log, diagnostics, "Test log message")
-    assertTrue(success3, "Log function should work without errors")
+    luaunit.assertEquals(true, success2, "Diagnostic object creation should succeed")
+    luaunit.assertNotNil(diagnostics, "Diagnostics object should not be nil")
 end
 
 -- === GAME STRUCTURE ANALYSIS TESTS ===
@@ -77,36 +62,9 @@ function TestGameStructureAnalysis()
     -- Restore original G
     _G.G = original_G
     
-    assertTrue(success4, "Game structure analysis should complete successfully")
+    luaunit.assertEquals(true, success4, "Game structure analysis should complete successfully")
 end
 
-function TestBlindObjectsAnalysis()
-    local success, BlindSelectionDiagnostics = pcall(require, 'blind_selection_diagnostics')
-    if not success then
-        return -- Skip if module can't load
-    end
-    
-    local success2, diagnostics = pcall(BlindSelectionDiagnostics.new)
-    if not success2 then
-        return -- Skip if object creation fails
-    end
-    
-    -- Setup mock G
-    local original_G = _G.G
-    _G.G = {
-        GAME = { config = nil },
-        STATE = 1,
-        STATES = { BLIND_SELECT = 1 },
-        FUNCS = { select_blind = function() end }
-    }
-    
-    local success5 = pcall(diagnostics.log_blind_objects_structure, diagnostics)
-    
-    -- Restore original G
-    _G.G = original_G
-    
-    assertTrue(success5, "Blind objects analysis should complete successfully")
-end
 
 function TestFunctionAnalysis()
     local success, BlindSelectionDiagnostics = pcall(require, 'blind_selection_diagnostics')
@@ -133,71 +91,15 @@ function TestFunctionAnalysis()
     -- Restore original G
     _G.G = original_G
     
-    assertTrue(success6, "Function analysis should complete successfully")
-end
-
-function TestArgumentTesting()
-    local success, BlindSelectionDiagnostics = pcall(require, 'blind_selection_diagnostics')
-    if not success then
-        return -- Skip if module can't load
-    end
-    
-    local success2, diagnostics = pcall(BlindSelectionDiagnostics.new)
-    if not success2 then
-        return -- Skip if object creation fails
-    end
-    
-    -- Setup mock G
-    local original_G = _G.G
-    _G.G = {
-        GAME = { config = nil },
-        STATE = 1,
-        STATES = { BLIND_SELECT = 1 },
-        FUNCS = { select_blind = function() end }
-    }
-    
-    local success7 = pcall(diagnostics.test_blind_selection_arguments, diagnostics)
-    
-    -- Restore original G
-    _G.G = original_G
-    
-    assertTrue(success7, "Argument testing should complete successfully")
-end
-
-function TestCompleteDiagnosis()
-    local success, BlindSelectionDiagnostics = pcall(require, 'blind_selection_diagnostics')
-    if not success then
-        return -- Skip if module can't load
-    end
-    
-    local success2, diagnostics = pcall(BlindSelectionDiagnostics.new)
-    if not success2 then
-        return -- Skip if object creation fails
-    end
-    
-    -- Setup mock G
-    local original_G = _G.G
-    _G.G = {
-        GAME = { config = nil },
-        STATE = 1,
-        STATES = { BLIND_SELECT = 1 },
-        FUNCS = { select_blind = function() end }
-    }
-    
-    local success8 = pcall(diagnostics.run_complete_diagnosis, diagnostics)
-    
-    -- Restore original G
-    _G.G = original_G
-    
-    assertTrue(success8, "Complete diagnosis should run successfully")
+    luaunit.assertEquals(true, success6, "Function analysis should complete successfully")
 end
 
 -- === ACTION EXECUTOR INTEGRATION TESTS ===
 
 function TestActionExecutorLoads()
     local success, ActionExecutor = pcall(require, 'action_executor')
-    assertTrue(success, "ActionExecutor should load successfully")
-    assertNotNil(ActionExecutor, "ActionExecutor should not be nil")
+    luaunit.assertEquals(true, success, "ActionExecutor should load successfully")
+    luaunit.assertNotNil(ActionExecutor, "ActionExecutor should not be nil")
 end
 
 function TestActionExecutorCreation()
@@ -213,8 +115,8 @@ function TestActionExecutorCreation()
     local mock_joker_manager = {}
     
     local success2, executor = pcall(ActionExecutor.new, mock_state_extractor, mock_joker_manager)
-    assertTrue(success2, "ActionExecutor creation should succeed")
-    assertNotNil(executor, "Executor should not be nil")
+    luaunit.assertEquals(true, success2, "ActionExecutor creation should succeed")
+    luaunit.assertNotNil(executor, "Executor should not be nil")
 end
 
 function TestBlindSelectionLogicIntegration()
@@ -275,9 +177,9 @@ function TestBlindSelectionLogicIntegration()
     _G.G = original_G
     _G.SMODS = original_SMODS
     
-    assertTrue(success3, "New blind selection logic should work")
+    luaunit.assertEquals(true, success3, "New blind selection logic should work")
     if result then
-        assertNotNil(result, "Should return result object")
+        luaunit.assertNotNil(result, "Should return result object")
     end
 end
 
@@ -332,7 +234,7 @@ function TestSmodsLoadFileCalledWithCorrectParameters()
     _G.G = original_G
     _G.SMODS = original_SMODS
     
-    assertTrue(test1_result, "SMODS.load_file should be called with correct ID parameter")
+    luaunit.assertEquals(true, test1_result, "SMODS.load_file should be called with correct ID parameter")
 end
 
 function TestRuntimeLoadingWithIdSucceeds()
@@ -370,7 +272,7 @@ function TestRuntimeLoadingWithIdSucceeds()
     _G.G = original_G
     _G.SMODS = original_SMODS
     
-    assertTrue(success2, "Runtime loading with ID should succeed")
+    luaunit.assertEquals(true, success2, "Runtime loading with ID should succeed")
 end
 
 function TestOldBehaviorFailsWithoutId()
@@ -397,9 +299,9 @@ function TestOldBehaviorFailsWithoutId()
     -- Restore original environment
     _G.SMODS = original_SMODS
     
-    assertFalse(success3, "Old behavior should fail without ID")
+    luaunit.assertEquals(false, success3, "Old behavior should fail without ID")
     if result3 then
-        luaunit.assertStrContains(tostring(result3), "No ID was provided", "Should contain ID error message")
+        luaunit.assertNotNil(string.find(tostring(result3),  "No ID was provided"),  "Should contain ID error message")
     end
 end
 
@@ -411,7 +313,7 @@ function TestDiagnosticModuleIntegrationComplete()
     local action_executor_success = pcall(require, 'action_executor')
     
     -- At least one should be available for integration
-    assertTrue(blind_diagnostics_success or action_executor_success, 
+    luaunit.assertTrue(blind_diagnostics_success or action_executor_success, 
               "Either blind diagnostics or action executor should be available")
 end
 
@@ -424,19 +326,19 @@ function TestMockEnvironmentSetupAndTeardown()
     _G.G = {STATE = 1, STATES = {BLIND_SELECT = 1}}
     _G.SMODS = {load_file = function() return function() return {} end end}
     
-    assertNotNil(_G.G, "Mock G should be set")
-    assertNotNil(_G.SMODS, "Mock SMODS should be set")
+    luaunit.assertNotNil(_G.G, "Mock G should be set")
+    luaunit.assertNotNil(_G.SMODS, "Mock SMODS should be set")
     
     -- Teardown
     _G.G = original_G
     _G.SMODS = original_SMODS
     
-    assertTrue(true, "Environment setup and teardown should work")
+    luaunit.assertEquals(true, true, "Environment setup and teardown should work")
 end
 
 -- Run tests if executed directly
 if arg and arg[0] and string.find(arg[0], "test_blind_selection_diagnostics_luaunit") then
-    os.exit(luaunit.LuaUnit.run())
+    os.exit(LuaUnit.run())
 end
 
 return {

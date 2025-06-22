@@ -1,18 +1,21 @@
 -- LuaUnit version of ShopStateDetection test suite
 -- Tests shop-specific game state detection patterns and timing mechanisms
 
-local luaunit = require('luaunit')
+local luaunit = require('libs.luaunit')
 local luaunit_helpers = require('luaunit_helpers')
 
--- Test class for ShopStateDetection functionality
-local TestShopStateDetection = {}
+-- =============================================================================
+-- SHARED SETUP AND TEARDOWN FUNCTIONALITY
+-- =============================================================================
 
-function TestShopStateDetection:setUp()
+local test_state = {}
+
+local function setUp()
     -- Save original globals
-    self.original_g = G
-    self.original_love = love
-    self.original_smods = _G.SMODS
-    self.original_print = print
+    test_state.original_g = G
+    test_state.original_love = love
+    test_state.original_smods = _G.SMODS
+    test_state.original_print = print
     
     -- Initialize clean state
     G = nil
@@ -20,18 +23,18 @@ function TestShopStateDetection:setUp()
     _G.SMODS = nil
     
     -- Set up test environment with shop-specific mock data
-    self:setup_test_environment()
+    setup_test_environment()
 end
 
-function TestShopStateDetection:tearDown()
+local function tearDown()
     -- Restore original globals
-    G = self.original_g
-    love = self.original_love
-    _G.SMODS = self.original_smods
-    print = self.original_print
+    G = test_state.original_g
+    love = test_state.original_love
+    _G.SMODS = test_state.original_smods
+    print = test_state.original_print
 end
 
-function TestShopStateDetection:setup_test_environment()
+function setup_test_environment()
     -- Mock SMODS framework with shop-specific components
     _G.SMODS = {
         load_file = function(filename)
@@ -263,7 +266,7 @@ function TestShopStateDetection:setup_test_environment()
 end
 
 -- Helper function to capture print output
-function TestShopStateDetection:capture_print_output(func)
+local function capture_print_output(func)
     local print_calls = {}
     local original_print = print
     _G.print = function(msg) table.insert(print_calls, msg) end
@@ -275,33 +278,34 @@ function TestShopStateDetection:capture_print_output(func)
 end
 
 -- Load BalatroMCP module
-function TestShopStateDetection:load_balatromcp()
-    if not self.BalatroMCP then
-        self.BalatroMCP = assert(SMODS.load_file("BalatroMCP.lua"))()
+local function load_balatromcp()
+    if not test_state.BalatroMCP then
+        test_state.BalatroMCP = assert(SMODS.load_file("BalatroMCP.lua"))()
     end
-    return self.BalatroMCP
+    return test_state.BalatroMCP
 end
 
 -- =============================================================================
 -- TEST CASES: SHOP STATE DETECTION SETUP
 -- =============================================================================
 
-function TestShopStateDetection:test_setup_shop_state_detection_initializes_tracking_variables()
-    local BalatroMCP = self:load_balatromcp()
+function testShopStateDetectionSetupInitializesTrackingVariables()
+    setUp()
+    local BalatroMCP = load_balatromcp()
     local mcp = BalatroMCP.new()
     
     -- Verify initial state before setup
     luaunit.assertNil(mcp.last_shop_state, "Should not have last_shop_state before setup")
-    luaunit.assertFalse(mcp.shop_state_initialized, "Should initialize shop_state_initialized to false in constructor")
+    luaunit.assertEquals(false, mcp.shop_state_initialized, "Should initialize shop_state_initialized to false in constructor")
     
     -- Call setup
-    local print_calls = self:capture_print_output(function()
+    local print_calls = capture_print_output(function()
         mcp:setup_shop_state_detection()
     end)
     
     -- Verify state tracking variables are initialized
     luaunit.assertNil(mcp.last_shop_state, "Should initialize last_shop_state to nil")
-    luaunit.assertFalse(mcp.shop_state_initialized, "Should initialize shop_state_initialized to false")
+    luaunit.assertEquals(false, mcp.shop_state_initialized, "Should initialize shop_state_initialized to false")
     
     -- Verify logging
     local found_setup_log = false
@@ -311,14 +315,16 @@ function TestShopStateDetection:test_setup_shop_state_detection_initializes_trac
             break
         end
     end
-    luaunit.assertTrue(found_setup_log, "Should log shop state detection setup")
+    luaunit.assertEquals(true, found_setup_log, "Should log shop state detection setup")
+    tearDown()
 end
 
-function TestShopStateDetection:test_hook_shop_interactions_sets_up_shop_state_detection()
-    local BalatroMCP = self:load_balatromcp()
+function testShopStateDetectionHookSetsUpShopStateDetection()
+    setUp()
+    local BalatroMCP = load_balatromcp()
     local mcp = BalatroMCP.new()
     
-    local print_calls = self:capture_print_output(function()
+    local print_calls = capture_print_output(function()
         mcp:hook_shop_interactions()
     end)
     
@@ -330,19 +336,21 @@ function TestShopStateDetection:test_hook_shop_interactions_sets_up_shop_state_d
             break
         end
     end
-    luaunit.assertTrue(found_setup_log, "Should call setup_shop_state_detection")
+    luaunit.assertEquals(true, found_setup_log, "Should call setup_shop_state_detection")
     
     -- Verify state tracking variables are initialized
     luaunit.assertNil(mcp.last_shop_state, "Should initialize last_shop_state")
-    luaunit.assertFalse(mcp.shop_state_initialized, "Should initialize shop_state_initialized")
+    luaunit.assertEquals(false, mcp.shop_state_initialized, "Should initialize shop_state_initialized")
+    tearDown()
 end
 
 -- =============================================================================
 -- TEST CASES: CORRECTED HOOK FUNCTION TESTS
 -- =============================================================================
 
-function TestShopStateDetection:test_hook_shop_interactions_hooks_cash_out_instead_of_go_to_shop()
-    local BalatroMCP = self:load_balatromcp()
+function testShopStateDetectionHooksCashOutInsteadOfGoToShop()
+    setUp()
+    local BalatroMCP = load_balatromcp()
     local mcp = BalatroMCP.new()
     
     -- Store original functions
@@ -356,16 +364,18 @@ function TestShopStateDetection:test_hook_shop_interactions_hooks_cash_out_inste
     
     -- Verify that go_to_shop was NOT touched
     luaunit.assertEquals(G.FUNCS.go_to_shop, original_go_to_shop, "Should not modify go_to_shop function")
+    tearDown()
 end
 
-function TestShopStateDetection:test_hook_shop_interactions_handles_missing_cash_out_gracefully()
-    local BalatroMCP = self:load_balatromcp()
+function testShopStateDetectionHandlesMissingCashOutGracefully()
+    setUp()
+    local BalatroMCP = load_balatromcp()
     local mcp = BalatroMCP.new()
     
     -- Remove cash_out function to test graceful handling
     G.FUNCS.cash_out = nil
     
-    local print_calls = self:capture_print_output(function()
+    local print_calls = capture_print_output(function()
         mcp:hook_shop_interactions()
     end)
     
@@ -377,15 +387,17 @@ function TestShopStateDetection:test_hook_shop_interactions_handles_missing_cash
             break
         end
     end
-    luaunit.assertTrue(found_warning, "Should warn when cash_out is not available")
+    luaunit.assertEquals(true, found_warning, "Should warn when cash_out is not available")
+    tearDown()
 end
 
 -- =============================================================================
 -- TEST CASES: SHOP STATE TRANSITION DETECTION
 -- =============================================================================
 
-function TestShopStateDetection:test_detect_shop_state_transition_handles_missing_g_object()
-    local BalatroMCP = self:load_balatromcp()
+function testShopStateDetectionHandlesMissingGObject()
+    setUp()
+    local BalatroMCP = load_balatromcp()
     local mcp = BalatroMCP.new()
     mcp:setup_shop_state_detection()
     
@@ -397,11 +409,13 @@ function TestShopStateDetection:test_detect_shop_state_transition_handles_missin
     mcp:detect_shop_state_transition()
     
     G = original_g
-    luaunit.assertTrue(true, "Should handle nil G object gracefully")
+    luaunit.assertEquals(true, true, "Should handle nil G object gracefully")
+    tearDown()
 end
 
-function TestShopStateDetection:test_detect_shop_state_transition_handles_missing_g_state()
-    local BalatroMCP = self:load_balatromcp()
+function testShopStateDetectionHandlesMissingGState()
+    setUp()
+    local BalatroMCP = load_balatromcp()
     local mcp = BalatroMCP.new()
     mcp:setup_shop_state_detection()
     
@@ -411,11 +425,13 @@ function TestShopStateDetection:test_detect_shop_state_transition_handles_missin
     -- Should not error
     mcp:detect_shop_state_transition()
     
-    luaunit.assertTrue(true, "Should handle missing G.STATE gracefully")
+    luaunit.assertEquals(true, true, "Should handle missing G.STATE gracefully")
+    tearDown()
 end
 
-function TestShopStateDetection:test_detect_shop_state_transition_handles_missing_g_states()
-    local BalatroMCP = self:load_balatromcp()
+function testShopStateDetectionHandlesMissingGStates()
+    setUp()
+    local BalatroMCP = load_balatromcp()
     local mcp = BalatroMCP.new()
     mcp:setup_shop_state_detection()
     
@@ -425,11 +441,13 @@ function TestShopStateDetection:test_detect_shop_state_transition_handles_missin
     -- Should not error
     mcp:detect_shop_state_transition()
     
-    luaunit.assertTrue(true, "Should handle missing G.STATES gracefully")
+    luaunit.assertEquals(true, true, "Should handle missing G.STATES gracefully")
+    tearDown()
 end
 
-function TestShopStateDetection:test_detect_shop_state_transition_initializes_tracking_on_first_run()
-    local BalatroMCP = self:load_balatromcp()
+function testShopStateDetectionInitializesTrackingOnFirstRun()
+    setUp()
+    local BalatroMCP = load_balatromcp()
     local mcp = BalatroMCP.new()
     mcp:setup_shop_state_detection()
     
@@ -440,11 +458,13 @@ function TestShopStateDetection:test_detect_shop_state_transition_initializes_tr
     mcp:detect_shop_state_transition()
     
     luaunit.assertEquals(mcp.last_shop_state, G.STATES.SELECTING_HAND, "Should initialize last_shop_state")
-    luaunit.assertFalse(mcp.shop_state_initialized, "Should keep shop_state_initialized as false")
+    luaunit.assertEquals(false, mcp.shop_state_initialized, "Should keep shop_state_initialized as false")
+    tearDown()
 end
 
-function TestShopStateDetection:test_detect_shop_state_transition_skips_when_delayed_capture_active()
-    local BalatroMCP = self:load_balatromcp()
+function testShopStateDetectionSkipsWhenDelayedCaptureActive()
+    setUp()
+    local BalatroMCP = load_balatromcp()
     local mcp = BalatroMCP.new()
     mcp:setup_shop_state_detection()
     
@@ -463,11 +483,13 @@ function TestShopStateDetection:test_detect_shop_state_transition_skips_when_del
     
     mcp:detect_shop_state_transition()
     
-    luaunit.assertFalse(shop_entered_called, "Should skip detection when delayed capture is active")
+    luaunit.assertEquals(false, shop_entered_called, "Should skip detection when delayed capture is active")
+    tearDown()
 end
 
-function TestShopStateDetection:test_detect_shop_state_transition_detects_transition_into_shop_state()
-    local BalatroMCP = self:load_balatromcp()
+function testShopStateDetectionDetectsTransitionIntoShopState()
+    setUp()
+    local BalatroMCP = load_balatromcp()
     local mcp = BalatroMCP.new()
     mcp:setup_shop_state_detection()
     
@@ -482,12 +504,12 @@ function TestShopStateDetection:test_detect_shop_state_transition_detects_transi
     local shop_entered_called = false
     mcp.on_shop_entered = function() shop_entered_called = true end
     
-    local print_calls = self:capture_print_output(function()
+    local print_calls = capture_print_output(function()
         mcp:detect_shop_state_transition()
     end)
     
-    luaunit.assertTrue(shop_entered_called, "Should call on_shop_entered when transitioning to shop")
-    luaunit.assertTrue(mcp.shop_state_initialized, "Should set shop_state_initialized to true")
+    luaunit.assertEquals(true, shop_entered_called, "Should call on_shop_entered when transitioning to shop")
+    luaunit.assertEquals(true, mcp.shop_state_initialized, "Should set shop_state_initialized to true")
     luaunit.assertEquals(mcp.last_shop_state, G.STATES.SHOP, "Should update last_shop_state")
     
     -- Should log the transition
@@ -498,11 +520,13 @@ function TestShopStateDetection:test_detect_shop_state_transition_detects_transi
             break
         end
     end
-    luaunit.assertTrue(found_transition_log, "Should log shop state transition")
+    luaunit.assertEquals(true, found_transition_log, "Should log shop state transition")
+    tearDown()
 end
 
-function TestShopStateDetection:test_detect_shop_state_transition_ignores_repeated_shop_state()
-    local BalatroMCP = self:load_balatromcp()
+function testShopStateDetectionIgnoresRepeatedShopState()
+    setUp()
+    local BalatroMCP = load_balatromcp()
     local mcp = BalatroMCP.new()
     mcp:setup_shop_state_detection()
     
@@ -519,11 +543,13 @@ function TestShopStateDetection:test_detect_shop_state_transition_ignores_repeat
     
     mcp:detect_shop_state_transition()
     
-    luaunit.assertFalse(shop_entered_called, "Should not call on_shop_entered when already in shop")
+    luaunit.assertEquals(false, shop_entered_called, "Should not call on_shop_entered when already in shop")
+    tearDown()
 end
 
-function TestShopStateDetection:test_detect_shop_state_transition_resets_flag_when_leaving_shop()
-    local BalatroMCP = self:load_balatromcp()
+function testShopStateDetectionResetsFlagWhenLeavingShop()
+    setUp()
+    local BalatroMCP = load_balatromcp()
     local mcp = BalatroMCP.new()
     mcp:setup_shop_state_detection()
     
@@ -537,16 +563,18 @@ function TestShopStateDetection:test_detect_shop_state_transition_resets_flag_wh
     
     mcp:detect_shop_state_transition()
     
-    luaunit.assertFalse(mcp.shop_state_initialized, "Should reset shop_state_initialized when leaving shop")
+    luaunit.assertEquals(false, mcp.shop_state_initialized, "Should reset shop_state_initialized when leaving shop")
     luaunit.assertEquals(mcp.last_shop_state, G.STATES.SELECTING_HAND, "Should update last_shop_state")
+    tearDown()
 end
 
 -- =============================================================================
 -- TEST CASES: DELAYED SHOP STATE CAPTURE TIMING
 -- =============================================================================
 
-function TestShopStateDetection:test_on_shop_entered_sets_correct_delay_timer()
-    local BalatroMCP = self:load_balatromcp()
+function testShopStateDetectionOnShopEnteredSetsCorrectDelayTimer()
+    setUp()
+    local BalatroMCP = load_balatromcp()
     local mcp = BalatroMCP.new()
     
     -- Mock state extractor
@@ -560,11 +588,11 @@ function TestShopStateDetection:test_on_shop_entered_sets_correct_delay_timer()
         end
     }
     
-    local print_calls = self:capture_print_output(function()
+    local print_calls = capture_print_output(function()
         mcp:on_shop_entered()
     end)
     
-    luaunit.assertTrue(mcp.delayed_shop_state_capture, "Should set delayed_shop_state_capture to true")
+    luaunit.assertEquals(true, mcp.delayed_shop_state_capture, "Should set delayed_shop_state_capture to true")
     luaunit.assertEquals(mcp.delayed_shop_capture_timer, 1.0, "Should set timer to 1.0 seconds (not 0.5)")
     
     -- Should log the delay setup
@@ -575,11 +603,13 @@ function TestShopStateDetection:test_on_shop_entered_sets_correct_delay_timer()
             break
         end
     end
-    luaunit.assertTrue(found_delay_log, "Should log delay setup")
+    luaunit.assertEquals(true, found_delay_log, "Should log delay setup")
+    tearDown()
 end
 
-function TestShopStateDetection:test_update_method_handles_delayed_shop_capture_timing()
-    local BalatroMCP = self:load_balatromcp()
+function testShopStateDetectionUpdateMethodHandlesDelayedShopCaptureTiming()
+    setUp()
+    local BalatroMCP = load_balatromcp()
     local mcp = BalatroMCP.new()
     mcp.polling_active = true
     
@@ -603,12 +633,12 @@ function TestShopStateDetection:test_update_method_handles_delayed_shop_capture_
     mcp.delayed_shop_capture_timer = 1.0
     
     -- Update with enough time to trigger capture
-    local print_calls = self:capture_print_output(function()
+    local print_calls = capture_print_output(function()
         mcp:update(1.5)  -- 1.5 seconds should trigger capture
     end)
     
-    luaunit.assertFalse(mcp.delayed_shop_state_capture, "Should clear delayed capture flag")
-    luaunit.assertTrue(state_sent, "Should send current state after delay")
+    luaunit.assertEquals(false, mcp.delayed_shop_state_capture, "Should clear delayed capture flag")
+    luaunit.assertEquals(true, state_sent, "Should send current state after delay")
     
     -- Should log the delayed capture execution
     local found_capture_log = false
@@ -620,12 +650,14 @@ function TestShopStateDetection:test_update_method_handles_delayed_shop_capture_
             found_debug_log = true
         end
     end
-    luaunit.assertTrue(found_capture_log, "Should log delayed capture execution")
-    luaunit.assertTrue(found_debug_log, "Should log shop items count after delay")
+    luaunit.assertEquals(true, found_capture_log, "Should log delayed capture execution")
+    luaunit.assertEquals(true, found_debug_log, "Should log shop items count after delay")
+    tearDown()
 end
 
-function TestShopStateDetection:test_update_method_does_not_trigger_premature_shop_capture()
-    local BalatroMCP = self:load_balatromcp()
+function testShopStateDetectionDoesNotTriggerPrematureShopCapture()
+    setUp()
+    local BalatroMCP = load_balatromcp()
     local mcp = BalatroMCP.new()
     mcp.polling_active = true
     
@@ -640,17 +672,19 @@ function TestShopStateDetection:test_update_method_does_not_trigger_premature_sh
     -- Update with insufficient time
     mcp:update(0.5)  -- Only 0.5 seconds, should not trigger
     
-    luaunit.assertTrue(mcp.delayed_shop_state_capture, "Should keep delayed capture flag")
+    luaunit.assertEquals(true, mcp.delayed_shop_state_capture, "Should keep delayed capture flag")
     luaunit.assertAlmostEquals(mcp.delayed_shop_capture_timer, 0.5, 0.01, "Should decrement timer correctly")
-    luaunit.assertFalse(state_sent, "Should not send state before timer expires")
+    luaunit.assertEquals(false, state_sent, "Should not send state before timer expires")
+    tearDown()
 end
 
 -- =============================================================================
 -- TEST CASES: SHOP COLLECTION POPULATION TIMING
 -- =============================================================================
 
-function TestShopStateDetection:test_on_shop_entered_logs_shop_collection_state()
-    local BalatroMCP = self:load_balatromcp()
+function testShopStateDetectionOnShopEnteredLogsShopCollectionState()
+    setUp()
+    local BalatroMCP = load_balatromcp()
     local mcp = BalatroMCP.new()
     
     -- Mock state extractor with empty shop
@@ -664,7 +698,7 @@ function TestShopStateDetection:test_on_shop_entered_logs_shop_collection_state(
         end
     }
     
-    local print_calls = self:capture_print_output(function()
+    local print_calls = capture_print_output(function()
         mcp:on_shop_entered()
     end)
     
@@ -676,11 +710,13 @@ function TestShopStateDetection:test_on_shop_entered_logs_shop_collection_state(
             break
         end
     end
-    luaunit.assertTrue(found_debug_log, "Should log shop collection state when hook fires")
+    luaunit.assertEquals(true, found_debug_log, "Should log shop collection state when hook fires")
+    tearDown()
 end
 
-function TestShopStateDetection:test_delayed_capture_shows_populated_shop_collections()
-    local BalatroMCP = self:load_balatromcp()
+function testShopStateDetectionDelayedCaptureShowsPopulatedShopCollections()
+    setUp()
+    local BalatroMCP = load_balatromcp()
     local mcp = BalatroMCP.new()
     mcp.polling_active = true
     
@@ -715,11 +751,11 @@ function TestShopStateDetection:test_delayed_capture_shows_populated_shop_collec
     mcp:on_shop_entered()
     
     -- Simulate shop population timing
-    local print_calls = self:capture_print_output(function()
+    local print_calls = capture_print_output(function()
         mcp:update(1.5)  -- Trigger delayed capture
     end)
     
-    luaunit.assertTrue(state_sent, "Should send state after delay")
+    luaunit.assertEquals(true, state_sent, "Should send state after delay")
     
     -- Should show populated shop in debug log
     local found_populated_log = false
@@ -729,15 +765,17 @@ function TestShopStateDetection:test_delayed_capture_shows_populated_shop_collec
             break
         end
     end
-    luaunit.assertTrue(found_populated_log, "Should log populated shop state after delay")
+    luaunit.assertEquals(true, found_populated_log, "Should log populated shop state after delay")
+    tearDown()
 end
 
 -- =============================================================================
 -- TEST CASES: HOOK VS NON-INTRUSIVE DETECTION COORDINATION
 -- =============================================================================
 
-function TestShopStateDetection:test_hook_and_non_intrusive_detection_work_together()
-    local BalatroMCP = self:load_balatromcp()
+function testShopStateDetectionHookAndNonIntrusiveDetectionWorkTogether()
+    setUp()
+    local BalatroMCP = load_balatromcp()
     local mcp = BalatroMCP.new()
     mcp:setup_shop_state_detection()
     
@@ -754,18 +792,20 @@ function TestShopStateDetection:test_hook_and_non_intrusive_detection_work_toget
     G.STATE = G.STATES.SHOP
     mcp:detect_shop_state_transition()
     
-    luaunit.assertTrue(hook_triggered, "Non-intrusive detection should trigger shop entry")
-    luaunit.assertTrue(mcp.shop_state_initialized, "Should set shop state initialized flag")
+    luaunit.assertEquals(true, hook_triggered, "Non-intrusive detection should trigger shop entry")
+    luaunit.assertEquals(true, mcp.shop_state_initialized, "Should set shop state initialized flag")
     
     -- Now test that subsequent calls don't re-trigger
     hook_triggered = false
     mcp:detect_shop_state_transition()
     
-    luaunit.assertFalse(hook_triggered, "Should not re-trigger when already initialized")
+    luaunit.assertEquals(false, hook_triggered, "Should not re-trigger when already initialized")
+    tearDown()
 end
 
-function TestShopStateDetection:test_non_intrusive_detection_prevents_duplicate_triggering()
-    local BalatroMCP = self:load_balatromcp()
+function testShopStateDetectionNonIntrusiveDetectionPreventsDuplicateTriggering()
+    setUp()
+    local BalatroMCP = load_balatromcp()
     local mcp = BalatroMCP.new()
     mcp:setup_shop_state_detection()
     
@@ -784,15 +824,17 @@ function TestShopStateDetection:test_non_intrusive_detection_prevents_duplicate_
     
     mcp:detect_shop_state_transition()
     
-    luaunit.assertFalse(hook_triggered, "Should not trigger when delayed capture is already active")
+    luaunit.assertEquals(false, hook_triggered, "Should not trigger when delayed capture is already active")
+    tearDown()
 end
 
 -- =============================================================================
 -- TEST CASES: STATE TRACKING VARIABLE MANAGEMENT
 -- =============================================================================
 
-function TestShopStateDetection:test_state_tracking_variables_are_properly_managed_across_updates()
-    local BalatroMCP = self:load_balatromcp()
+function testShopStateDetectionStateTrackingVariablesProperlyManagedAcrossUpdates()
+    setUp()
+    local BalatroMCP = load_balatromcp()
     local mcp = BalatroMCP.new()
     mcp:setup_shop_state_detection()
     mcp.polling_active = true
@@ -804,7 +846,7 @@ function TestShopStateDetection:test_state_tracking_variables_are_properly_manag
     mcp:update(0.1)
     
     luaunit.assertEquals(mcp.last_shop_state, G.STATES.SELECTING_HAND, "Should track initial state")
-    luaunit.assertFalse(mcp.shop_state_initialized, "Should start with shop not initialized")
+    luaunit.assertEquals(false, mcp.shop_state_initialized, "Should start with shop not initialized")
     
     -- Transition to shop
     G.STATE = G.STATES.SHOP
@@ -814,7 +856,7 @@ function TestShopStateDetection:test_state_tracking_variables_are_properly_manag
     mcp:update(0.1)
     
     luaunit.assertEquals(mcp.last_shop_state, G.STATES.SHOP, "Should update to shop state")
-    luaunit.assertTrue(mcp.shop_state_initialized, "Should set shop initialized")
+    luaunit.assertEquals(true, mcp.shop_state_initialized, "Should set shop initialized")
     luaunit.assertEquals(shop_entry_count, 1, "Should trigger shop entry once")
     
     -- Stay in shop (should not re-trigger)
@@ -827,17 +869,19 @@ function TestShopStateDetection:test_state_tracking_variables_are_properly_manag
     mcp:update(0.1)
     
     luaunit.assertEquals(mcp.last_shop_state, G.STATES.SELECTING_HAND, "Should update to hand state")
-    luaunit.assertFalse(mcp.shop_state_initialized, "Should reset shop initialized flag")
+    luaunit.assertEquals(false, mcp.shop_state_initialized, "Should reset shop initialized flag")
     
     -- Re-enter shop (should trigger again)
     G.STATE = G.STATES.SHOP
     mcp:update(0.1)
     
     luaunit.assertEquals(shop_entry_count, 2, "Should trigger shop entry again after leaving and re-entering")
+    tearDown()
 end
 
-function TestShopStateDetection:test_update_method_calls_detect_shop_state_transition()
-    local BalatroMCP = self:load_balatromcp()
+function testShopStateDetectionUpdateMethodCallsDetectShopStateTransition()
+    setUp()
+    local BalatroMCP = load_balatromcp()
     local mcp = BalatroMCP.new()
     mcp.polling_active = true
     
@@ -847,15 +891,17 @@ function TestShopStateDetection:test_update_method_calls_detect_shop_state_trans
     
     mcp:update(0.1)
     
-    luaunit.assertTrue(detection_called, "Update method should call detect_shop_state_transition")
+    luaunit.assertEquals(true, detection_called, "Update method should call detect_shop_state_transition")
+    tearDown()
 end
 
 -- =============================================================================
 -- TEST CASES: INTEGRATION TESTS
 -- =============================================================================
 
-function TestShopStateDetection:test_complete_shop_detection_workflow_integration()
-    local BalatroMCP = self:load_balatromcp()
+function testShopStateDetectionCompleteShopDetectionWorkflowIntegration()
+    setUp()
+    local BalatroMCP = load_balatromcp()
     local mcp = BalatroMCP.new()
     mcp.polling_active = true
     
@@ -886,7 +932,7 @@ function TestShopStateDetection:test_complete_shop_detection_workflow_integratio
     -- Transition to shop via state change (non-intrusive detection)
     G.STATE = G.STATES.SHOP
     
-    local print_calls = self:capture_print_output(function()
+    local print_calls = capture_print_output(function()
         -- This should trigger non-intrusive detection
         mcp:update(0.1)
         
@@ -894,7 +940,7 @@ function TestShopStateDetection:test_complete_shop_detection_workflow_integratio
         mcp:update(1.5)
     end)
     
-    luaunit.assertTrue(states_sent >= 1, "Should send state after delayed capture")
+    luaunit.assertEquals(true, states_sent >= 1, "Should send state after delayed capture")
     
     -- Verify logs show proper detection and timing
     local found_detection = false
@@ -907,34 +953,33 @@ function TestShopStateDetection:test_complete_shop_detection_workflow_integratio
         end
     end
     
-    luaunit.assertTrue(found_detection, "Should detect shop state transition")
-    luaunit.assertTrue(found_delayed_capture, "Should execute delayed capture")
+    luaunit.assertEquals(true, found_detection, "Should detect shop state transition")
+    luaunit.assertEquals(true, found_delayed_capture, "Should execute delayed capture")
+    tearDown()
 end
 
--- =============================================================================
--- TEST RUNNER
--- =============================================================================
-
-function run_tests()
-    print("Starting ShopStateDetection LuaUnit tests...")
-    
-    -- Run tests using LuaUnit by running the test class
-    local result = luaunit.LuaUnit.run({'-v', '--pattern', 'TestShopStateDetection'})
-    
-    -- LuaUnit.run() returns 0 for success, non-zero for failure
-    local success = (result == 0)
-    
-    if success then
-        print("\n✅ All ShopStateDetection tests passed! (LuaUnit)")
-    else
-        print("\n❌ ShopStateDetection tests failed! (LuaUnit)")
-    end
-    
-    return success
-end
-
--- Module exports
+-- Return all test functions as a table for LuaUnit runner
 return {
-    TestShopStateDetection = TestShopStateDetection,
-    run_tests = run_tests
+    testShopStateDetectionSetupInitializesTrackingVariables = testShopStateDetectionSetupInitializesTrackingVariables,
+    testShopStateDetectionHookSetsUpShopStateDetection = testShopStateDetectionHookSetsUpShopStateDetection,
+    testShopStateDetectionHooksCashOutInsteadOfGoToShop = testShopStateDetectionHooksCashOutInsteadOfGoToShop,
+    testShopStateDetectionHandlesMissingCashOutGracefully = testShopStateDetectionHandlesMissingCashOutGracefully,
+    testShopStateDetectionHandlesMissingGObject = testShopStateDetectionHandlesMissingGObject,
+    testShopStateDetectionHandlesMissingGState = testShopStateDetectionHandlesMissingGState,
+    testShopStateDetectionHandlesMissingGStates = testShopStateDetectionHandlesMissingGStates,
+    testShopStateDetectionInitializesTrackingOnFirstRun = testShopStateDetectionInitializesTrackingOnFirstRun,
+    testShopStateDetectionSkipsWhenDelayedCaptureActive = testShopStateDetectionSkipsWhenDelayedCaptureActive,
+    testShopStateDetectionDetectsTransitionIntoShopState = testShopStateDetectionDetectsTransitionIntoShopState,
+    testShopStateDetectionIgnoresRepeatedShopState = testShopStateDetectionIgnoresRepeatedShopState,
+    testShopStateDetectionResetsFlagWhenLeavingShop = testShopStateDetectionResetsFlagWhenLeavingShop,
+    testShopStateDetectionOnShopEnteredSetsCorrectDelayTimer = testShopStateDetectionOnShopEnteredSetsCorrectDelayTimer,
+    testShopStateDetectionUpdateMethodHandlesDelayedShopCaptureTiming = testShopStateDetectionUpdateMethodHandlesDelayedShopCaptureTiming,
+    testShopStateDetectionDoesNotTriggerPrematureShopCapture = testShopStateDetectionDoesNotTriggerPrematureShopCapture,
+    testShopStateDetectionOnShopEnteredLogsShopCollectionState = testShopStateDetectionOnShopEnteredLogsShopCollectionState,
+    testShopStateDetectionDelayedCaptureShowsPopulatedShopCollections = testShopStateDetectionDelayedCaptureShowsPopulatedShopCollections,
+    testShopStateDetectionHookAndNonIntrusiveDetectionWorkTogether = testShopStateDetectionHookAndNonIntrusiveDetectionWorkTogether,
+    testShopStateDetectionNonIntrusiveDetectionPreventsDuplicateTriggering = testShopStateDetectionNonIntrusiveDetectionPreventsDuplicateTriggering,
+    testShopStateDetectionStateTrackingVariablesProperlyManagedAcrossUpdates = testShopStateDetectionStateTrackingVariablesProperlyManagedAcrossUpdates,
+    testShopStateDetectionUpdateMethodCallsDetectShopStateTransition = testShopStateDetectionUpdateMethodCallsDetectShopStateTransition,
+    testShopStateDetectionCompleteShopDetectionWorkflowIntegration = testShopStateDetectionCompleteShopDetectionWorkflowIntegration
 }

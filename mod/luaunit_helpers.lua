@@ -292,39 +292,39 @@ function luaunit_helpers.wrap_test_function(test_func, setup_func, teardown_func
         -- Create a mock test framework object for compatibility
         local mock_t = {
             assert_equal = function(_, expected, actual, message)
-                local luaunit = require('luaunit')
+                local luaunit = require('lib.luaunit')
                 luaunit.assertEquals(actual, expected, message)
             end,
             assert_true = function(_, condition, message)
-                local luaunit = require('luaunit')
-                luaunit.assertTrue(condition, message)
+                local luaunit = require('lib.luaunit')
+                luaunit.assertEquals(true, condition, message)
             end,
             assert_false = function(_, condition, message)
-                local luaunit = require('luaunit')
-                luaunit.assertFalse(condition, message)
+                local luaunit = require('lib.luaunit')
+                luaunit.assertEquals(false, condition, message)
             end,
             assert_nil = function(_, value, message)
-                local luaunit = require('luaunit')
+                local luaunit = require('lib.luaunit')
                 luaunit.assertNil(value, message)
             end,
             assert_not_nil = function(_, value, message)
-                local luaunit = require('luaunit')
+                local luaunit = require('lib.luaunit')
                 luaunit.assertNotNil(value, message)
             end,
             assert_type = function(_, expected_type, value, message)
-                local luaunit = require('luaunit')
+                local luaunit = require('lib.luaunit')
                 luaunit.assertType(value, expected_type, message)
             end,
             assert_contains = function(_, haystack, needle, message)
-                local luaunit = require('luaunit')
+                local luaunit = require('lib.luaunit')
                 if type(haystack) == "string" then
-                    luaunit.assertStrContains(haystack, needle, message)
+                    luaunit.assertNotNil(string.find(haystack,  needle),  message)
                 else
                     error("assert_contains only supports string search")
                 end
             end,
             assert_match = function(_, text, pattern, message)
-                local luaunit = require('luaunit')
+                local luaunit = require('lib.luaunit')
                 luaunit.assertStrMatches(text, pattern, message)
             end
         }

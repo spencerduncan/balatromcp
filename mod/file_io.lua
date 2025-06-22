@@ -2,6 +2,7 @@
 -- Handles communication through JSON files with the MCP server
 
 local FileIO = {}
+local json = require("libs.json")
 FileIO.__index = FileIO
 
 function FileIO.new(base_path)
@@ -13,9 +14,6 @@ function FileIO.new(base_path)
     
     -- Initialize debug logging for this component
     self.component_name = "FILE_IO"
-    
-    -- Initialize JSON handling with robust fallback
-    self:_initialize_json()
     
     -- Test and log filesystem availability
     if love and love.filesystem then
@@ -71,19 +69,6 @@ function FileIO:log(message)
         if not success then
             print("BalatroMCP [FILE_IO]: Failed to write debug log: " .. tostring(err))
         end
-    end
-end
-function FileIO:_initialize_json()
-    -- Load the main JSON library using Steammodded loading
-    local json_success, json_result = pcall(function()
-        return assert(SMODS.load_file("libs/json.lua"))()
-    end)
-    if json_success then
-        self.json = json_result
-        self:log("JSON library loaded successfully")
-    else
-        self:log("ERROR: JSON library failed to load: " .. tostring(json_result))
-        error("Failed to load required JSON library via SMODS")
     end
 end
 

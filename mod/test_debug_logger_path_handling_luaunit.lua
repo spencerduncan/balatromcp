@@ -260,8 +260,63 @@ local function run_debug_logger_path_tests_luaunit()
     return success
 end
 
--- Export the test class and runner
+-- Convert class methods to standalone functions for LuaUnit registration
+function TestDebugLoggerInitializationWithSubdirectory()
+    local test_instance = TestDebugLoggerPathHandling:new()
+    test_instance:setUp()
+    test_instance:testDebugLoggerInitializationWithSubdirectory()
+    test_instance:tearDown()
+end
+
+function TestDebugLoggerDefaultInitialization()
+    local test_instance = TestDebugLoggerPathHandling:new()
+    test_instance:setUp()
+    test_instance:testDebugLoggerDefaultInitialization()
+    test_instance:tearDown()
+end
+
+function TestDebugLoggerCustomLogFilePathWithCurrentDirectory()
+    local test_instance = TestDebugLoggerPathHandling:new()
+    test_instance:setUp()
+    test_instance:testDebugLoggerCustomLogFilePathWithCurrentDirectory()
+    test_instance:tearDown()
+end
+
+function TestDebugLoggerCustomLogFilePathWithSubdirectory()
+    local test_instance = TestDebugLoggerPathHandling:new()
+    test_instance:setUp()
+    test_instance:testDebugLoggerCustomLogFilePathWithSubdirectory()
+    test_instance:tearDown()
+end
+
+function TestDebugLoggerTestFileCommunicationWithCurrentDirectory()
+    local test_instance = TestDebugLoggerPathHandling:new()
+    test_instance:setUp()
+    test_instance:testDebugLoggerTestFileCommunicationWithCurrentDirectory()
+    test_instance:tearDown()
+end
+
+function TestDebugLoggerTestFileCommunicationWithSubdirectory()
+    local test_instance = TestDebugLoggerPathHandling:new()
+    test_instance:setUp()
+    test_instance:testDebugLoggerTestFileCommunicationWithSubdirectory()
+    test_instance:tearDown()
+end
+
+function TestDebugLoggerDirectoryCreationBehaviorComparison()
+    local test_instance = TestDebugLoggerPathHandling:new()
+    test_instance:setUp()
+    test_instance:testDebugLoggerDirectoryCreationBehaviorComparison()
+    test_instance:tearDown()
+end
+
+-- Export individual test functions for LuaUnit registration
 return {
-    TestDebugLoggerPathHandling = TestDebugLoggerPathHandling,
-    run_tests = run_debug_logger_path_tests_luaunit
+    TestDebugLoggerInitializationWithSubdirectory = TestDebugLoggerInitializationWithSubdirectory,
+    TestDebugLoggerDefaultInitialization = TestDebugLoggerDefaultInitialization,
+    TestDebugLoggerCustomLogFilePathWithCurrentDirectory = TestDebugLoggerCustomLogFilePathWithCurrentDirectory,
+    TestDebugLoggerCustomLogFilePathWithSubdirectory = TestDebugLoggerCustomLogFilePathWithSubdirectory,
+    TestDebugLoggerTestFileCommunicationWithCurrentDirectory = TestDebugLoggerTestFileCommunicationWithCurrentDirectory,
+    TestDebugLoggerTestFileCommunicationWithSubdirectory = TestDebugLoggerTestFileCommunicationWithSubdirectory,
+    TestDebugLoggerDirectoryCreationBehaviorComparison = TestDebugLoggerDirectoryCreationBehaviorComparison
 }

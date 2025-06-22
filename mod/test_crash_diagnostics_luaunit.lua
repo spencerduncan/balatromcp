@@ -2,7 +2,7 @@
 -- Tests object validation, hook safety, emergency diagnostics, and crash pattern detection
 -- Migrated from custom test framework to LuaUnit
 
-local luaunit = require('luaunit')
+local luaunit = require('libs.luaunit')
 
 -- Load CrashDiagnostics module directly for testing
 dofile("crash_diagnostics.lua")
@@ -94,9 +94,9 @@ function TestValidateObjectConfigDetectsNilObject()
     local diagnostics = CrashDiagnostics.new()
     local result = diagnostics:validate_object_config(nil, "test_object", "test_operation")
     
-    assertFalse(result, "Should return false for nil object")
-    assertEquals(diagnostics.object_access_count, 1, "Should increment object access count")
-    luaunit.assertStrContains(diagnostics.last_object_accessed, "test_object at test_operation", "Should record object access")
+    luaunit.assertEquals(false, result, "Should return false for nil object")
+    luaunit.assertEquals(diagnostics.object_access_count, 1, "Should increment object access count")
+    luaunit.assertNotNil(string.find(diagnostics.last_object_accessed,  "test_object at test_operation"),  "Should record object access")
 end
 
 function TestValidateObjectConfigDetectsNilConfigField()
@@ -106,8 +106,8 @@ function TestValidateObjectConfigDetectsNilConfigField()
     local corrupted_joker = create_corrupted_joker_no_config()
     local result = diagnostics:validate_object_config(corrupted_joker, "corrupted_joker", "test_validation")
     
-    assertFalse(result, "Should return false for object with nil config")
-    assertEquals(diagnostics.object_access_count, 1, "Should increment object access count")
+    luaunit.assertEquals(false, result, "Should return false for object with nil config")
+    luaunit.assertEquals(diagnostics.object_access_count, 1, "Should increment object access count")
 end
 
 function TestValidateObjectConfigPassesForValidObject()
@@ -117,8 +117,8 @@ function TestValidateObjectConfigPassesForValidObject()
     local valid_joker = create_valid_joker("j_joker", "Joker")
     local result = diagnostics:validate_object_config(valid_joker, "valid_joker", "test_validation")
     
-    assertTrue(result, "Should return true for valid object with config")
-    assertEquals(diagnostics.object_access_count, 1, "Should increment object access count")
+    luaunit.assertEquals(true, result, "Should return true for valid object with config")
+    luaunit.assertEquals(diagnostics.object_access_count, 1, "Should increment object access count")
 end
 
 function TestValidateObjectConfigLogsAvailablePropertiesForCorruptedObjects()
@@ -141,19 +141,19 @@ function TestValidateObjectConfigLogsAvailablePropertiesForCorruptedObjects()
     
     _G.print = original_print
     
-    assertFalse(result, "Should return false for corrupted object")
+    luaunit.assertEquals(false, result, "Should return false for corrupted object")
     
     -- Check that diagnostic information was logged
     local found_properties_log = false
     for _, msg in ipairs(print_calls) do
         if string.find(msg, "properties:") then
             found_properties_log = true
-            luaunit.assertStrContains(msg, "unique_val:number", "Should log unique_val property")
-            luaunit.assertStrContains(msg, "sell_cost:number", "Should log sell_cost property")
+            luaunit.assertNotNil(string.find(msg,  "unique_val:number"),  "Should log unique_val property")
+            luaunit.assertNotNil(string.find(msg,  "sell_cost:number"),  "Should log sell_cost property")
             break
         end
     end
-    assertTrue(found_properties_log, "Should log available properties for corrupted objects")
+    luaunit.assertEquals(true, found_properties_log, "Should log available properties for corrupted objects")
 end
 
 -- === HOOK SAFETY TESTS ===
@@ -166,9 +166,9 @@ function TestPreHookValidationDetectsNilGObject()
     
     local result = diagnostics:pre_hook_validation("test_hook")
     
-    assertFalse(result, "Should return false when G object is nil")
-    assertEquals(diagnostics.hook_call_count, 1, "Should increment hook call count")
-    assertEquals(diagnostics.last_hook_called, "test_hook", "Should record hook name")
+    luaunit.assertEquals(false, result, "Should return false when G object is nil")
+    luaunit.assertEquals(diagnostics.hook_call_count, 1, "Should increment hook call count")
+    luaunit.assertEquals(diagnostics.last_hook_called, "test_hook", "Should record hook name")
 end
 
 function TestPreHookValidationDetectsNilGState()
@@ -179,8 +179,8 @@ function TestPreHookValidationDetectsNilGState()
     
     local result = diagnostics:pre_hook_validation("test_hook")
     
-    assertFalse(result, "Should return false when G.STATE is nil")
-    assertEquals(diagnostics.hook_call_count, 1, "Should increment hook call count")
+    luaunit.assertEquals(false, result, "Should return false when G.STATE is nil")
+    luaunit.assertEquals(diagnostics.hook_call_count, 1, "Should increment hook call count")
 end
 
 function TestPreHookValidationValidatesHandCardsForCardHooks()
@@ -196,7 +196,7 @@ function TestPreHookValidationValidatesHandCardsForCardHooks()
     
     local result = diagnostics:pre_hook_validation("play_cards_test")
     
-    assertFalse(result, "Should return false when hand contains corrupted cards")
+    luaunit.assertEquals(false, result, "Should return false when hand contains corrupted cards")
 end
 
 function TestPreHookValidationValidatesJokersForJokerHooks()
@@ -215,7 +215,7 @@ function TestPreHookValidationValidatesJokersForJokerHooks()
     
     -- The actual implementation may not validate jokers in pre_hook_validation for joker hooks
     -- Let's adjust the test to match the actual behavior
-    assertTrue(result or not result, "pre_hook_validation should handle joker validation")
+    luaunit.assertEquals(true, result or not result, "pre_hook_validation should handle joker validation")
 end
 
 function TestPreHookValidationPassesForValidGameState()
@@ -229,10 +229,10 @@ function TestPreHookValidationPassesForValidGameState()
     
     local result = diagnostics:pre_hook_validation("valid_hook_test")
     
-    assertTrue(result, "Should return true for valid game state")
+    luaunit.assertEquals(true, result, "Should return true for valid game state")
 end
 
-function TestCreateSafeHookWrapsFunction WithErrorHandling()
+function TestCreateSafeHookWrapsFunctionWithErrorHandling()
     setup_test_environment()
     
     local diagnostics = CrashDiagnostics.new()
@@ -250,7 +250,7 @@ function TestCreateSafeHookWrapsFunction WithErrorHandling()
     
     _G.print = original_print
     
-    assertNil(result, "Should return nil when wrapped function errors")
+    luaunit.assertNil(result, "Should return nil when wrapped function errors")
     
     -- Check that error was logged
     local found_error_log = false
@@ -260,7 +260,10 @@ function TestCreateSafeHookWrapsFunction WithErrorHandling()
             break
         end
     end
-    assertTrue(found_error_log, "Should log hook errors")
+    for k,v in pairs(_G) do
+        print(k)
+    end
+    luaunit.assertEquals(true, found_error_log, "Should log hook errors")
 end
 
 function TestCreateSafeHookSkipsExecutionOnPreHookValidationFailure()
@@ -276,7 +279,7 @@ function TestCreateSafeHookSkipsExecutionOnPreHookValidationFailure()
     safe_hook()
     
     -- The implementation may still call the function even if validation fails, so adjust the test
-    assertTrue(function_called or not function_called, "Function call behavior depends on implementation")
+    luaunit.assertEquals(true, function_called or not function_called, "Function call behavior depends on implementation")
 end
 
 -- === HOOK CHAIN TRACKING TESTS ===
@@ -290,10 +293,10 @@ function TestTrackHookChainMaintainsHookHistory()
     diagnostics:track_hook_chain("hook2")
     diagnostics:track_hook_chain("hook3")
     
-    assertNotNil(diagnostics.hook_chain, "Hook chain should be initialized")
-    assertEquals(#diagnostics.hook_chain, 3, "Should track all hook calls")
-    assertEquals(diagnostics.hook_chain[1].hook, "hook1", "Should maintain hook order")
-    assertEquals(diagnostics.hook_chain[3].hook, "hook3", "Should record latest hook")
+    luaunit.assertNotNil(diagnostics.hook_chain, "Hook chain should be initialized")
+    luaunit.assertEquals(#diagnostics.hook_chain, 3, "Should track all hook calls")
+    luaunit.assertEquals(diagnostics.hook_chain[1].hook, "hook1", "Should maintain hook order")
+    luaunit.assertEquals(diagnostics.hook_chain[3].hook, "hook3", "Should record latest hook")
 end
 
 function TestTrackHookChainLimitsChainLengthTo10()
@@ -306,9 +309,9 @@ function TestTrackHookChainLimitsChainLengthTo10()
         diagnostics:track_hook_chain("hook" .. i)
     end
     
-    assertEquals(#diagnostics.hook_chain, 10, "Should limit hook chain to 10 entries")
-    assertEquals(diagnostics.hook_chain[1].hook, "hook6", "Should remove oldest entries")
-    assertEquals(diagnostics.hook_chain[10].hook, "hook15", "Should keep newest entries")
+    luaunit.assertEquals(#diagnostics.hook_chain, 10, "Should limit hook chain to 10 entries")
+    luaunit.assertEquals(diagnostics.hook_chain[1].hook, "hook6", "Should remove oldest entries")
+    luaunit.assertEquals(diagnostics.hook_chain[10].hook, "hook15", "Should keep newest entries")
 end
 
 function TestAnalyzeHookChainDetectsRapidHookCalls()
@@ -324,8 +327,8 @@ function TestAnalyzeHookChainDetectsRapidHookCalls()
     
     local analysis = diagnostics:analyze_hook_chain()
     
-    luaunit.assertStrContains(analysis, "rapid_hook", "Should include hook name in analysis")
-    luaunit.assertStrContains(analysis, "WARNING.*Rapid calls", "Should detect rapid calls pattern")
+    luaunit.assertNotNil(string.find(analysis,  "rapid_hook"),  "Should include hook name in analysis")
+    luaunit.assertNotNil(string.find(analysis,  "WARNING.*Rapid calls"),  "Should detect rapid calls pattern")
 end
 
 function TestAnalyzeHookChainHandlesEmptyHookChain()
@@ -335,7 +338,7 @@ function TestAnalyzeHookChainHandlesEmptyHookChain()
     
     local analysis = diagnostics:analyze_hook_chain()
     
-    luaunit.assertStrContains(analysis, "No hook chain data available", "Should handle empty hook chain gracefully")
+    luaunit.assertNotNil(string.find(analysis,  "No hook chain data available"),  "Should handle empty hook chain gracefully")
 end
 
 -- === GAME STATE VALIDATION TESTS ===
@@ -348,7 +351,7 @@ function TestValidateGameStateDetectsCriticalObjectCorruption()
     
     local result = diagnostics:validate_game_state("critical_operation")
     
-    assertTrue(result, "Should still return true but log warnings for missing non-critical objects")
+    luaunit.assertEquals(true, result, "Should still return true but log warnings for missing non-critical objects")
 end
 
 function TestValidateGameStateHandlesNonNumberGState()
@@ -366,7 +369,7 @@ function TestValidateGameStateHandlesNonNumberGState()
     
     _G.print = original_print
     
-    assertTrue(result, "Should return true but warn about invalid state type")
+    luaunit.assertEquals(true, result, "Should return true but warn about invalid state type")
     
     local found_warning = false
     for _, msg in ipairs(print_calls) do
@@ -375,7 +378,7 @@ function TestValidateGameStateHandlesNonNumberGState()
             break
         end
     end
-    assertTrue(found_warning, "Should warn about non-number G.STATE")
+    luaunit.assertEquals(true, found_warning, "Should warn about non-number G.STATE")
 end
 
 -- === EMERGENCY STATE DUMP TESTS ===
@@ -402,7 +405,7 @@ function TestEmergencyStateDumpHandlesNilGObject()
             break
         end
     end
-    assertTrue(found_nil_g_log, "Should log when G object is nil")
+    luaunit.assertEquals(true, found_nil_g_log, "Should log when G object is nil")
 end
 
 function TestEmergencyStateDumpAnalyzesJokerCorruption()
@@ -438,7 +441,7 @@ function TestEmergencyStateDumpAnalyzesJokerCorruption()
         end
     end
     
-    assertTrue(found_emergency_output or #print_calls > 0, "Emergency dump should produce some output")
+    luaunit.assertEquals(true, found_emergency_output or #print_calls > 0, "Emergency dump should produce some output")
 end
 
 function TestEmergencyStateDumpIncludesHookChainAnalysis()
@@ -466,7 +469,7 @@ function TestEmergencyStateDumpIncludesHookChainAnalysis()
             break
         end
     end
-    assertTrue(found_hook_analysis, "Should include hook chain analysis in emergency dump")
+    luaunit.assertEquals(true, found_hook_analysis, "Should include hook chain analysis in emergency dump")
 end
 
 -- === CONTEXT TRACKING TESTS ===
@@ -483,16 +486,16 @@ function TestGetCrashContextProvidesComprehensiveCrashInformation()
     
     local context = diagnostics:get_crash_context()
     
-    assertNotNil(context, "Should return crash context")
-    assertEquals("table", type(context), "Context should be a table")
+    luaunit.assertNotNil(context, "Should return crash context")
+    luaunit.assertEquals("table", type(context), "Context should be a table")
     -- Basic validation of context structure without relying on specific field formats
     if context.last_hook_called then
-        assertEquals("string", type(context.last_hook_called), "Should have string hook name")
+        luaunit.assertEquals("string", type(context.last_hook_called), "Should have string hook name")
     end
     if context.timestamp then
         -- Accept either string or number for timestamp
         local ts_type = type(context.timestamp)
-        assertTrue(ts_type == "string" or ts_type == "number", "Should have timestamp (string or number)")
+        luaunit.assertEquals(true, ts_type == "string" or ts_type == "number", "Should have timestamp (string or number)")
     end
 end
 
@@ -530,7 +533,7 @@ function TestMonitorJokerOperationsDetectsAndLogsCorruptedJokers()
         end
     end
     
-    assertTrue(found_monitoring_log, "Should log monitoring activity")
+    luaunit.assertEquals(true, found_monitoring_log, "Should log monitoring activity")
 end
 
 -- Run tests if executed directly
@@ -548,7 +551,7 @@ return {
     TestPreHookValidationValidatesHandCardsForCardHooks = TestPreHookValidationValidatesHandCardsForCardHooks,
     TestPreHookValidationValidatesJokersForJokerHooks = TestPreHookValidationValidatesJokersForJokerHooks,
     TestPreHookValidationPassesForValidGameState = TestPreHookValidationPassesForValidGameState,
-    TestCreateSafeHookWrapsFunction WithErrorHandling = TestCreateSafeHookWrapsFunction WithErrorHandling,
+    TestCreateSafeHookWrapsFunctionWithErrorHandling = TestCreateSafeHookWrapsFunctionWithErrorHandling,
     TestCreateSafeHookSkipsExecutionOnPreHookValidationFailure = TestCreateSafeHookSkipsExecutionOnPreHookValidationFailure,
     TestTrackHookChainMaintainsHookHistory = TestTrackHookChainMaintainsHookHistory,
     TestTrackHookChainLimitsChainLengthTo10 = TestTrackHookChainLimitsChainLengthTo10,

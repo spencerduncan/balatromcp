@@ -2,7 +2,7 @@
 -- Provides a wrapper that maintains the current TestFramework API
 -- Maps current assertions to luaunit equivalents while handling parameter order differences
 
-local luaunit = require('luaunit')
+local luaunit = require('lib.luaunit')
 
 -- TestFramework compatibility wrapper
 local TestFramework = {}
@@ -33,11 +33,11 @@ function TestFramework:assert_equal(expected, actual, message)
 end
 
 function TestFramework:assert_true(condition, message)
-    luaunit.assertTrue(condition, message)
+    luaunit.assertEquals(true, condition, message)
 end
 
 function TestFramework:assert_false(condition, message)
-    luaunit.assertFalse(condition, message)
+    luaunit.assertEquals(false, condition, message)
 end
 
 function TestFramework:assert_nil(value, message)
@@ -55,7 +55,7 @@ end
 
 function TestFramework:assert_contains(haystack, needle, message)
     if type(haystack) == "string" then
-        luaunit.assertStrContains(haystack, needle, message)
+        luaunit.assertNotNil(string.find(haystack,  needle),  message)
     else
         error("assert_contains only supports string search in compatibility mode")
     end
