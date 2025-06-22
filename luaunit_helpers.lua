@@ -8,6 +8,49 @@ local luaunit_helpers = {}
 -- MOCK GENERATORS (preserved from current framework)
 -- =============================================================================
 
+-- Comprehensive state constants generator for testing enhanced get_current_phase() method
+function luaunit_helpers.create_mock_states()
+    -- Sequential integers starting from 1 for all game states
+    -- Organized by functional categories as defined in enhanced get_current_phase() method
+    return {
+        -- Hand/Card Selection States
+        SELECTING_HAND = 1,
+        DRAW_TO_HAND = 2,
+        HAND_PLAYED = 3,
+        
+        -- Shop and Purchase States
+        SHOP = 4,
+        
+        -- Blind Selection and Round States
+        BLIND_SELECT = 5,
+        NEW_ROUND = 6,
+        ROUND_EVAL = 7,
+        
+        -- Pack Opening States
+        STANDARD_PACK = 8,
+        BUFFOON_PACK = 9,
+        TAROT_PACK = 10,
+        PLANET_PACK = 11,
+        SPECTRAL_PACK = 12,
+        SMODS_BOOSTER_OPENED = 13,
+        
+        -- Consumable Usage States
+        PLAY_TAROT = 14,
+        
+        -- Menu and Navigation States
+        MENU = 15,
+        SPLASH = 16,
+        TUTORIAL = 17,
+        DEMO_CTA = 18,
+        
+        -- Game End States
+        GAME_OVER = 19,
+        
+        -- Special Game Modes
+        SANDBOX = 20
+    }
+end
+
 -- Mock G object generator (preserves exact functionality from test_state_extractor.lua)
 function luaunit_helpers.create_mock_g(options)
     options = options or {}
@@ -17,12 +60,8 @@ function luaunit_helpers.create_mock_g(options)
     -- Add STATE and STATES if requested
     if options.has_state then
         mock_g.STATE = options.state_value or 1
-        mock_g.STATES = options.states or {
-            SELECTING_HAND = 1,
-            SHOP = 2,
-            BLIND_SELECT = 3,
-            DRAW_TO_HAND = 4
-        }
+        -- Use comprehensive state constants by default, maintain backward compatibility
+        mock_g.STATES = options.states or luaunit_helpers.create_mock_states()
     end
     
     -- Add GAME object if requested

@@ -237,6 +237,7 @@ function StateExtractor:get_session_id()
 end
 
 function StateExtractor:get_current_phase()
+    -- Validate G object structure
     if not self:safe_check_path(G, {"STATE"}) then
         self:log("WARNING: G.STATE not accessible, returning default phase")
         return "hand_selection"
@@ -247,21 +248,79 @@ function StateExtractor:get_current_phase()
         return "hand_selection"
     end
     
-    -- CRITICAL FIX: Force fresh access to global G object, don't cache reference
-    local current_state = _G.G.STATE  -- Direct global access
-    local states = _G.G.STATES       -- Direct global access
+    -- Use consistent direct access to G object
+    local current_state = G.STATE
+    local states = G.STATES
     
-    -- Safe state comparison with fallback
-    if current_state == self:safe_get_value(states, "SELECTING_HAND", nil) then
+    -- Comprehensive state mapping using G.STATES constants
+    -- Hand/Card Selection States
+    if current_state == states.SELECTING_HAND then
         return "hand_selection"
-    elseif current_state == self:safe_get_value(states, "SHOP", nil) then
+    elseif current_state == states.DRAW_TO_HAND then
+        return "drawing_cards"
+    elseif current_state == states.HAND_PLAYED then
+        return "hand_played"
+    
+    -- Shop and Purchase States
+    elseif current_state == states.SHOP then
         return "shop"
-    elseif current_state == self:safe_get_value(states, "BLIND_SELECT", nil) then
+    
+    -- Blind Selection and Round States
+    elseif current_state == states.BLIND_SELECT then
         return "blind_selection"
-    elseif current_state == self:safe_get_value(states, "DRAW_TO_HAND", nil) then
-        return "hand_selection"
+    elseif current_state == states.NEW_ROUND then
+        return "new_round"
+    elseif current_state == states.ROUND_EVAL then
+        return "round_evaluation"
+    
+    -- Pack Opening States
+    elseif current_state == states.STANDARD_PACK then
+        return "pack_opening"
+    elseif current_state == states.BUFFOON_PACK then
+        return "pack_opening"
+    elseif current_state == states.TAROT_PACK then
+        return "pack_opening"
+    elseif current_state == states.PLANET_PACK then
+        return "pack_opening"
+    elseif current_state == states.SPECTRAL_PACK then
+        return "pack_opening"
+    elseif current_state == states.SMODS_BOOSTER_OPENED then
+        return "pack_opening"
+    
+    -- Consumable Usage States
+    elseif current_state == states.PLAY_TAROT then
+        return "using_consumable"
+    
+    -- Menu and Navigation States
+    elseif current_state == states.MENU then
+        return "menu"
+    elseif current_state == states.SPLASH then
+        return "splash"
+    elseif current_state == states.TUTORIAL then
+        return "tutorial"
+    elseif current_state == states.DEMO_CTA then
+        return "demo_prompt"
+    
+    -- Game End States
+    elseif current_state == states.GAME_OVER then
+        return "game_over"
+    
+    -- Special Game Modes
+    elseif current_state == states.SANDBOX then
+        return "sandbox"
+    
+    -- Fallback for unknown states
     else
-        return "hand_selection" -- Default
+        -- Log unknown state for debugging
+        local state_name = "unknown"
+        for state_key, state_value in pairs(states) do
+            if state_value == current_state then
+                state_name = state_key
+                break
+            end
+        end
+        self:log("WARNING: Unknown game state detected: " .. state_name .. " (value: " .. tostring(current_state) .. ")")
+        return "hand_selection" -- Safe default
     end
 end
 
