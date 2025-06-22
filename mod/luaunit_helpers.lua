@@ -172,15 +172,31 @@ function luaunit_helpers.setup_mock_love_filesystem()
     return love.filesystem
 end
 
+-- Setup Love2D graphics constants for joker positioning
+function luaunit_helpers.setup_mock_love_graphics()
+    if not love then
+        love = {}
+    end
+    
+    -- Add graphics constants that joker_manager needs
+    love.graphics = love.graphics or {}
+    
+    -- Set up global graphics constants that Balatro uses
+    _G.CARD_W = 71  -- Standard card width in Balatro
+    _G.CARD_H = 95  -- Standard card height in Balatro
+    
+    return love.graphics
+end
+
 -- Mock SMODS environment setup (preserves exact functionality from test_file_io.lua)
 function luaunit_helpers.setup_mock_smods()
     if not _G.SMODS then
-        -- Create mock SMODS object
+        -- Create mock SMODS object that uses the actual JSON library
         _G.SMODS = {
             load_file = function(filename)
                 -- Mock implementation that mimics SMODS.load_file behavior
                 if filename == "libs/json.lua" then
-                    -- Return a function that when called returns the JSON library
+                    -- Return a function that when called returns the actual JSON library
                     return function()
                         return require("libs.json")
                     end
@@ -253,6 +269,7 @@ end
 function FileIOTestBase:setUp()
     LuaUnitTestBase.setUp(self)
     luaunit_helpers.setup_mock_love_filesystem()
+    luaunit_helpers.setup_mock_love_graphics()
     luaunit_helpers.setup_mock_smods()
 end
 

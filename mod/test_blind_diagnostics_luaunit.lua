@@ -73,6 +73,160 @@ local function setup_mock_smods()
                     
                     return BlindProgressionDiagnostics
                 end
+            elseif filename == "libs/json.lua" then
+                -- Return JSON library for FileIO compatibility
+                return function()
+                    local function encode_value(data)
+                        if data == nil then return "null"
+                        elseif type(data) == "boolean" then return tostring(data)
+                        elseif type(data) == "number" then return tostring(data)
+                        elseif type(data) == "string" then return '"' .. data .. '"'
+                        elseif type(data) == "table" then
+                            local result = "{"
+                            local first = true
+                            for k, v in pairs(data) do
+                                if not first then result = result .. "," end
+                                if type(k) == "string" then
+                                    result = result .. '"' .. k .. '":'
+                                else
+                                    result = result .. tostring(k) .. ':'
+                                end
+                                result = result .. encode_value(v)  -- Recursive encoding
+                                first = false
+                            end
+                            return result .. "}"
+                        else
+                            return '"' .. tostring(data) .. '"'
+                        end
+                    end
+                    
+                    return {
+                        encode = encode_value,
+                        decode = function(json_string)
+                            -- Enhanced JSON decoding for nested structures
+                            local function decode_value(str)
+                                str = str:gsub('^%s*', ''):gsub('%s*$', '') -- trim whitespace
+                                
+                                if str == "null" then return nil
+                                elseif str == "true" then return true
+                                elseif str == "false" then return false
+                                elseif tonumber(str) then return tonumber(str)
+                                elseif str:match('^".*"$') then
+                                    return str:sub(2, -2)
+                                elseif str:match('^%[.*%]$') then
+                                    -- Parse array
+                                    local result = {}
+                                    local content = str:sub(2, -2)
+                                    if content == "" then return result end
+                                    
+                                    local items = {}
+                                    local depth = 0
+                                    local current = ""
+                                    local in_string = false
+                                    
+                                    for i = 1, #content do
+                                        local char = content:sub(i, i)
+                                        if char == '"' and (i == 1 or content:sub(i-1, i-1) ~= '\\') then
+                                            in_string = not in_string
+                                        elseif not in_string then
+                                            if char == '{' or char == '[' then
+                                                depth = depth + 1
+                                            elseif char == '}' or char == ']' then
+                                                depth = depth - 1
+                                            elseif char == ',' and depth == 0 then
+                                                table.insert(items, current)
+                                                current = ""
+                                            else
+                                                current = current .. char
+                                            end
+                                        else
+                                            current = current .. char
+                                        end
+                                    end
+                                    if current ~= "" then
+                                        table.insert(items, current)
+                                    end
+                                    
+                                    for i, item in ipairs(items) do
+                                        result[i] = decode_value(item)
+                                    end
+                                    return result
+                                elseif str:match('^{.*}$') then
+                                    -- Parse object with nested structure support
+                                    local result = {}
+                                    local content = str:sub(2, -2)
+                                    if content == "" then return result end
+                                    
+                                    local pairs_list = {}
+                                    local depth = 0
+                                    local current = ""
+                                    local in_string = false
+                                    
+                                    for i = 1, #content do
+                                        local char = content:sub(i, i)
+                                        if char == '"' and (i == 1 or content:sub(i-1, i-1) ~= '\\') then
+                                            in_string = not in_string
+                                        elseif not in_string then
+                                            if char == '{' or char == '[' then
+                                                depth = depth + 1
+                                            elseif char == '}' or char == ']' then
+                                                depth = depth - 1
+                                            elseif char == ',' and depth == 0 then
+                                                table.insert(pairs_list, current)
+                                                current = ""
+                                            else
+                                                current = current .. char
+                                            end
+                                        else
+                                            current = current .. char
+                                        end
+                                    end
+                                    if current ~= "" then
+                                        table.insert(pairs_list, current)
+                                    end
+                                    
+                                    for _, pair in ipairs(pairs_list) do
+                                        local colon_pos = nil
+                                        local depth = 0
+                                        local in_string = false
+                                        
+                                        for i = 1, #pair do
+                                            local char = pair:sub(i, i)
+                                            if char == '"' and (i == 1 or pair:sub(i-1, i-1) ~= '\\') then
+                                                in_string = not in_string
+                                            elseif not in_string then
+                                                if char == '{' or char == '[' then
+                                                    depth = depth + 1
+                                                elseif char == '}' or char == ']' then
+                                                    depth = depth - 1
+                                                elseif char == ':' and depth == 0 then
+                                                    colon_pos = i
+                                                    break
+                                                end
+                                            end
+                                        end
+                                        
+                                        if colon_pos then
+                                            local key = pair:sub(1, colon_pos - 1):gsub('^%s*', ''):gsub('%s*$', '')
+                                            local value = pair:sub(colon_pos + 1):gsub('^%s*', ''):gsub('%s*$', '')
+                                            
+                                            if key:match('^".*"$') then
+                                                key = key:sub(2, -2)
+                                            end
+                                            
+                                            result[key] = decode_value(value)
+                                        end
+                                    end
+                                    return result
+                                else
+                                    return str
+                                end
+                            end
+                            
+                            return decode_value(json_string)
+                        end
+                    }
+                end
             else
                 error("Module not found: " .. filename)
             end
