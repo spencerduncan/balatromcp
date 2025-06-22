@@ -8,12 +8,11 @@ print("=== BALATRO MCP MOD - LUAUNIT TEST RUNNER ===")
 print("Running LuaUnit-based tests for validation logic and JSON fallback functionality...")
 
 -- Import luaunit
-local luaunit = require('luaunit')
-
+luaunit = require('luaunit')
+print(luaunit.indices)
 -- Test modules to run (will be populated as tests are migrated)
 local luaunit_test_modules = {
-    -- Example: {name = "luaunit_test_file_io", description = "FileIO JSON fallback functionality"},
-    -- This will be populated as we migrate tests to luaunit
+    {name = "test_debug_logger_path_handling_luaunit", description = "DebugLogger path handling functionality"},
 }
 
 local total_passed = 0
@@ -55,36 +54,23 @@ for _, module_info in ipairs(luaunit_test_modules) do
         print("   Module type: " .. type(test_module))
         table.insert(failed_modules, module_info.name)
     else
-        -- Run the LuaUnit test class
+        -- Run the LuaUnit test module by requiring it and calling its test runner
         print("Running LuaUnit tests for " .. module_info.description .. "...")
         
-        -- Set class name for better reporting
-        test_module.class_name = module_info.name
+        local success, result = pcall(function()
+            return test_module.run_tests()
+        end)
         
-        -- Create a LuaUnit runner instance
-        local runner = luaunit.LuaUnit:new()
-        runner.verbosity = 2  -- Detailed output
-        
-        -- Run the test class
-        runner:runTestClass(test_module)
-        
-        -- Get results
-        local results = runner.result
-        local success_count = results.run_tests - results.failed_tests - results.error_tests
-        
-        if results.failed_tests == 0 and results.error_tests == 0 then
+        if success and result then
             print("✅ " .. module_info.description .. " tests PASSED")
-            total_passed = total_passed + success_count
+            total_passed = total_passed + 1
         else
             print("❌ " .. module_info.description .. " tests FAILED")
+            if not success then
+                print("   Error: " .. tostring(result))
+            end
             table.insert(failed_modules, module_info.name)
-            total_passed = total_passed + success_count
-            total_failed = total_failed + results.failed_tests + results.error_tests
-        end
-        
-        -- Display detailed results for this module
-        if results.failed_tests > 0 or results.error_tests > 0 then
-            runner:displayResults()
+            total_failed = total_failed + 1
         end
     end
 end
