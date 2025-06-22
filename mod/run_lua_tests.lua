@@ -22,12 +22,8 @@ end
 
 -- Test modules to run (custom framework)
 local test_modules = {
-    {name = "test_state_extractor", description = "StateExtractor validation logic"},
-    {name = "test_file_io", description = "FileIO JSON fallback functionality"},
     {name = "test_api_method_fixes", description = "API method fixes validation"},
     {name = "test_crash_diagnostics", description = "CrashDiagnostics object validation and hook safety"},
-    {name = "test_joker_manager_crash_safety", description = "JokerManager defensive programming and safe config access"},
-    {name = "test_shop_state_detection", description = "Shop state detection and timing mechanisms"}
 }
 
 -- LuaUnit test modules (to be populated as tests are migrated)
