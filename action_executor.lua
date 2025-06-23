@@ -11,6 +11,37 @@ function ActionExecutor.new(state_extractor, joker_manager)
     return self
 end
 
+-- Centralized validation methods to eliminate code duplication
+function ActionExecutor:validate_game_state()
+    if not G then
+        return false, "Game state not available"
+    end
+
+    if not G.STATE then
+        return false, "Game state not available"
+    end
+
+    if not G.STATES then
+        return false, "Game state not available"
+    end
+
+    return true, nil
+end
+
+function ActionExecutor:get_current_state_name()
+    if not G or not G.STATES then
+        return "UNKNOWN"
+    end
+
+    for name, value in pairs(G.STATES) do
+        if value == G.STATE then
+            return name
+        end
+    end
+
+    return "UNKNOWN"
+end
+
 function ActionExecutor:execute_action(action_data)
     local action_type = action_data.action_type
     
@@ -141,20 +172,13 @@ end
 function ActionExecutor:execute_go_to_shop(action_data)
     print("BalatroMCP: Executing cash_out to go to shop")
     
-    if not G or not G.STATE or not G.STATES then
-        return false, "Game state not available"
+    local success, error_message = self:validate_game_state()
+    if not success then
+        return false, error_message
     end
     
     if G.STATE ~= G.STATES.ROUND_EVAL then
-        local current_state_name = "UNKNOWN"
-        if G.STATES then
-            for name, value in pairs(G.STATES) do
-                if value == G.STATE then
-                    current_state_name = name
-                    break
-                end
-            end
-        end
+        local current_state_name = self:get_current_state_name()
         return false, "Cannot cash out, must be in round eval state. Current state: " .. current_state_name
     end
     
@@ -191,20 +215,13 @@ function ActionExecutor:execute_buy_item(action_data)
         return false, "Invalid shop index"
     end
     
-    if not G or not G.STATE or not G.STATES then
-        return false, "Game state not available"
+    local success, error_message = self:validate_game_state()
+    if not success then
+        return false, error_message
     end
     
     if G.STATE ~= G.STATES.SHOP then
-        local current_state_name = "UNKNOWN"
-        if G.STATES then
-            for name, value in pairs(G.STATES) do
-                if value == G.STATE then
-                    current_state_name = name
-                    break
-                end
-            end
-        end
+        local current_state_name = self:get_current_state_name()
         return false, "Cannot buy item, must be in shop state. Current state: " .. current_state_name
     end
     
@@ -363,20 +380,13 @@ function ActionExecutor:execute_select_blind(action_data)
     
     print("BalatroMCP: Selecting blind: " .. blind_type)
     
-    if not G or not G.STATE or not G.STATES then
-        return false, "Game state not available"
+    local success, error_message = self:validate_game_state()
+    if not success then
+        return false, error_message
     end
     
     if G.STATE ~= G.STATES.BLIND_SELECT then
-        local current_state_name = "UNKNOWN"
-        if G.STATES then
-            for name, value in pairs(G.STATES) do
-                if value == G.STATE then
-                    current_state_name = name
-                    break
-                end
-            end
-        end
+        local current_state_name = self:get_current_state_name()
         return false, "Game not in blind selection state. Current state: " .. current_state_name
     end
     
@@ -566,30 +576,13 @@ function ActionExecutor:execute_move_playing_card(action_data)
 end
 
 function ActionExecutor:execute_skip_blind(action_data)
-    -- Check if global G object exists
-    if not G then
-        return false, "Game state not available"
+    local success, error_message = self:validate_game_state()
+    if not success then
+        return false, error_message
     end
     
-    -- Check if G.STATE exists
-    if not G.STATE then
-        return false, "Game state not available"
-    end
-    
-    -- Check if G.STATES exists
-    if not G.STATES then
-        return false, "Game state not available"
-    end
-    
-    -- Check if we're in the correct state for skipping blind
     if G.STATE ~= G.STATES.BLIND_SELECT then
-        local current_state_name = "UNKNOWN"
-        for name, value in pairs(G.STATES) do
-            if value == G.STATE then
-                current_state_name = name
-                break
-            end
-        end
+        local current_state_name = self:get_current_state_name()
         return false, "Cannot skip blind, must be in blind selection state. Current state: " .. current_state_name
     end
     
