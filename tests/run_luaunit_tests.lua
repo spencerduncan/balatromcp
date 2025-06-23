@@ -9,7 +9,7 @@ print("Running comprehensive LuaUnit test coverage...")
 print("")
 
 -- Import luaunit
-local luaunit = require('../libs/luaunit')
+local luaunit = require('libs.luaunit')
 
 -- Test modules to run (all migrated test suites)
 local luaunit_test_modules = {

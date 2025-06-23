@@ -2,8 +2,8 @@
 -- Tests safe access patterns, validation logic, extraction functions, and edge cases
 -- Migrated from test_state_extractor.lua to use LuaUnit framework
 
-local luaunit = require('../libs/luaunit')
-local luaunit_helpers = require('luaunit_helpers')
+local luaunit = require('libs.luaunit')
+local luaunit_helpers = require('tests.luaunit_helpers')
 
 -- =============================================================================
 -- SHARED SETUP AND TEARDOWN FUNCTIONALITY

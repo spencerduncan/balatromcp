@@ -2,9 +2,9 @@
 -- Tests file I/O operations, path management, and IMessageTransport interface implementation
 -- Follows Single Responsibility Principle testing - focused on file operations
 
-local luaunit_helpers = require('luaunit_helpers')
-local luaunit = require('../libs/luaunit')
-local FileTransport = require('../transports/file_transport')
+local luaunit_helpers = require('tests.luaunit_helpers')
+local luaunit = require('libs.luaunit')
+local FileTransport = require('transports.file_transport')
 
 -- Helper function to set up before each test
 local function setUp()

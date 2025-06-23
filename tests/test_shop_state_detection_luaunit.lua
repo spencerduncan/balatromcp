@@ -1,8 +1,8 @@
 -- LuaUnit version of ShopStateDetection test suite
 -- Tests shop-specific game state detection patterns and timing mechanisms
 
-local luaunit = require('../libs/luaunit')
-local luaunit_helpers = require('luaunit_helpers')
+local luaunit = require('libs.luaunit')
+local luaunit_helpers = require('tests.luaunit_helpers')
 
 -- =============================================================================
 -- SHARED SETUP AND TEARDOWN FUNCTIONALITY
