@@ -432,15 +432,12 @@ function BalatroMCP:cleanup_hooks()
 end
 
 function BalatroMCP:process_pending_actions()
-    print("procing")
     if self.processing_action then
-        print("already procing")
         return
     end
     
     local message_data = self.message_manager:read_actions()
     if not message_data then
-        print("no action")
         return
     end
     
@@ -453,14 +450,13 @@ function BalatroMCP:process_pending_actions()
     
     local sequence = action_data.sequence_id or 0
     if sequence <= self.last_action_sequence then
-        print("already procced")
         return
     end
     
     self.processing_action = true
     self.last_action_sequence = sequence
     
-    print("BalatroMCP: Processing action: " .. (action_data.action_type or "unknown"))
+    print("BalatroMCP: Processing action [seq=" .. sequence .. "]: " .. (action_data.action_type or "unknown"))
     
     local state_before = self.state_extractor:extract_current_state()
     local phase_before = state_before and state_before.current_phase or "unknown"
