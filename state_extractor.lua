@@ -381,19 +381,101 @@ end
 
 function StateExtractor:extract_current_blind()
     -- Extract current blind information with CIRCULAR REFERENCE SAFE access
+    local current_phase = self:get_current_phase()
+    
+    -- During blind selection phase, extract information from blind selection options
+    if current_phase == "blind_selection" then
+        return self:extract_blind_selection_info()
+    end
+    
+    -- For other phases, extract from current blind
     if not self:safe_check_path(G, {"GAME", "blind"}) then
-        return nil
+        return {
+            name = "",
+            blind_type = "small",
+            requirement = 0,
+            reward = 0,
+            properties = {}
+        }
     end
     
     local blind = G.GAME.blind
     return {
-        name = self:safe_primitive_value(blind, "name", "Unknown"),
+        name = self:safe_primitive_value(blind, "name", ""),
         blind_type = self:determine_blind_type_safe(blind),
         requirement = self:safe_primitive_value(blind, "chips", 0),
         reward = self:safe_primitive_value(blind, "dollars", 0),
         -- AVOID CIRCULAR REFERENCE: Don't extract complex config object
         properties = {}
     }
+end
+
+function StateExtractor:extract_blind_selection_info()
+    -- Extract blind information during blind selection phase
+    local blind_info = {
+        name = "",
+        blind_type = "small",
+        requirement = 0,
+        reward = 0,
+        properties = {}
+    }
+    
+    -- Try to determine which blind is being selected from game progression
+    if self:safe_check_path(G, {"GAME", "blind_on_deck"}) then
+        local blind_on_deck = G.GAME.blind_on_deck
+        if blind_on_deck then
+            blind_info.blind_type = string.lower(blind_on_deck)
+            
+            -- Try to get blind details from selection options
+            if self:safe_check_path(G, {"blind_select_opts"}) then
+                local blind_option = G.blind_select_opts[string.lower(blind_on_deck)]
+                if blind_option and blind_option.config and blind_option.config.blind then
+                    local blind_config = blind_option.config.blind
+                    blind_info.name = self:safe_primitive_value(blind_config, "name", "")
+                    blind_info.requirement = self:safe_primitive_value(blind_config, "chips", 0)
+                    blind_info.reward = self:safe_primitive_value(blind_config, "dollars", 0)
+                end
+            end
+        end
+    else
+        -- Fallback: determine from available blind options
+        if self:safe_check_path(G, {"blind_select_opts"}) then
+            -- If we have both small and big, we're likely selecting big blind
+            if G.blind_select_opts["big"] and G.blind_select_opts["small"] then
+                blind_info.blind_type = "big"
+                
+                local blind_option = G.blind_select_opts["big"]
+                if blind_option and blind_option.config and blind_option.config.blind then
+                    local blind_config = blind_option.config.blind
+                    blind_info.name = self:safe_primitive_value(blind_config, "name", "Big Blind")
+                    blind_info.requirement = self:safe_primitive_value(blind_config, "chips", 0)
+                    blind_info.reward = self:safe_primitive_value(blind_config, "dollars", 0)
+                end
+            elseif G.blind_select_opts["small"] then
+                blind_info.blind_type = "small"
+                
+                local blind_option = G.blind_select_opts["small"]
+                if blind_option and blind_option.config and blind_option.config.blind then
+                    local blind_config = blind_option.config.blind
+                    blind_info.name = self:safe_primitive_value(blind_config, "name", "Small Blind")
+                    blind_info.requirement = self:safe_primitive_value(blind_config, "chips", 0)
+                    blind_info.reward = self:safe_primitive_value(blind_config, "dollars", 0)
+                end
+            elseif G.blind_select_opts["boss"] then
+                blind_info.blind_type = "boss"
+                
+                local blind_option = G.blind_select_opts["boss"]
+                if blind_option and blind_option.config and blind_option.config.blind then
+                    local blind_config = blind_option.config.blind
+                    blind_info.name = self:safe_primitive_value(blind_config, "name", "Boss Blind")
+                    blind_info.requirement = self:safe_primitive_value(blind_config, "chips", 0)
+                    blind_info.reward = self:safe_primitive_value(blind_config, "dollars", 0)
+                end
+            end
+        end
+    end
+    
+    return blind_info
 end
 
 function StateExtractor:determine_blind_type(blind)
