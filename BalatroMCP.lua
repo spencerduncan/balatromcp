@@ -9,28 +9,6 @@
 
 print("BalatroMCP: MAIN FILE LOADING STARTED")
 
-local ModLoadingDiagnostics = nil
-local diag_success, diag_error = pcall(function()
-    if SMODS and SMODS.load_file then
-        print("BalatroMCP: SMODS available, attempting to load diagnostics")
-        ModLoadingDiagnostics = assert(SMODS.load_file("mod_loading_diagnostics.lua"))()
-        print("BalatroMCP: Diagnostics loaded successfully")
-    else
-        print("BalatroMCP: CRITICAL - SMODS or SMODS.load_file not available")
-        print("BalatroMCP: SMODS exists: " .. tostring(SMODS ~= nil))
-        if SMODS then
-            print("BalatroMCP: SMODS.load_file exists: " .. tostring(SMODS.load_file ~= nil))
-        end
-    end
-end)
-
-if not diag_success then
-    print("BalatroMCP: CRITICAL - Diagnostics loading failed: " .. tostring(diag_error))
-    print("BalatroMCP: This indicates fundamental mod loading issues")
-end
-
-print("BalatroMCP: Attempting to load core modules...")
-
 local DebugLogger = nil
 local debug_success, debug_error = pcall(function()
     DebugLogger = assert(SMODS.load_file("debug_logger.lua"))()
@@ -40,13 +18,31 @@ if not debug_success then
     print("BalatroMCP: DebugLogger load failed: " .. tostring(debug_error))
 end
 
-local FileIO = nil
-local fileio_success, fileio_error = pcall(function()
-    FileIO = assert(SMODS.load_file("file_io.lua"))()
-    print("BalatroMCP: FileIO loaded successfully")
+local MessageTransport = nil
+local transport_success, transport_error = pcall(function()
+    MessageTransport = assert(SMODS.load_file("interfaces/message_transport.lua"))()
+    print("BalatroMCP: MessageTransport interface loaded successfully")
 end)
-if not fileio_success then
-    print("BalatroMCP: FileIO load failed: " .. tostring(fileio_error))
+if not transport_success then
+    print("BalatroMCP: MessageTransport interface load failed: " .. tostring(transport_error))
+end
+
+local FileTransport = nil
+local file_transport_success, file_transport_error = pcall(function()
+    FileTransport = assert(SMODS.load_file("transports/file_transport.lua"))()
+    print("BalatroMCP: FileTransport loaded successfully")
+end)
+if not file_transport_success then
+    print("BalatroMCP: FileTransport load failed: " .. tostring(file_transport_error))
+end
+
+local MessageManager = nil
+local message_manager_success, message_manager_error = pcall(function()
+    MessageManager = assert(SMODS.load_file("message_manager.lua"))()
+    print("BalatroMCP: MessageManager loaded successfully")
+end)
+if not message_manager_success then
+    print("BalatroMCP: MessageManager load failed: " .. tostring(message_manager_error))
 end
 
 local StateExtractor = nil
@@ -85,24 +81,15 @@ if not crash_success then
     print("BalatroMCP: CrashDiagnostics load failed: " .. tostring(crash_error))
 end
 
-local NilConfigDiagnostics = nil
-local nil_config_success, nil_config_error = pcall(function()
-    NilConfigDiagnostics = assert(SMODS.load_file("nil_config_diagnostics.lua"))()
-    print("BalatroMCP: NilConfigDiagnostics loaded successfully")
-end)
-if not nil_config_success then
-    print("BalatroMCP: NilConfigDiagnostics load failed: " .. tostring(nil_config_error))
-end
-
 print("BalatroMCP: MODULE LOADING SUMMARY:")
-print("  Diagnostics: " .. (diag_success and "SUCCESS" or "FAILED"))
 print("  DebugLogger: " .. (debug_success and "SUCCESS" or "FAILED"))
-print("  FileIO: " .. (fileio_success and "SUCCESS" or "FAILED"))
+print("  MessageTransport: " .. (transport_success and "SUCCESS" or "FAILED"))
+print("  FileTransport: " .. (file_transport_success and "SUCCESS" or "FAILED"))
+print("  MessageManager: " .. (message_manager_success and "SUCCESS" or "FAILED"))
 print("  StateExtractor: " .. (state_success and "SUCCESS" or "FAILED"))
 print("  ActionExecutor: " .. (action_success and "SUCCESS" or "FAILED"))
 print("  JokerManager: " .. (joker_success and "SUCCESS" or "FAILED"))
 print("  CrashDiagnostics: " .. (crash_success and "SUCCESS" or "FAILED"))
-print("  NilConfigDiagnostics: " .. (nil_config_success and "SUCCESS" or "FAILED"))
 
 local BalatroMCP = {}
 BalatroMCP.__index = BalatroMCP
@@ -113,37 +100,35 @@ function BalatroMCP.new()
     self.debug_logger = DebugLogger.new()
     self.debug_logger:info("=== BALATRO MCP INITIALIZATION STARTED ===", "INIT")
     
-    self.crash_diagnostics = CrashDiagnostics.new()
-    self.debug_logger:info("Crash diagnostics initialized", "INIT")
-    
-    if NilConfigDiagnostics then
-        --self.nil_config_diagnostics = NilConfigDiagnostics.new()
-        --_G.BalatroMCP_NilConfigDiagnostics = self.nil_config_diagnostics
-        self.debug_logger:info("Nil config diagnostics initialized", "INIT")
-    else
-        self.debug_logger:error("NilConfigDiagnostics not available", "INIT")
-    end
-    
     self.debug_logger:test_environment()
+    
+    -- Initialize crash diagnostics
+    if CrashDiagnostics then
+        self.crash_diagnostics = CrashDiagnostics.new()
+        self.debug_logger:info("CrashDiagnostics component initialized successfully", "INIT")
+    else
+        self.debug_logger:error("CrashDiagnostics module not available", "INIT")
+    end
     
     local init_success = true
     
-    local file_io_success, file_io_error = pcall(function()
-        self.file_io = FileIO.new()
-        self.debug_logger:info("FileIO component initialized successfully", "INIT")
+    local message_manager_success, message_manager_error = pcall(function()
+        self.file_transport = FileTransport.new()
+        self.message_manager = MessageManager.new(self.file_transport, "BALATRO_MCP")
+        self.debug_logger:info("MessageManager and FileTransport components initialized successfully", "INIT")
     end)
     
-    if not file_io_success then
-        self.debug_logger:error("FileIO initialization failed: " .. tostring(file_io_error), "INIT")
+    if not message_manager_success then
+        self.debug_logger:error("MessageManager initialization failed: " .. tostring(message_manager_error), "INIT")
         init_success = false
     end
     
     local state_success, state_error = pcall(function()
         self.state_extractor = StateExtractor.new()
         
-        if self.nil_config_diagnostics then
-            self.nil_config_diagnostics:create_safe_state_extraction_wrapper(self.state_extractor)
-            self.debug_logger:info("StateExtractor wrapped with nil config diagnostics", "INIT")
+        if self.crash_diagnostics then
+            self.crash_diagnostics:create_safe_state_extraction_wrapper(self.state_extractor)
+            self.debug_logger:info("StateExtractor wrapped with crash diagnostics", "INIT")
         end
         
         self.debug_logger:info("StateExtractor component initialized successfully", "INIT")
@@ -231,7 +216,6 @@ function BalatroMCP:update(dt)
         return
     end
     
-    
     -- NON-INTRUSIVE BLIND SELECTION DETECTION
     self:detect_blind_selection_transition()
     
@@ -308,32 +292,50 @@ function BalatroMCP:hook_hand_evaluation()
     if G.FUNCS then
         local original_play_cards = G.FUNCS.play_cards_from_highlighted
         if original_play_cards then
-            G.FUNCS.play_cards_from_highlighted = self.crash_diagnostics:create_safe_hook(
-                function(...)
-                    self.crash_diagnostics:track_hook_chain("play_cards_from_highlighted")
-                    self.crash_diagnostics:validate_game_state("play_cards_from_highlighted")
+            if self.crash_diagnostics then
+                G.FUNCS.play_cards_from_highlighted = self.crash_diagnostics:create_safe_hook(
+                    function(...)
+                        self.crash_diagnostics:track_hook_chain("play_cards_from_highlighted")
+                        self.crash_diagnostics:validate_game_state("play_cards_from_highlighted")
+                        print("BalatroMCP: Hand played - capturing state")
+                        local result = original_play_cards(...)
+                        self:on_hand_played()
+                        return result
+                    end,
+                    "play_cards_from_highlighted"
+                )
+            else
+                G.FUNCS.play_cards_from_highlighted = function(...)
                     print("BalatroMCP: Hand played - capturing state")
                     local result = original_play_cards(...)
                     self:on_hand_played()
                     return result
-                end,
-                "play_cards_from_highlighted"
-            )
+                end
+            end
         end
         
         local original_discard_cards = G.FUNCS.discard_cards_from_highlighted
         if original_discard_cards then
-            G.FUNCS.discard_cards_from_highlighted = self.crash_diagnostics:create_safe_hook(
-                function(...)
-                    self.crash_diagnostics:track_hook_chain("discard_cards_from_highlighted")
-                    self.crash_diagnostics:validate_game_state("discard_cards_from_highlighted")
+            if self.crash_diagnostics then
+                G.FUNCS.discard_cards_from_highlighted = self.crash_diagnostics:create_safe_hook(
+                    function(...)
+                        self.crash_diagnostics:track_hook_chain("discard_cards_from_highlighted")
+                        self.crash_diagnostics:validate_game_state("discard_cards_from_highlighted")
+                        print("BalatroMCP: Cards discarded - capturing state")
+                        local result = original_discard_cards(...)
+                        self:on_cards_discarded()
+                        return result
+                    end,
+                    "discard_cards_from_highlighted"
+                )
+            else
+                G.FUNCS.discard_cards_from_highlighted = function(...)
                     print("BalatroMCP: Cards discarded - capturing state")
                     local result = original_discard_cards(...)
                     self:on_cards_discarded()
                     return result
-                end,
-                "discard_cards_from_highlighted"
-            )
+                end
+            end
         end
     end
 end
@@ -350,17 +352,26 @@ function BalatroMCP:hook_shop_interactions()
     if G.FUNCS then
         local original_cash_out = G.FUNCS.cash_out
         if original_cash_out then
-            G.FUNCS.cash_out = self.crash_diagnostics:create_safe_hook(
-                function(...)
-                    self.crash_diagnostics:track_hook_chain("cash_out")
-                    self.crash_diagnostics:validate_game_state("cash_out")
+            if self.crash_diagnostics then
+                G.FUNCS.cash_out = self.crash_diagnostics:create_safe_hook(
+                    function(...)
+                        self.crash_diagnostics:track_hook_chain("cash_out")
+                        self.crash_diagnostics:validate_game_state("cash_out")
+                        print("BalatroMCP: Cash out triggered - capturing state")
+                        local result = original_cash_out(...)
+                        self:on_shop_entered()
+                        return result
+                    end,
+                    "cash_out"
+                )
+            else
+                G.FUNCS.cash_out = function(...)
                     print("BalatroMCP: Cash out triggered - capturing state")
                     local result = original_cash_out(...)
                     self:on_shop_entered()
                     return result
-                end,
-                "cash_out"
-            )
+                end
+            end
         else
             print("BalatroMCP: WARNING - G.FUNCS.cash_out not available for shop hooks")
         end
@@ -427,9 +438,16 @@ function BalatroMCP:process_pending_actions()
         return
     end
     
-    local action_data = self.file_io:read_actions()
-    if not action_data then
+    local message_data = self.message_manager:read_actions()
+    if not message_data then
         print("no action")
+        return
+    end
+    
+    -- Extract action data from message wrapper
+    local action_data = message_data.data
+    if not action_data then
+        print("BalatroMCP: ERROR - No action data in message")
         return
     end
     
@@ -485,7 +503,7 @@ function BalatroMCP:handle_delayed_state_extraction()
     if self.pending_action_result then
         self.pending_action_result.new_state = current_state
         
-        self.file_io:write_action_result(self.pending_action_result)
+        self.message_manager:write_action_result(self.pending_action_result)
         print("BalatroMCP: Delayed action result sent with updated state")
         
         self.pending_action_result = nil
@@ -523,11 +541,11 @@ function BalatroMCP:send_state_update(state)
     local state_message = {
         message_type = "state_update",
         timestamp = os.time(),
-        sequence = self.file_io:get_next_sequence_id(),
+        sequence = self.message_manager:get_next_sequence_id(),
         state = state
     }
     
-    self.file_io:write_game_state(state_message)
+    self.message_manager:write_game_state(state_message)
     print("BalatroMCP: State update sent")
     
     -- Extract and send deck state alongside game state
@@ -535,11 +553,11 @@ function BalatroMCP:send_state_update(state)
     local deck_message = {
         message_type = "deck_update",
         timestamp = os.time(),
-        sequence = self.file_io:get_next_sequence_id(),
+        sequence = self.message_manager:get_next_sequence_id(),
         deck_cards = deck_cards
     }
     
-    self.file_io:write_deck_state(deck_message)
+    self.message_manager:write_deck_state(deck_message)
     print("BalatroMCP: Deck state sent with " .. #deck_cards .. " cards")
 end
 
