@@ -18,6 +18,7 @@ local luaunit_test_modules = {
     {name = "test_joker_manager_crash_safety_luaunit", description = "JokerManager crash safety and defensive programming"},
     {name = "test_shop_state_detection_luaunit", description = "ShopStateDetection shop state transition detection and timing mechanisms"},
     {name = "test_state_extractor_luaunit", description = "StateExtractor comprehensive state extraction functionality and validation logic"},
+    {name = "test_action_executor_luaunit", description = "ActionExecutor NYI methods parameter validation and error handling"},
     
     -- Diagnostic modules (85 tests total)
     {name = "test_api_method_fixes_luaunit", description = "API method fixes and validation"},

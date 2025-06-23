@@ -215,7 +215,7 @@ function testActionExecutorSkipBlindWrongGameState()
     
     local success, error_message = executor:execute_skip_blind(action_data)
     luaunit.assertEquals(false, success, "Should return false when not in blind selection state")
-    luaunit.assertTrue(string.find(error_message, "Cannot skip blind, must be in blind selection state"), "Should return correct error message")
+    luaunit.assertNotNil(string.find(error_message, "Cannot skip blind, must be in blind selection state"), "Should return correct error message")
     tearDown()
 end
 

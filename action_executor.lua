@@ -552,11 +552,13 @@ function ActionExecutor:execute_move_playing_card(action_data)
     local from_index = action_data.from_index
     local to_index = action_data.to_index
     
-    if not from_index or from_index < 0 then
+    -- Validate from_index parameter
+    if from_index == nil or from_index < 0 then
         return false, "Invalid from index"
     end
     
-    if not to_index or to_index < 0 then
+    -- Validate to_index parameter
+    if to_index == nil or to_index < 0 then
         return false, "Invalid to index"
     end
     
@@ -564,18 +566,28 @@ function ActionExecutor:execute_move_playing_card(action_data)
 end
 
 function ActionExecutor:execute_skip_blind(action_data)
-    if not G or not G.STATE or not G.STATES then
+    -- Check if global G object exists
+    if not G then
         return false, "Game state not available"
     end
     
+    -- Check if G.STATE exists
+    if not G.STATE then
+        return false, "Game state not available"
+    end
+    
+    -- Check if G.STATES exists
+    if not G.STATES then
+        return false, "Game state not available"
+    end
+    
+    -- Check if we're in the correct state for skipping blind
     if G.STATE ~= G.STATES.BLIND_SELECT then
         local current_state_name = "UNKNOWN"
-        if G.STATES then
-            for name, value in pairs(G.STATES) do
-                if value == G.STATE then
-                    current_state_name = name
-                    break
-                end
+        for name, value in pairs(G.STATES) do
+            if value == G.STATE then
+                current_state_name = name
+                break
             end
         end
         return false, "Cannot skip blind, must be in blind selection state. Current state: " .. current_state_name
