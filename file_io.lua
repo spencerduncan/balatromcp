@@ -205,6 +205,86 @@ function FileIO:write_game_state(state_data)
     return true
 end
 
+function FileIO:write_deck_state(deck_data)
+    self:log("Attempting to write deck state")
+    
+    local filepath
+    if self.base_path == "." then
+        filepath = "deck_state.json"
+    else
+        filepath = self.base_path .. "/deck_state.json"
+    end
+    
+    if not deck_data then
+        self:log("ERROR: No deck data provided")
+        return false
+    end
+    
+    if not self.json then
+        self:log("ERROR: No JSON library available for encoding")
+        return false
+    end
+    
+    if not love or not love.filesystem then
+        self:log("ERROR: love.filesystem not available")
+        return false
+    end
+    
+    local message = {
+        timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+        sequence_id = self:get_next_sequence_id(),
+        message_type = "deck_state",
+        data = deck_data
+    }
+    
+    self:log("Created deck message structure with sequence_id: " .. message.sequence_id)
+    
+    -- Test JSON encoding with enhanced error reporting
+    local encode_success, encoded_data = pcall(self.json.encode, message)
+    if not encode_success then
+        self:log("ERROR: JSON encoding failed: " .. tostring(encoded_data))
+        return false
+    end
+    
+    self:log("JSON encoding successful, data length: " .. #encoded_data)
+    
+    self:log("Writing to file: " .. filepath)
+    
+    local write_success = love.filesystem.write(filepath, encoded_data)
+    
+    if not write_success then
+        self:log("ERROR: File write failed")
+        return false
+    end
+    
+    self:log("Deck state written successfully")
+    
+    -- Verify file content
+    local verify_content = love.filesystem.read(filepath)
+    if verify_content then
+        self:log("File verification successful")
+        
+        -- Verify JSON can be parsed back
+        local parse_success, parsed_data = pcall(self.json.decode, verify_content)
+        if parse_success then
+            self:log("DIAGNOSTIC: Deck file content is valid JSON")
+            if parsed_data.sequence_id == message.sequence_id then
+                self:log("DIAGNOSTIC: Deck sequence ID matches - write integrity confirmed")
+            else
+                self:log("WARNING: Deck sequence ID mismatch - possible write corruption")
+            end
+        else
+            self:log("ERROR: Deck file content is corrupted JSON: " .. tostring(parsed_data))
+            return false
+        end
+    else
+        self:log("WARNING: Deck file verification failed")
+        return false
+    end
+    
+    return true
+end
+
 function FileIO:read_actions()
     
     -- Handle path construction for current directory vs subdirectory
@@ -331,7 +411,7 @@ end
 function FileIO:cleanup_old_files(max_age_seconds)
     max_age_seconds = max_age_seconds or 300 -- 5 minutes default
     
-    local files = {"game_state.json", "actions.json", "action_results.json"}
+    local files = {"game_state.json", "deck_state.json", "actions.json", "action_results.json"}
     local current_time = os.time()
     
     for _, filename in ipairs(files) do

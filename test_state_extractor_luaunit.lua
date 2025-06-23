@@ -583,6 +583,74 @@ function testStateExtractorExtractCurrentBlindValidBlind()
     tearDown()
 end
 
+function testStateExtractorExtractDeckCardsMissingGPlayingCards()
+    setUp()
+    G = {}
+    local StateExtractor = require("state_extractor")
+    local extractor = StateExtractor.new()
+    
+    local result = extractor:extract_deck_cards()
+    luaunit.assertEquals("table", type(result), "Should return table")
+    luaunit.assertEquals(0, #result, "Should return empty array when G.playing_cards missing")
+    tearDown()
+end
+
+function testStateExtractorExtractDeckCardsValidDeck()
+    setUp()
+    G = {
+        playing_cards = {
+            luaunit_helpers.create_mock_card({id = "deck_card1", rank = "A", suit = "Spades"}),
+            luaunit_helpers.create_mock_card({id = "deck_card2", rank = "K", suit = "Hearts"}),
+            luaunit_helpers.create_mock_card({id = "deck_card3", rank = "Q", suit = "Diamonds"})
+        }
+    }
+    local StateExtractor = require("state_extractor")
+    local extractor = StateExtractor.new()
+    
+    local result = extractor:extract_deck_cards()
+    luaunit.assertEquals(3, #result, "Should return correct number of deck cards")
+    luaunit.assertEquals("deck_card1", result[1].id, "Should preserve deck card ID")
+    luaunit.assertEquals("A", result[1].rank, "Should preserve deck card rank")
+    luaunit.assertEquals("Spades", result[1].suit, "Should preserve deck card suit")
+    
+    -- Verify same structure as hand cards
+    luaunit.assertNotNil(result[1].enhancement, "Should have enhancement field like hand cards")
+    luaunit.assertNotNil(result[1].edition, "Should have edition field like hand cards")
+    luaunit.assertNotNil(result[1].seal, "Should have seal field like hand cards")
+    tearDown()
+end
+
+function testStateExtractorExtractDeckCardsUsesConsistentCardStructure()
+    setUp()
+    G = luaunit_helpers.create_mock_g({
+        has_hand = true,
+        hand_cards = {
+            luaunit_helpers.create_mock_card({id = "hand_card", rank = "J", suit = "Clubs"})
+        }
+    })
+    G.playing_cards = {
+        luaunit_helpers.create_mock_card({id = "deck_card", rank = "J", suit = "Clubs"})
+    }
+    
+    local StateExtractor = require("state_extractor")
+    local extractor = StateExtractor.new()
+    
+    local hand_result = extractor:extract_hand_cards()
+    local deck_result = extractor:extract_deck_cards()
+    
+    -- Verify both have same field structure
+    local hand_card = hand_result[1]
+    local deck_card = deck_result[1]
+    
+    local expected_fields = {"id", "rank", "suit", "enhancement", "edition", "seal"}
+    for _, field in ipairs(expected_fields) do
+        luaunit.assertNotNil(hand_card[field], "Hand card should have " .. field .. " field")
+        luaunit.assertNotNil(deck_card[field], "Deck card should have " .. field .. " field")
+    end
+    
+    tearDown()
+end
+
 -- =============================================================================
 -- EDGE CASE TESTS (6 tests)
 -- =============================================================================
@@ -759,6 +827,9 @@ return {
     testStateExtractorExtractJokersValidJokers = testStateExtractorExtractJokersValidJokers,
     testStateExtractorExtractCurrentBlindMissingGGameBlind = testStateExtractorExtractCurrentBlindMissingGGameBlind,
     testStateExtractorExtractCurrentBlindValidBlind = testStateExtractorExtractCurrentBlindValidBlind,
+    testStateExtractorExtractDeckCardsMissingGPlayingCards = testStateExtractorExtractDeckCardsMissingGPlayingCards,
+    testStateExtractorExtractDeckCardsValidDeck = testStateExtractorExtractDeckCardsValidDeck,
+    testStateExtractorExtractDeckCardsUsesConsistentCardStructure = testStateExtractorExtractDeckCardsUsesConsistentCardStructure,
     testStateExtractorExtractCurrentStateHandlesAllExtractionErrorsGracefully = testStateExtractorExtractCurrentStateHandlesAllExtractionErrorsGracefully,
     testStateExtractorCardEnhancementDetectionHandlesMalformedCards = testStateExtractorCardEnhancementDetectionHandlesMalformedCards,
     testStateExtractorCardEditionDetectionHandlesMalformedCards = testStateExtractorCardEditionDetectionHandlesMalformedCards,

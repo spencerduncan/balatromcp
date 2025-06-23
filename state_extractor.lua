@@ -374,6 +374,34 @@ function StateExtractor:extract_hand_cards()
     return hand_cards
 end
 
+function StateExtractor:extract_deck_cards()
+    -- Extract current deck cards with CIRCULAR REFERENCE SAFE access
+    local deck_cards = {}
+    
+    if not self:safe_check_path(G, {"playing_cards"}) then
+        self:log("WARNING: G.playing_cards not accessible, returning empty deck")
+        return deck_cards
+    end
+    
+    for i, card in ipairs(G.playing_cards) do
+        if card then
+            -- SAFE EXTRACTION: Only extract primitive values, avoid object references
+            local safe_card = {
+                id = self:safe_primitive_value(card, "unique_val", "deck_card_" .. i),
+                rank = self:safe_primitive_nested_value(card, {"base", "value"}, "A"),
+                suit = self:safe_primitive_nested_value(card, {"base", "suit"}, "Spades"),
+                enhancement = self:get_card_enhancement_safe(card),
+                edition = self:get_card_edition_safe(card),
+                seal = self:get_card_seal_safe(card)
+            }
+            table.insert(deck_cards, safe_card)
+        end
+    end
+    
+    self:log("Extracted " .. #deck_cards .. " deck cards from G.playing_cards")
+    return deck_cards
+end
+
 function StateExtractor:get_card_enhancement(card)
     if not card then
         return "none"

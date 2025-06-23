@@ -529,6 +529,18 @@ function BalatroMCP:send_state_update(state)
     
     self.file_io:write_game_state(state_message)
     print("BalatroMCP: State update sent")
+    
+    -- Extract and send deck state alongside game state
+    local deck_cards = self.state_extractor:extract_deck_cards()
+    local deck_message = {
+        message_type = "deck_update",
+        timestamp = os.time(),
+        sequence = self.file_io:get_next_sequence_id(),
+        deck_cards = deck_cards
+    }
+    
+    self.file_io:write_deck_state(deck_message)
+    print("BalatroMCP: Deck state sent with " .. #deck_cards .. " cards")
 end
 
 function BalatroMCP:calculate_state_hash(state)

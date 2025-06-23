@@ -123,6 +123,31 @@ local function TestFileIOWriteGameState()
     tearDown()
 end
 
+local function TestFileIOWriteDeckState()
+    setUp()
+    
+    local FileIO_module = require("file_io")
+    local fileio = FileIO_module.new("test_shared")
+    
+    local test_deck = {
+        {id = "deck_card1", rank = "A", suit = "Spades", enhancement = "none", edition = "none", seal = "none"},
+        {id = "deck_card2", rank = "K", suit = "Hearts", enhancement = "bonus", edition = "foil", seal = "none"},
+        {id = "deck_card3", rank = "Q", suit = "Diamonds", enhancement = "none", edition = "none", seal = "Gold"}
+    }
+    
+    local success = fileio:write_deck_state(test_deck)
+    luaunit.assertTrue(success, "Should successfully write deck state")
+    
+    -- Verify file was written
+    local file_content = love.filesystem.read("test_shared/deck_state.json")
+    luaunit.assertNotNil(file_content, "Should create deck state file")
+    luaunit.assertStrContains(file_content, "deck_card1", "Should contain deck card data")
+    luaunit.assertStrContains(file_content, "deck_state", "Should contain message type")
+    luaunit.assertStrContains(file_content, "message_type", "Should contain message structure")
+    
+    tearDown()
+end
+
 local function TestFileIOWriteActionResult()
     setUp()
     
@@ -534,6 +559,7 @@ return {
     TestSMODSLoadFileJSONLoadingSuccess = TestSMODSLoadFileJSONLoadingSuccess,
     TestSMODSLoadFileFailureHandling = TestSMODSLoadFileFailureHandling,
     TestFileIOWriteGameState = TestFileIOWriteGameState,
+    TestFileIOWriteDeckState = TestFileIOWriteDeckState,
     TestFileIOWriteActionResult = TestFileIOWriteActionResult,
     TestFileIOReadActions = TestFileIOReadActions,
     TestFileIOErrorHandlingNilData = TestFileIOErrorHandlingNilData,
