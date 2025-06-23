@@ -15,7 +15,6 @@ local luaunit = require('libs.luaunit')
 local luaunit_test_modules = {
     -- Core modules (120 tests total)
     {name = "test_debug_logger_path_handling_luaunit", description = "DebugLogger path handling functionality"},
-    {name = "test_file_io_luaunit", description = "FileIO JSON handling and file operations"},
     {name = "test_joker_manager_crash_safety_luaunit", description = "JokerManager crash safety and defensive programming"},
     {name = "test_shop_state_detection_luaunit", description = "ShopStateDetection shop state transition detection and timing mechanisms"},
     {name = "test_state_extractor_luaunit", description = "StateExtractor comprehensive state extraction functionality and validation logic"},
@@ -26,6 +25,10 @@ local luaunit_test_modules = {
     {name = "test_crash_diagnostics_luaunit", description = "Crash diagnostics and hook safety validation"},
     {name = "test_sequence_id_processing_luaunit", description = "Sequence ID processing bug fixes and validation"},
     {name = "test_blind_selection_diagnostics_luaunit", description = "Blind selection diagnostics and SMODS integration"},
+    
+    -- Refactored architecture modules (51 tests total)
+    {name = "test_message_manager_luaunit", description = "MessageManager message creation and metadata management"},
+    {name = "test_file_transport_luaunit", description = "FileTransport file-based I/O operations and path handling"},
 }
 
 -- Set up a minimal environment for testing

@@ -205,6 +205,10 @@ function luaunit_helpers.setup_mock_love_filesystem()
                 return true
             end
             return false
+        end,
+        
+        isFused = function()
+            return false -- Mock always returns false (development mode)
         end
     }
     
@@ -252,6 +256,13 @@ end
 -- Clean up SMODS mock (preserves exact functionality from test_file_io.lua)
 function luaunit_helpers.cleanup_mock_smods()
     _G.SMODS = nil
+end
+
+-- Clean up Love2D filesystem mock
+function luaunit_helpers.cleanup_mock_love_filesystem()
+    if love then
+        love.filesystem = nil
+    end
 end
 
 -- Clean up Love2D mock
