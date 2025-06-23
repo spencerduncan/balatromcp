@@ -14,7 +14,9 @@ $DestinationPath = "$env:APPDATA\Balatro\mods\BalatroMCP"
 # Files and directories to include
 $IncludeFiles = @(
     "action_executor.lua",
-    "BalatroMCP.lua", 
+    "BalatroMCP.lua",
+    "crash_diagnostics.lua"
+    "debug_logger.lua", 
     "joker_manager.lua",
     "manifest.json",
     "message_manager.lua",
