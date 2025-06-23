@@ -51,12 +51,12 @@ function Copy-ModFiles {
     # Copy root level files
     Write-Status "Copying root level files..." "Cyan"
     foreach ($file in $IncludeFiles) {
-        $sourcePath = Join-Path $SourcePath $file
+        $_sourcePath = Join-Path $SourcePath $file
         $destPath = Join-Path $DestinationPath $file
         
-        if (Test-Path $sourcePath) {
+        if (Test-Path $_sourcePath) {
             Write-Status "  Copying: $file" "White"
-            Copy-Item $sourcePath $destPath -Force
+            Copy-Item $_sourcePath $destPath -Force
         } else {
             Write-Warning "Source file not found: $file"
         }
