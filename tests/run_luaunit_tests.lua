@@ -9,7 +9,7 @@ print("Running comprehensive LuaUnit test coverage...")
 print("")
 
 -- Import luaunit
-local luaunit = require('libs.luaunit')
+local luaunit = require('../libs/luaunit')
 
 -- Test modules to run (all migrated test suites)
 local luaunit_test_modules = {
@@ -42,7 +42,7 @@ local total_tests = 0
 for _, module_info in ipairs(luaunit_test_modules) do
     print(string.format("Loading %s (%s)...", module_info.name, module_info.description))
     
-    local success, test_module = pcall(require, module_info.name)
+    local success, test_module = pcall(require, "tests." .. module_info.name)
     
     if success and test_module and type(test_module) == "table" then
         local test_count = 0

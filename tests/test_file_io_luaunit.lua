@@ -3,7 +3,7 @@
 -- Migrated from test_file_io.lua to use LuaUnit framework with individual function exports
 
 local luaunit_helpers = require('luaunit_helpers')
-local luaunit = require('libs.luaunit')
+local luaunit = require('../libs/luaunit')
 
 -- Helper function to set up before each test
 local function setUp()

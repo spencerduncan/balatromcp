@@ -2,7 +2,7 @@
 -- Tests safe joker validation, protected config access, Blueprint/Brainstorm optimization with corruption scenarios
 -- Migrated from test_joker_manager_crash_safety.lua to use LuaUnit framework with individual function exports
 
-local luaunit = require('libs.luaunit')
+local luaunit = require('../libs/luaunit')
 local luaunit_helpers = require('luaunit_helpers')
 
 -- Helper function for string contains assertions

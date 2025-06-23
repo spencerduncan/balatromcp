@@ -3,8 +3,8 @@
 -- Follows Single Responsibility Principle testing - focused on message logic
 
 local luaunit_helpers = require('luaunit_helpers')
-local luaunit = require('libs.luaunit')
-local MessageManager = require('message_manager')
+local luaunit = require('../libs/luaunit')
+local MessageManager = require('../message_manager')
 
 -- Mock transport implementation for testing
 local MockTransport = {}

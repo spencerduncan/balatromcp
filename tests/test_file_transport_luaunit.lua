@@ -3,8 +3,8 @@
 -- Follows Single Responsibility Principle testing - focused on file operations
 
 local luaunit_helpers = require('luaunit_helpers')
-local luaunit = require('libs.luaunit')
-local FileTransport = require('transports.file_transport')
+local luaunit = require('../libs/luaunit')
+local FileTransport = require('../transports/file_transport')
 
 -- Helper function to set up before each test
 local function setUp()

@@ -2,7 +2,7 @@
 -- Tests the "." (current directory) vs subdirectory path logic
 -- Migrated from test_debug_logger_path_handling.lua to use LuaUnit framework
 
-local luaunit = require('libs.luaunit')
+local luaunit = require('../libs/luaunit')
 local luaunit_helpers = require('luaunit_helpers')
 
 -- DebugLogger Path Handling Test Class
