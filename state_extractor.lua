@@ -530,14 +530,23 @@ function StateExtractor:get_available_actions()
         table.insert(actions, "go_to_shop")
         table.insert(actions, "sort_hand_by_rank")
         table.insert(actions, "sort_hand_by_suit")
+        table.insert(actions, "sell_joker")
+        table.insert(actions, "sell_consumable")
+        table.insert(actions, "reorder_jokers")
+        table.insert(actions, "move_playing_card")
+        table.insert(actions, "use_consumable")
     elseif phase == "shop" then
         table.insert(actions, "buy_item")
         table.insert(actions, "sell_joker")
         table.insert(actions, "sell_consumable")
         table.insert(actions, "reroll_shop")
+        table.insert(actions, "reorder_jokers")
+        table.insert(actions, "use_consumable")
     elseif phase == "blind_selection" then
         table.insert(actions, "select_blind")
         table.insert(actions, "reroll_boss")
+        -- TODO: This is not available for boss blind
+        table.insert(actions, "skip_blind")
     end
     
     -- Add consumable usage if consumables are available

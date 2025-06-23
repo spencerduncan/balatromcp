@@ -48,6 +48,10 @@ function ActionExecutor:execute_action(action_data)
         success, error_message = self:execute_sort_hand_by_suit(action_data)
     elseif action_type == "use_consumable" then
         success, error_message = self:execute_use_consumable(action_data)
+    elseif action_type == "move_playing_card" then
+        success, error_message = self:execute_move_playing_card(action_data)
+    elseif action_type == "skip_blind" then
+        success, error_message = self:execute_skip_blind(action_data)
     elseif action_type == "diagnose_blind_progression" then
         success, error_message = self:execute_diagnose_blind_progression(action_data)
     elseif action_type == "diagnose_blind_activation" then
@@ -542,6 +546,42 @@ function ActionExecutor:execute_diagnose_blind_activation(action_data)
     diagnostics:check_blind_database()
     
     return true, nil
+end
+
+function ActionExecutor:execute_move_playing_card(action_data)
+    local from_index = action_data.from_index
+    local to_index = action_data.to_index
+    
+    if not from_index or from_index < 0 then
+        return false, "Invalid from index"
+    end
+    
+    if not to_index or to_index < 0 then
+        return false, "Invalid to index"
+    end
+    
+    return false, "Move playing card action not yet implemented"
+end
+
+function ActionExecutor:execute_skip_blind(action_data)
+    if not G or not G.STATE or not G.STATES then
+        return false, "Game state not available"
+    end
+    
+    if G.STATE ~= G.STATES.BLIND_SELECT then
+        local current_state_name = "UNKNOWN"
+        if G.STATES then
+            for name, value in pairs(G.STATES) do
+                if value == G.STATE then
+                    current_state_name = name
+                    break
+                end
+            end
+        end
+        return false, "Cannot skip blind, must be in blind selection state. Current state: " .. current_state_name
+    end
+    
+    return false, "Skip blind action not yet implemented"
 end
 
 return ActionExecutor
