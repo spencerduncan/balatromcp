@@ -9,26 +9,15 @@ function StateExtractor.new()
     self.component_name = "STATE_EXTRACTOR"
     
     -- Immediately test G object availability and structure
-    self:log("Initializing StateExtractor")
     self:validate_g_object()
     
     return self
 end
 
-function StateExtractor:log(message)
-    local log_msg = "BalatroMCP [" .. self.component_name .. "]: " .. message
-    print(log_msg)
-end
-
 function StateExtractor:validate_g_object()
-    self:log("=== VALIDATING G OBJECT STRUCTURE ===")
-    
     if not G then
-        self:log("CRITICAL: Global G object is nil - game state extraction impossible")
         return false
     end
-    
-    self:log("G object exists")
     
     -- Test critical G object properties
     local critical_properties = {
@@ -39,14 +28,7 @@ function StateExtractor:validate_g_object()
     for _, prop in ipairs(critical_properties) do
         if G[prop] == nil then
             table.insert(missing_properties, prop)
-            self:log("MISSING: G." .. prop .. " is nil")
-        else
-            self:log("FOUND: G." .. prop .. " exists (type: " .. type(G[prop]) .. ")")
         end
-    end
-    
-    if #missing_properties > 0 then
-        self:log("WARNING: Missing " .. #missing_properties .. " critical properties: " .. table.concat(missing_properties, ", "))
     end
     
     -- Test specific structures we rely on
@@ -59,48 +41,11 @@ end
 
 function StateExtractor:validate_game_object()
     if not G or not G.GAME then
-        self:log("ERROR: G.GAME object not available")
         return
-    end
-    
-    self:log("--- VALIDATING G.GAME STRUCTURE ---")
-    
-    local game_properties = {"dollars", "current_round", "round_resets", "blind"}
-    for _, prop in ipairs(game_properties) do
-        if G.GAME[prop] ~= nil then
-            self:log("G.GAME." .. prop .. " = " .. tostring(G.GAME[prop]) .. " (type: " .. type(G.GAME[prop]) .. ")")
-        else
-            self:log("ERROR: G.GAME." .. prop .. " is nil")
-        end
-    end
-    
-    -- Test round structure
-    if G.GAME.current_round then
-        self:log("--- VALIDATING CURRENT ROUND ---")
-        local round_properties = {"hands_left", "discards_left"}
-        for _, prop in ipairs(round_properties) do
-            if G.GAME.current_round[prop] ~= nil then
-                self:log("G.GAME.current_round." .. prop .. " = " .. tostring(G.GAME.current_round[prop]))
-            else
-                self:log("ERROR: G.GAME.current_round." .. prop .. " is nil")
-            end
-        end
-    end
-    
-    -- Test ante structure
-    if G.GAME.round_resets then
-        self:log("--- VALIDATING ROUND RESETS ---")
-        if G.GAME.round_resets.ante then
-            self:log("G.GAME.round_resets.ante = " .. tostring(G.GAME.round_resets.ante))
-        else
-            self:log("ERROR: G.GAME.round_resets.ante is nil")
-        end
     end
 end
 
 function StateExtractor:validate_card_areas()
-    self:log("--- VALIDATING CARD AREAS ---")
-    
     local areas = {
         {name = "hand", object = G.hand},
         {name = "jokers", object = G.jokers},
@@ -109,78 +54,21 @@ function StateExtractor:validate_card_areas()
     }
     
     for _, area in ipairs(areas) do
-        if area.object then
-            self:log("G." .. area.name .. " exists")
-            
-            if area.object.cards then
-                self:log("G." .. area.name .. ".cards exists with " .. #area.object.cards .. " items")
-                
-                -- Validate first card structure if available
-                if #area.object.cards > 0 then
-                    self:validate_card_structure(area.object.cards[1], area.name .. "[1]")
-                end
-            else
-                self:log("ERROR: G." .. area.name .. ".cards is nil")
-            end
-        else
-            self:log("ERROR: G." .. area.name .. " is nil")
+        if area.object and area.object.cards and #area.object.cards > 0 then
+            self:validate_card_structure(area.object.cards[1], area.name .. "[1]")
         end
     end
 end
 
 function StateExtractor:validate_card_structure(card, card_name)
     if not card then
-        self:log("ERROR: " .. card_name .. " is nil")
         return
-    end
-    
-    self:log("--- VALIDATING " .. card_name .. " STRUCTURE ---")
-    
-    -- Check base properties
-    if card.base then
-        self:log(card_name .. ".base exists")
-        if card.base.value then
-            self:log(card_name .. ".base.value = " .. tostring(card.base.value))
-        else
-            self:log("ERROR: " .. card_name .. ".base.value is nil")
-        end
-        
-        if card.base.suit then
-            self:log(card_name .. ".base.suit = " .. tostring(card.base.suit))
-        else
-            self:log("ERROR: " .. card_name .. ".base.suit is nil")
-        end
-    else
-        self:log("ERROR: " .. card_name .. ".base is nil")
-    end
-    
-    -- Check other properties
-    local other_properties = {"ability", "edition", "seal", "unique_val", "config"}
-    for _, prop in ipairs(other_properties) do
-        if card[prop] ~= nil then
-            self:log(card_name .. "." .. prop .. " exists (type: " .. type(card[prop]) .. ")")
-        else
-            self:log("WARNING: " .. card_name .. "." .. prop .. " is nil")
-        end
     end
 end
 
 function StateExtractor:validate_states()
     if not G.STATE or not G.STATES then
-        self:log("ERROR: G.STATE or G.STATES not available")
         return
-    end
-    
-    self:log("--- VALIDATING GAME STATES ---")
-    self:log("Current G.STATE = " .. tostring(G.STATE))
-    
-    -- List all available states
-    if type(G.STATES) == "table" then
-        local state_names = {}
-        for key, value in pairs(G.STATES) do
-            table.insert(state_names, key .. "=" .. tostring(value))
-        end
-        self:log("Available G.STATES: " .. table.concat(state_names, ", "))
     end
 end
 
@@ -212,17 +100,11 @@ function StateExtractor:extract_current_state()
             -- REMOVED: Individual success logging
         else
             table.insert(extraction_errors, extraction.name .. ": " .. tostring(result))
-            -- Only log critical errors
-            if extraction.name == "current_phase" or extraction.name == "money" then
-                self:log("ERROR extracting " .. extraction.name .. ": " .. tostring(result))
-            end
             state[extraction.name] = nil -- Ensure it's explicitly nil
         end
     end
     
-    -- Only log if there are errors
     if #extraction_errors > 0 then
-        self:log("STATE EXTRACTION: " .. #extraction_errors .. " errors")
         state.extraction_errors = extraction_errors
     end
     
@@ -239,12 +121,10 @@ end
 function StateExtractor:get_current_phase()
     -- Validate G object structure
     if not self:safe_check_path(G, {"STATE"}) then
-        self:log("WARNING: G.STATE not accessible, returning default phase")
         return "hand_selection"
     end
     
     if not self:safe_check_path(G, {"STATES"}) then
-        self:log("WARNING: G.STATES not accessible, returning default phase")
         return "hand_selection"
     end
     
@@ -311,15 +191,6 @@ function StateExtractor:get_current_phase()
     
     -- Fallback for unknown states
     else
-        -- Log unknown state for debugging
-        local state_name = "unknown"
-        for state_key, state_value in pairs(states) do
-            if state_value == current_state then
-                state_name = state_key
-                break
-            end
-        end
-        self:log("WARNING: Unknown game state detected: " .. state_name .. " (value: " .. tostring(current_state) .. ")")
         return "hand_selection" -- Safe default
     end
 end
@@ -379,7 +250,6 @@ function StateExtractor:extract_deck_cards()
     local deck_cards = {}
     
     if not self:safe_check_path(G, {"playing_cards"}) then
-        self:log("WARNING: G.playing_cards not accessible, returning empty deck")
         return deck_cards
     end
     
@@ -398,7 +268,6 @@ function StateExtractor:extract_deck_cards()
         end
     end
     
-    self:log("Extracted " .. #deck_cards .. " deck cards from G.playing_cards")
     return deck_cards
 end
 
@@ -466,8 +335,6 @@ function StateExtractor:extract_jokers()
                 properties = self:extract_joker_properties_safe(joker)
             }
             table.insert(jokers, safe_joker)
-        else
-            self:log("WARNING: Null joker found at position " .. i)
         end
     end
     
@@ -506,8 +373,6 @@ function StateExtractor:extract_consumables()
                 properties = {}
             }
             table.insert(consumables, safe_consumable)
-        else
-            self:log("WARNING: Null consumable found at position " .. i)
         end
     end
     
@@ -586,8 +451,6 @@ function StateExtractor:extract_shop_contents()
                     properties = {}
                 }
                 table.insert(shop_contents, safe_item)
-            else
-                self:log("WARNING: Shop item at position " .. i .. " missing ability.set")
             end
         end
     end
@@ -649,36 +512,6 @@ function StateExtractor:extract_shop_contents()
         end
     end
     
-    -- Log extraction results for debugging with detailed collection info
-    if #shop_contents > 0 then
-        self:log("Extracted " .. #shop_contents .. " shop items")
-        
-        -- Debug log: Check which collections have items
-        local jokers_count = (self:safe_check_path(G, {"shop_jokers", "cards"}) and #G.shop_jokers.cards) or 0
-        local consumables_count = (self:safe_check_path(G, {"shop_consumables", "cards"}) and #G.shop_consumables.cards) or 0
-        local boosters_count = (self:safe_check_path(G, {"shop_booster", "cards"}) and #G.shop_booster.cards) or 0
-        local vouchers_count = (self:safe_check_path(G, {"shop_vouchers", "cards"}) and #G.shop_vouchers.cards) or 0
-        
-        self:log("Shop collection counts: jokers=" .. jokers_count ..
-                ", consumables=" .. consumables_count ..
-                ", boosters=" .. boosters_count ..
-                ", vouchers=" .. vouchers_count)
-    else
-        self:log("WARNING: No shop items found in any shop arrays")
-        
-        -- Debug log: Check which collections exist when empty
-        local collections_debug = {}
-        if G then
-            table.insert(collections_debug, "shop_jokers=" .. (G.shop_jokers and "exists" or "nil"))
-            table.insert(collections_debug, "shop_consumables=" .. (G.shop_consumables and "exists" or "nil"))
-            table.insert(collections_debug, "shop_booster=" .. (G.shop_booster and "exists" or "nil"))
-            table.insert(collections_debug, "shop_vouchers=" .. (G.shop_vouchers and "exists" or "nil"))
-        end
-        
-        if #collections_debug > 0 then
-            self:log("Shop collections status: " .. table.concat(collections_debug, ", "))
-        end
-    end
     
     return shop_contents
 end
@@ -888,7 +721,6 @@ end
 function StateExtractor:determine_blind_type_safe(blind)
     -- Determine the type of blind with CIRCULAR REFERENCE SAFE access
     if not blind then
-        self:log("WARNING: Blind object is nil, returning default type")
         return "small"
     end
     
