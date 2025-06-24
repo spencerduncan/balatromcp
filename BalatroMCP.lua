@@ -543,16 +543,19 @@ end
 
 function BalatroMCP:hook_hand_evaluation()
     if G.FUNCS then
+        -- Capture self reference for closure
+        local balatro_mcp_instance = self
+        
         local original_play_cards = G.FUNCS.play_cards_from_highlighted
         if original_play_cards then
             if self.crash_diagnostics then
                 G.FUNCS.play_cards_from_highlighted = self.crash_diagnostics:create_safe_hook(
                     function(...)
-                        self.crash_diagnostics:track_hook_chain("play_cards_from_highlighted")
-                        self.crash_diagnostics:validate_game_state("play_cards_from_highlighted")
+                        balatro_mcp_instance.crash_diagnostics:track_hook_chain("play_cards_from_highlighted")
+                        balatro_mcp_instance.crash_diagnostics:validate_game_state("play_cards_from_highlighted")
                         print("BalatroMCP: Hand played - capturing state")
                         local result = original_play_cards(...)
-                        self:on_hand_played()
+                        balatro_mcp_instance:on_hand_played()
                         return result
                     end,
                     "play_cards_from_highlighted"
@@ -561,7 +564,7 @@ function BalatroMCP:hook_hand_evaluation()
                 G.FUNCS.play_cards_from_highlighted = function(...)
                     print("BalatroMCP: Hand played - capturing state")
                     local result = original_play_cards(...)
-                    self:on_hand_played()
+                    balatro_mcp_instance:on_hand_played()
                     return result
                 end
             end
@@ -572,11 +575,11 @@ function BalatroMCP:hook_hand_evaluation()
             if self.crash_diagnostics then
                 G.FUNCS.discard_cards_from_highlighted = self.crash_diagnostics:create_safe_hook(
                     function(...)
-                        self.crash_diagnostics:track_hook_chain("discard_cards_from_highlighted")
-                        self.crash_diagnostics:validate_game_state("discard_cards_from_highlighted")
+                        balatro_mcp_instance.crash_diagnostics:track_hook_chain("discard_cards_from_highlighted")
+                        balatro_mcp_instance.crash_diagnostics:validate_game_state("discard_cards_from_highlighted")
                         print("BalatroMCP: Cards discarded - capturing state")
                         local result = original_discard_cards(...)
-                        self:on_cards_discarded()
+                        balatro_mcp_instance:on_cards_discarded()
                         return result
                     end,
                     "discard_cards_from_highlighted"
@@ -585,7 +588,7 @@ function BalatroMCP:hook_hand_evaluation()
                 G.FUNCS.discard_cards_from_highlighted = function(...)
                     print("BalatroMCP: Cards discarded - capturing state")
                     local result = original_discard_cards(...)
-                    self:on_cards_discarded()
+                    balatro_mcp_instance:on_cards_discarded()
                     return result
                 end
             end
@@ -597,6 +600,9 @@ function BalatroMCP:hook_blind_selection()
     print("BalatroMCP: Setting up blind selection hooks")
     
     if G.FUNCS then
+        -- Capture self reference for closure
+        local balatro_mcp_instance = self
+        
         -- Hook blind selection functions
         local blind_functions = {
             "select_blind",
@@ -611,12 +617,12 @@ function BalatroMCP:hook_blind_selection()
                     print("BalatroMCP: Blind selection detected via " .. func_name)
                     
                     -- Extract blind info before selection
-                    local blind_info = self:extract_blind_selection_info_from_element(e)
+                    local blind_info = balatro_mcp_instance:extract_blind_selection_info_from_element(e)
                     
                     local result = original_func(e, ...)
                     
                     -- Send status update for blind selection
-                    self:send_status_update("blind_selected", {
+                    balatro_mcp_instance:send_status_update("blind_selected", {
                         blind_type = blind_info.type,
                         blind_name = blind_info.name,
                         requirement = blind_info.requirement,
@@ -625,7 +631,7 @@ function BalatroMCP:hook_blind_selection()
                     })
                     
                     -- Trigger the existing blind selection handler
-                    self:on_blind_selected()
+                    balatro_mcp_instance:on_blind_selected()
                     
                     return result
                 end
@@ -641,8 +647,8 @@ function BalatroMCP:hook_blind_selection()
                 
                 local result = original_skip(e, ...)
                 
-                self:send_status_update("blind_skipped", {})
-                self:send_current_state()
+                balatro_mcp_instance:send_status_update("blind_skipped", {})
+                balatro_mcp_instance:send_current_state()
                 
                 return result
             end
@@ -657,8 +663,8 @@ function BalatroMCP:hook_blind_selection()
                 
                 local result = original_reroll_boss(...)
                 
-                self:send_status_update("boss_blind_rerolled", {})
-                self:send_current_state()
+                balatro_mcp_instance:send_status_update("boss_blind_rerolled", {})
+                balatro_mcp_instance:send_current_state()
                 
                 return result
             end
@@ -669,17 +675,20 @@ end
 
 function BalatroMCP:hook_shop_interactions()
     if G.FUNCS then
+        -- Capture self reference for closure
+        local balatro_mcp_instance = self
+        
         -- Hook cash_out for shop entry detection
         local original_cash_out = G.FUNCS.cash_out
         if original_cash_out then
             if self.crash_diagnostics then
                 G.FUNCS.cash_out = self.crash_diagnostics:create_safe_hook(
                     function(...)
-                        self.crash_diagnostics:track_hook_chain("cash_out")
-                        self.crash_diagnostics:validate_game_state("cash_out")
+                        balatro_mcp_instance.crash_diagnostics:track_hook_chain("cash_out")
+                        balatro_mcp_instance.crash_diagnostics:validate_game_state("cash_out")
                         print("BalatroMCP: Cash out triggered - capturing state")
                         local result = original_cash_out(...)
-                        self:on_shop_entered()
+                        balatro_mcp_instance:on_shop_entered()
                         return result
                     end,
                     "cash_out"
@@ -688,7 +697,7 @@ function BalatroMCP:hook_shop_interactions()
                 G.FUNCS.cash_out = function(...)
                     print("BalatroMCP: Cash out triggered - capturing state")
                     local result = original_cash_out(...)
-                    self:on_shop_entered()
+                    balatro_mcp_instance:on_shop_entered()
                     return result
                 end
             end
@@ -712,12 +721,12 @@ function BalatroMCP:hook_shop_interactions()
                     print("BalatroMCP: Shop purchase detected via " .. func_name)
                     
                     -- Extract item info before purchase
-                    local item_info = self:extract_shop_item_info(e)
+                    local item_info = balatro_mcp_instance:extract_shop_item_info(e)
                     
                     local result = original_func(e, ...)
                     
                     -- Send status update for purchase
-                    self:send_status_update("shop_purchase", {
+                    balatro_mcp_instance:send_status_update("shop_purchase", {
                         item_name = item_info.name,
                         item_type = item_info.type,
                         cost = item_info.cost,
@@ -725,7 +734,7 @@ function BalatroMCP:hook_shop_interactions()
                     })
                     
                     -- Send updated game state
-                    self:send_current_state()
+                    balatro_mcp_instance:send_current_state()
                     
                     return result
                 end
@@ -741,8 +750,8 @@ function BalatroMCP:hook_shop_interactions()
                 
                 local result = original_reroll(...)
                 
-                self:send_status_update("shop_reroll", {})
-                self:send_current_state()
+                balatro_mcp_instance:send_status_update("shop_reroll", {})
+                balatro_mcp_instance:send_current_state()
                 
                 return result
             end
@@ -756,6 +765,9 @@ function BalatroMCP:hook_game_start()
     print("BalatroMCP: Setting up game start hooks")
     
     if G.FUNCS then
+        -- Capture self reference for closure
+        local balatro_mcp_instance = self
+        
         local game_start_functions = {
             "start_run",      -- Most likely candidate
             "new_run",
@@ -775,7 +787,7 @@ function BalatroMCP:hook_game_start()
                 G.FUNCS[func_name] = function(...)
                     print("BalatroMCP: Game start detected via " .. func_name .. " - capturing state")
                     local result = original_func(...)
-                    self:on_game_started()
+                    balatro_mcp_instance:on_game_started()
                     return result
                 end
                 
