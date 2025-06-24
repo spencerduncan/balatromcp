@@ -6,7 +6,7 @@
     Generates properly formatted actions.json files with correct structure
     for testing various action types in the BalatroMCP system.
 .PARAMETER Action
-    The type of action to create (skip_blind, select_blind, play_hand, discard_cards, go_to_shop, buy_item, sell_joker, sell_consumable, use_consumable, reorder_jokers, reroll_boss, reroll_shop, sort_hand_by_rank, sort_hand_by_suit, move_playing_card, select_pack_offer, diagnose_blind_progression, diagnose_blind_activation)
+    The type of action to create (skip_blind, select_blind, play_hand, discard_cards, go_to_shop, buy_item, sell_joker, sell_consumable, use_consumable, reorder_jokers, reroll_boss, reroll_shop, sort_hand_by_rank, sort_hand_by_suit, move_playing_card, select_pack_offer, go_next, diagnose_blind_progression, diagnose_blind_activation)
 .PARAMETER Sequence
     The sequence ID for the action (required)
 .PARAMETER Target
@@ -39,7 +39,7 @@
 
 param(
     [Parameter(Mandatory=$true)]
-    [ValidateSet("skip_blind", "select_blind", "play_hand", "discard_cards", "go_to_shop", "buy_item", "sell_joker", "sell_consumable", "use_consumable", "reorder_jokers", "reroll_boss", "reroll_shop", "sort_hand_by_rank", "sort_hand_by_suit", "move_playing_card", "select_pack_offer", "diagnose_blind_progression", "diagnose_blind_activation")]
+    [ValidateSet("skip_blind", "select_blind", "play_hand", "discard_cards", "go_to_shop", "buy_item", "sell_joker", "sell_consumable", "use_consumable", "reorder_jokers", "reroll_boss", "reroll_shop", "sort_hand_by_rank", "sort_hand_by_suit", "move_playing_card", "select_pack_offer", "go_next", "diagnose_blind_progression", "diagnose_blind_activation")]
     [string]$Action,
     
     [Parameter(Mandatory=$true)]
