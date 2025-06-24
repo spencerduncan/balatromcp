@@ -212,6 +212,7 @@ end
 
 function ActionExecutor:execute_buy_item(action_data)
     local shop_index = action_data.shop_index
+    local buy_and_use = action_data.buy_and_use or false
     
     if not shop_index or shop_index < 0 then
         return false, "Invalid shop index"
@@ -229,16 +230,16 @@ function ActionExecutor:execute_buy_item(action_data)
     
     local shop_items = {}
     local shop_collections = {
-        {collection = G.shop_jokers, name = "jokers", type = "main"},
-        {collection = G.shop_consumables, name = "consumables", type = "main"},  -- For planets, tarots, spectrals
-        {collection = G.shop_booster, name = "boosters", type = "booster"},      -- For booster packs
-        {collection = G.shop_vouchers, name = "vouchers", type = "voucher"}      -- For vouchers
+        {collection = G.shop_jokers, name = "jokers", type = "main", category = "joker"},
+        {collection = G.shop_consumables, name = "consumables", type = "main", category = "consumable"},  -- For planets, tarots, spectrals
+        {collection = G.shop_booster, name = "boosters", type = "booster", category = "booster"},      -- For booster packs
+        {collection = G.shop_vouchers, name = "vouchers", type = "voucher", category = "voucher"}      -- For vouchers
     }
     
     for _, shop_collection in ipairs(shop_collections) do
         if shop_collection.collection and shop_collection.collection.cards then
             for _, card in ipairs(shop_collection.collection.cards) do
-                table.insert(shop_items, {card = card, type = shop_collection.type, name = shop_collection.name})
+                table.insert(shop_items, {card = card, type = shop_collection.type, name = shop_collection.name, category = shop_collection.category})
             end
         end
     end
@@ -255,12 +256,16 @@ function ActionExecutor:execute_buy_item(action_data)
     local card = shop_item.card
     local item_type = shop_item.type
     local item_category = shop_item.name
+    local item_category_type = shop_item.category
     
-    print("BalatroMCP: Attempting to buy " .. item_category .. " item at index " .. shop_index .. " (type: " .. item_type .. ")")
+    print("BalatroMCP: Attempting to buy " .. item_category .. " item at index " .. shop_index .. " (type: " .. item_type .. ", category: " .. item_category_type .. ", buy_and_use: " .. tostring(buy_and_use) .. ")")
     
+    -- Check for buy space, but skip if using buy_and_use for consumables (they don't go to inventory)
     if item_type == "main" and G.FUNCS and G.FUNCS.check_for_buy_space then
-        if not G.FUNCS.check_for_buy_space(card) then
-            return false, "Cannot buy item - no space available"
+        if not (buy_and_use and item_category_type == "consumable") then
+            if not G.FUNCS.check_for_buy_space(card) then
+                return false, "Cannot buy item - no space available"
+            end
         end
     end
     
@@ -278,10 +283,28 @@ function ActionExecutor:execute_buy_item(action_data)
             return false, "Buy function not available"
         end
         
-        print("BalatroMCP: Calling G.FUNCS.buy_from_shop for " .. item_category)
-        success, error_result = pcall(function()
-            G.FUNCS.buy_from_shop({config = {ref_table = card}})
-        end)
+        -- Handle buy_and_use for consumables
+        if buy_and_use and item_category_type == "consumable" then
+            -- Check if buy_and_use is available for this consumable
+            if not G.FUNCS.can_buy_and_use then
+                return false, "Buy and use function not available"
+            end
+            
+            local can_buy_and_use_result = G.FUNCS.can_buy_and_use({config = {ref_table = card}})
+            if not can_buy_and_use_result then
+                return false, "Cannot buy and use this consumable"
+            end
+            
+            print("BalatroMCP: Calling G.FUNCS.buy_from_shop with buy_and_use for " .. item_category)
+            success, error_result = pcall(function()
+                G.FUNCS.buy_from_shop({config = {ref_table = card, id = "buy_and_use"}})
+            end)
+        else
+            print("BalatroMCP: Calling G.FUNCS.buy_from_shop for " .. item_category)
+            success, error_result = pcall(function()
+                G.FUNCS.buy_from_shop({config = {ref_table = card}})
+            end)
+        end
         
     elseif item_type == "voucher" then
         if not G.FUNCS or not G.FUNCS.use_card then
