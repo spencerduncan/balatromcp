@@ -135,7 +135,7 @@ switch ($Action) {
             Write-Error "Target (item_id) is required for use_consumable action"
             exit 1
         }
-        $actionData.item_id = [double]$Target
+        $actionData.consumable_index = [int]$Target
     }
     
     "select_pack_offer" {

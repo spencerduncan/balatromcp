@@ -585,29 +585,22 @@ function ActionExecutor:execute_sort_hand_by_suit(action_data)
 end
 
 function ActionExecutor:execute_use_consumable(action_data)
-    local item_id = action_data.item_id
+     local consumable_index = action_data.consumable_index
     
-    if not item_id then
-        return false, "No consumable ID specified"
+    if not consumable_index or consumable_index < 0 then
+        return false, "Invalid consumable index"
     end
     
     if not G or not G.consumeables or not G.consumeables.cards then
         return false, "No consumables available"
     end
     
-    local consumable = nil
-    for _, card in ipairs(G.consumeables.cards) do
-        if card.unique_val == item_id then
-            consumable = card
-            break
-        end
-    end
-    
+    local consumable = G.consumeables.cards[consumable_index + 1] -- Lua 1-based indexing
     if not consumable then
-        return false, "Consumable not found: " .. item_id
+        return false, "Consumable not found at index: " .. consumable_index
     end
     
-    if consumable.use then
+    if consumable.can_use_consumable(false, false) then
         consumable:use()
         return true, nil
     else

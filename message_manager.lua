@@ -168,7 +168,6 @@ function MessageManager:read_actions()
     
     local message_data = self.transport:read_message("actions")
     if not message_data then
-        self:log("No actions available (this is normal)")
         return nil
     end
     

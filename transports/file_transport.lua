@@ -152,7 +152,6 @@ function FileTransport:read_message(message_type)
     local filepath = self:get_filepath(message_type)
     
     if not love.filesystem.getInfo(filepath) then
-        self:log("No " .. message_type .. " file found (this is normal)")
         return nil
     end
     
