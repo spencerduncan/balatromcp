@@ -90,7 +90,8 @@ function StateExtractor:extract_current_state()
         {name = "current_blind", func = function() return self:extract_current_blind() end},
         {name = "shop_contents", func = function() return self:extract_shop_contents() end},
         {name = "available_actions", func = function() return self:get_available_actions() end},
-        {name = "post_hand_joker_reorder_available", func = function() return self:is_joker_reorder_available() end}
+        {name = "post_hand_joker_reorder_available", func = function() return self:is_joker_reorder_available() end},
+        {name = "deck_cards", func = function() return self:extract_deck_cards() end}
     }
     
     for _, extraction in ipairs(extractions) do
@@ -246,7 +247,7 @@ function StateExtractor:extract_hand_cards()
 end
 
 function StateExtractor:extract_deck_cards()
-    -- Extract current deck cards with CIRCULAR REFERENCE SAFE access
+    -- Extract full deck cards from G.playing_cards with CIRCULAR REFERENCE SAFE access
     local deck_cards = {}
     
     if not self:safe_check_path(G, {"playing_cards"}) then
@@ -269,6 +270,32 @@ function StateExtractor:extract_deck_cards()
     end
     
     return deck_cards
+end
+
+function StateExtractor:extract_remaining_deck_cards()
+    -- Extract remaining deck cards from G.deck.cards with CIRCULAR REFERENCE SAFE access
+    local remaining_deck_cards = {}
+    
+    if not self:safe_check_path(G, {"deck", "cards"}) then
+        return remaining_deck_cards
+    end
+    
+    for i, card in ipairs(G.deck.cards) do
+        if card then
+            -- SAFE EXTRACTION: Only extract primitive values, avoid object references
+            local safe_card = {
+                id = self:safe_primitive_value(card, "unique_val", "remaining_deck_card_" .. i),
+                rank = self:safe_primitive_nested_value(card, {"base", "value"}, "A"),
+                suit = self:safe_primitive_nested_value(card, {"base", "suit"}, "Spades"),
+                enhancement = self:get_card_enhancement_safe(card),
+                edition = self:get_card_edition_safe(card),
+                seal = self:get_card_seal_safe(card)
+            }
+            table.insert(remaining_deck_cards, safe_card)
+        end
+    end
+    
+    return remaining_deck_cards
 end
 
 function StateExtractor:get_card_enhancement(card)

@@ -159,6 +159,48 @@ function MessageManager:write_deck_state(deck_data)
     self:log("Deck state written and verified successfully")
     return true
 end
+function MessageManager:write_remaining_deck(remaining_deck_data)
+    self:log("Attempting to write remaining deck state")
+    
+    if not remaining_deck_data then
+        self:log("ERROR: No remaining deck data provided")
+        return false
+    end
+    
+    if not self.transport:is_available() then
+        self:log("ERROR: Transport is not available")
+        return false
+    end
+    
+    local message = self:create_message(remaining_deck_data, "remaining_deck")
+    self:log("Created remaining deck message structure with sequence_id: " .. message.sequence_id)
+    
+    -- Encode message to JSON
+    local encode_success, encoded_data = pcall(self.json.encode, message)
+    if not encode_success then
+        self:log("ERROR: JSON encoding failed: " .. tostring(encoded_data))
+        return false
+    end
+    
+    self:log("JSON encoding successful, data length: " .. #encoded_data)
+    
+    -- Delegate to transport
+    local write_success = self.transport:write_message(encoded_data, "remaining_deck")
+    if not write_success then
+        self:log("ERROR: Transport write failed")
+        return false
+    end
+    
+    -- Verify through transport
+    local verify_success = self.transport:verify_message(encoded_data, "remaining_deck")
+    if not verify_success then
+        self:log("ERROR: Message verification failed")
+        return false
+    end
+    
+    self:log("Remaining deck state written and verified successfully")
+    return true
+end
 
 function MessageManager:read_actions()
     if not self.transport:is_available() then
