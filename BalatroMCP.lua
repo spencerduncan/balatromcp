@@ -555,6 +555,18 @@ function BalatroMCP:send_state_update(state)
     
     self.message_manager:write_deck_state(deck_message)
     print("BalatroMCP: Deck state sent with " .. #deck_cards .. " cards")
+    
+    -- Extract and send remaining deck state alongside game state
+    local remaining_deck_cards = self.state_extractor:extract_remaining_deck_cards()
+    local remaining_deck_message = {
+        message_type = "remaining_deck_update",
+        timestamp = os.time(),
+        sequence = self.message_manager:get_next_sequence_id(),
+        remaining_deck_cards = remaining_deck_cards
+    }
+    
+    self.message_manager:write_remaining_deck(remaining_deck_message)
+    print("BalatroMCP: Remaining deck state sent with " .. #remaining_deck_cards .. " cards")
 end
 
 function BalatroMCP:calculate_state_hash(state)
