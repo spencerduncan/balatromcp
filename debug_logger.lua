@@ -338,4 +338,62 @@ function DebugLogger:test_file_communication()
     end
 end
 
+function DebugLogger:test_transport_communication(transport)
+    if not transport then
+        self:error("No transport provided for communication test", "TRANSPORT_IO")
+        return
+    end
+    
+    self:info("=== TRANSPORT COMMUNICATION TEST ===", "TRANSPORT_IO")
+    
+    -- Test transport availability
+    local available = transport:is_available()
+    if available then
+        self:info("Transport availability: SUCCESS", "TRANSPORT_IO")
+    else
+        self:error("Transport availability: FAILED", "TRANSPORT_IO")
+        return
+    end
+    
+    -- Test message write (only for non-actions message types)
+    local test_message = {
+        test = "transport_write",
+        timestamp = os.time(),
+        sequence_id = 1
+    }
+    
+    local json_success, json_lib = pcall(function()
+        if SMODS then
+            local json_loader = SMODS.load_file("libs/json.lua")
+            return json_loader()
+        else
+            return require("json")
+        end
+    end)
+    
+    if json_success and json_lib then
+        local encode_success, encoded = pcall(json_lib.encode, test_message)
+        if encode_success then
+            local write_success = transport:write_message(encoded, "debug_test")
+            if write_success then
+                self:info("Transport write test: SUCCESS", "TRANSPORT_IO")
+                
+                -- Test message verification
+                local verify_success = transport:verify_message(encoded, "debug_test")
+                if verify_success then
+                    self:info("Transport verify test: SUCCESS", "TRANSPORT_IO")
+                else
+                    self:warn("Transport verify test: FAILED", "TRANSPORT_IO")
+                end
+            else
+                self:error("Transport write test: FAILED", "TRANSPORT_IO")
+            end
+        else
+            self:error("JSON encode for transport test: FAILED", "TRANSPORT_IO")
+        end
+    else
+        self:error("JSON library required for transport test: FAILED", "TRANSPORT_IO")
+    end
+end
+
 return DebugLogger

@@ -31,6 +31,7 @@ local luaunit_test_modules = {
     {name = "test_message_manager_luaunit", description = "MessageManager message creation and metadata management"},
     {name = "test_file_transport_luaunit", description = "FileTransport file-based I/O operations and path handling"},
     {name = "test_https_transport_luaunit", description = "HttpsTransport HTTPS-based I/O operations and network communication"},
+    {name = "test_balatromcp_transport_initialization_luaunit", description = "BalatroMCP transport initialization and configuration"},
 }
 
 -- Set up a minimal environment for testing

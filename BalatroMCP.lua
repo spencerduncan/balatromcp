@@ -9,6 +9,34 @@
 
 print("BalatroMCP: MAIN FILE LOADING STARTED")
 
+-- Transport Configuration
+-- Can be overridden by external configuration or options menu
+local USE_HTTP_TRANSPORT = false -- Set to true to enable HTTP transport instead of file transport
+
+-- HTTP Transport Configuration
+-- These can be overridden by external configuration
+local HTTP_CONFIG = {
+    base_url = "http://localhost:8000",  -- Default test server URL
+    game_data_endpoint = "/game-data",
+    actions_endpoint = "/actions",
+    timeout = 5
+}
+
+-- Function to allow external configuration override
+local function configure_transport(use_http, http_config)
+    if use_http ~= nil then
+        USE_HTTP_TRANSPORT = use_http
+    end
+    if http_config and type(http_config) == "table" then
+        for key, value in pairs(http_config) do
+            HTTP_CONFIG[key] = value
+        end
+    end
+end
+
+-- Export configuration function for external use
+_G.BalatroMCP_Configure = configure_transport
+
 local DebugLogger = nil
 local debug_success, debug_error = pcall(function()
     DebugLogger = assert(SMODS.load_file("debug_logger.lua"))()
@@ -34,6 +62,15 @@ local file_transport_success, file_transport_error = pcall(function()
 end)
 if not file_transport_success then
     print("BalatroMCP: FileTransport load failed: " .. tostring(file_transport_error))
+end
+
+local HttpsTransport = nil
+local https_transport_success, https_transport_error = pcall(function()
+    HttpsTransport = assert(SMODS.load_file("transports/https_transport.lua"))()
+    print("BalatroMCP: HttpsTransport loaded successfully")
+end)
+if not https_transport_success then
+    print("BalatroMCP: HttpsTransport load failed: " .. tostring(https_transport_error))
 end
 
 local MessageManager = nil
@@ -85,11 +122,13 @@ print("BalatroMCP: MODULE LOADING SUMMARY:")
 print("  DebugLogger: " .. (debug_success and "SUCCESS" or "FAILED"))
 print("  MessageTransport: " .. (transport_success and "SUCCESS" or "FAILED"))
 print("  FileTransport: " .. (file_transport_success and "SUCCESS" or "FAILED"))
+print("  HttpsTransport: " .. (https_transport_success and "SUCCESS" or "FAILED"))
 print("  MessageManager: " .. (message_manager_success and "SUCCESS" or "FAILED"))
 print("  StateExtractor: " .. (state_success and "SUCCESS" or "FAILED"))
 print("  ActionExecutor: " .. (action_success and "SUCCESS" or "FAILED"))
 print("  JokerManager: " .. (joker_success and "SUCCESS" or "FAILED"))
 print("  CrashDiagnostics: " .. (crash_success and "SUCCESS" or "FAILED"))
+print("  Transport Selection: " .. (USE_HTTP_TRANSPORT and "HTTP" or "FILE"))
 
 local BalatroMCP = {}
 BalatroMCP.__index = BalatroMCP
@@ -112,16 +151,43 @@ function BalatroMCP.new()
     
     local init_success = true
     
-    local message_manager_success, message_manager_error = pcall(function()
-        self.file_transport = FileTransport.new()
-        self.message_manager = MessageManager.new(self.file_transport, "BALATRO_MCP")
-        self.debug_logger:info("MessageManager and FileTransport components initialized successfully", "INIT")
-    end)
-    
-    if not message_manager_success then
-        self.debug_logger:error("MessageManager initialization failed: " .. tostring(message_manager_error), "INIT")
-        init_success = false
+    if USE_HTTP_TRANSPORT then
+        if not HttpsTransport then
+            error("HttpsTransport module not available but USE_HTTP_TRANSPORT is enabled")
+        end
+        
+        -- Use configurable HTTP settings
+        local https_config = {}
+        for key, value in pairs(HTTP_CONFIG) do
+            https_config[key] = value
+        end
+        
+        -- Initialize HTTP transport with error propagation
+        local transport = HttpsTransport.new(https_config)
+        -- Test availability but don't fail hard - log warning instead
+        local available = transport:is_available()
+        if not available then
+            self.debug_logger:warn("HTTP transport server not immediately reachable at " .. https_config.base_url .. " - will retry during operation", "INIT")
+        else
+            self.debug_logger:info("HTTP transport server connection verified at " .. https_config.base_url, "INIT")
+        end
+        
+        self.transport = transport
+        self.transport_type = "HTTP"
+        self.debug_logger:info("HttpsTransport component initialized successfully with base_url: " .. https_config.base_url, "INIT")
+    else
+        if not FileTransport then
+            error("FileTransport module not available but file transport is selected")
+        end
+        
+        self.transport = FileTransport.new()
+        self.file_transport = self.transport  -- Backward compatibility reference
+        self.transport_type = "FILE"
+        self.debug_logger:info("FileTransport component initialized successfully", "INIT")
     end
+    
+    self.message_manager = MessageManager.new(self.transport, "BALATRO_MCP")
+    self.debug_logger:info("MessageManager component initialized successfully", "INIT")
     
     local state_success, state_error = pcall(function()
         self.state_extractor = StateExtractor.new()
@@ -175,7 +241,12 @@ function BalatroMCP.new()
     self.delayed_shop_capture_timer = 0
     
     if init_success then
-        self.debug_logger:test_file_communication()
+        if self.transport_type == "FILE" then
+            self.debug_logger:test_file_communication()
+        else
+            -- Use transport-agnostic test for HTTP transport
+            self.debug_logger:test_transport_communication(self.transport)
+        end
     end
     
     if init_success then
@@ -724,7 +795,10 @@ end
 
 local mod_instance = nil
 
-if SMODS then
+-- Check if we're in a test environment - if so, don't auto-initialize
+local is_test_environment = _G.BalatroMCP_Test_Environment or false
+
+if SMODS and not is_test_environment then
     print("BalatroMCP: SMODS framework detected, initializing mod...")
 
     local init_success, init_error = pcall(function()
@@ -740,6 +814,8 @@ if SMODS then
     if not init_success then
         print("BalatroMCP: CRITICAL ERROR - Mod initialization failed: " .. tostring(init_error))
     end
+elseif is_test_environment then
+    print("BalatroMCP: Test environment detected, skipping auto-initialization")
     
     _G.BalatroMCP_Instance = mod_instance
     
