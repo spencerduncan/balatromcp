@@ -55,8 +55,8 @@ function HttpsTransport:initialize_libraries()
     end
     
     -- Check for SMODS.https availability
-    if SMODS and SMODS.https then
-        self.http_client = SMODS.https
+    self.http_client = require("SMODS.https")
+    if SMODS and self.http_client then
         self:log("SMODS.https available - HTTP operations enabled")
     else
         error("SMODS.https not available - HTTPS transport cannot function")
@@ -125,49 +125,46 @@ function HttpsTransport:make_request(method, url, body, headers)
     
     local start_time = os.clock()
     
-    -- Prepare SMODS.https request parameters
-    local request_params = {
+    -- Prepare SMODS.https request options
+    local options = {
         method = method,
-        url = url,
-        headers = headers,
-        timeout = self.timeout
+        headers = headers
     }
     
     -- Add body for POST requests
     if method == "POST" and body then
-        request_params.data = body
+        options.data = body
     end
     
-    -- Make the HTTP request using SMODS.https
-    local success, response = pcall(self.http_client.request, request_params)
+    -- Make the HTTP request using SMODS.https (url, options)
+    local success, status_code, response_body, response_headers = pcall(self.http_client.request, url, options)
     
     local end_time = os.clock()
     local duration = end_time - start_time
     
     if not success then
-        self:log("ERROR: HTTP request failed: " .. tostring(response))
+        self:log("ERROR: HTTP request failed: " .. tostring(status_code))
         return nil, "request_failed"
     end
     
-    if not response then
-        self:log("ERROR: No response received")
+    -- SMODS.https returns: code, body, headers
+    if not status_code then
+        self:log("ERROR: No status code received")
         return nil, "no_response"
     end
-    
-    -- Extract response data based on SMODS.https response format
-    local response_body = response.body or response.data or ""
-    local status_code = response.status or response.code or 0
     
     self:log("Request #" .. request_id .. " completed in " .. string.format("%.3f", duration) .. "s, status: " .. tostring(status_code))
     
     -- Check for successful HTTP status codes
-    if status_code > 0 and (status_code < 200 or status_code >= 300) then
+    if status_code < 200 or status_code >= 300 then
         self:log("ERROR: HTTP request returned error status: " .. status_code)
-        self:log("Response body: " .. string.sub(response_body, 1, 200))
+        if response_body then
+            self:log("Response body: " .. string.sub(tostring(response_body), 1, 200))
+        end
         return nil, status_code
     end
     
-    return response_body, status_code, response.headers
+    return response_body or "", status_code, response_headers
 end
 
 -- IMessageTransport interface implementation
