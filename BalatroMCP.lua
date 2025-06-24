@@ -237,9 +237,6 @@ function BalatroMCP.new()
     self.pending_state_extraction = false
     self.pending_action_result = nil
     
-    self.delayed_shop_state_capture = false
-    self.delayed_shop_capture_timer = 0
-    
     if init_success then
         if self.transport_type == "FILE" then
             self.debug_logger:test_file_communication()
@@ -302,32 +299,6 @@ function BalatroMCP:update(dt)
     
     -- NON-INTRUSIVE SHOP STATE DETECTION
     self:detect_shop_state_transition()
-    
-    -- Handle delayed blind state capture
-    if self.delayed_blind_state_capture then
-        self.delayed_blind_capture_timer = self.delayed_blind_capture_timer - dt
-        if self.delayed_blind_capture_timer <= 0 then
-            print("BalatroMCP: Executing delayed blind selection state capture")
-            self.delayed_blind_state_capture = false
-            self:send_current_state()
-        end
-    end
-    
-    -- Handle delayed shop state capture
-    if self.delayed_shop_state_capture then
-        self.delayed_shop_capture_timer = self.delayed_shop_capture_timer - dt
-        if self.delayed_shop_capture_timer <= 0 then
-            print("BalatroMCP: Executing delayed shop state capture")
-            self.delayed_shop_state_capture = false
-            
-            -- Extract and log shop state after delay
-            local current_state = self.state_extractor:extract_current_state()
-            local shop_items = current_state and current_state.shop_contents and #current_state.shop_contents or 0
-            print("BalatroMCP: DEBUG - Shop state after delay: shop_items=" .. tostring(shop_items))
-            
-            self:send_current_state()
-        end
-    end
     
     -- Update blind transition cooldown
     if self.blind_transition_cooldown > 0 then
@@ -422,15 +393,86 @@ function BalatroMCP:hook_hand_evaluation()
 end
 
 function BalatroMCP:hook_blind_selection()
-    print("BalatroMCP: Using non-intrusive blind selection detection (no direct hooks)")
+    print("BalatroMCP: Setting up blind selection hooks")
     
     self.last_blind_state = G and G.STATE or nil
     self.blind_transition_detected = false
     self.blind_transition_cooldown = 0
+    
+    if G.FUNCS then
+        -- Hook blind selection functions
+        local blind_functions = {
+            "select_blind",
+            "play_blind",
+            "choose_blind"
+        }
+        
+        for _, func_name in ipairs(blind_functions) do
+            local original_func = G.FUNCS[func_name]
+            if original_func then
+                G.FUNCS[func_name] = function(e, ...)
+                    print("BalatroMCP: Blind selection detected via " .. func_name)
+                    
+                    -- Extract blind info before selection
+                    local blind_info = self:extract_blind_selection_info_from_element(e)
+                    
+                    local result = original_func(e, ...)
+                    
+                    -- Send status update for blind selection
+                    self:send_status_update("blind_selected", {
+                        blind_type = blind_info.type,
+                        blind_name = blind_info.name,
+                        requirement = blind_info.requirement,
+                        reward = blind_info.reward,
+                        function_used = func_name
+                    })
+                    
+                    -- Trigger the existing blind selection handler
+                    self:on_blind_selected()
+                    
+                    return result
+                end
+                print("BalatroMCP: Hooked blind function: " .. func_name)
+            end
+        end
+        
+        -- Hook blind skip function
+        local original_skip = G.FUNCS.skip_blind
+        if original_skip then
+            G.FUNCS.skip_blind = function(e, ...)
+                print("BalatroMCP: Blind skip detected")
+                
+                local result = original_skip(e, ...)
+                
+                self:send_status_update("blind_skipped", {})
+                self:send_current_state()
+                
+                return result
+            end
+            print("BalatroMCP: Hooked skip_blind function")
+        end
+        
+        -- Hook boss blind reroll function
+        local original_reroll_boss = G.FUNCS.reroll_boss
+        if original_reroll_boss then
+            G.FUNCS.reroll_boss = function(...)
+                print("BalatroMCP: Boss blind reroll detected")
+                
+                local result = original_reroll_boss(...)
+                
+                self:send_status_update("boss_blind_rerolled", {})
+                self:send_current_state()
+                
+                return result
+            end
+            print("BalatroMCP: Hooked reroll_boss function")
+        end
+    end
 end
 
 function BalatroMCP:hook_shop_interactions()
     if G.FUNCS then
+        -- Hook cash_out for shop entry detection
         local original_cash_out = G.FUNCS.cash_out
         if original_cash_out then
             if self.crash_diagnostics then
@@ -455,6 +497,59 @@ function BalatroMCP:hook_shop_interactions()
             end
         else
             print("BalatroMCP: WARNING - G.FUNCS.cash_out not available for shop hooks")
+        end
+        
+        -- Hook shop purchase functions for status updates
+        local shop_functions = {
+            "buy_from_shop",
+            "purchase_item",
+            "shop_purchase",
+            "buy_joker",
+            "buy_card"
+        }
+        
+        for _, func_name in ipairs(shop_functions) do
+            local original_func = G.FUNCS[func_name]
+            if original_func then
+                G.FUNCS[func_name] = function(e, ...)
+                    print("BalatroMCP: Shop purchase detected via " .. func_name)
+                    
+                    -- Extract item info before purchase
+                    local item_info = self:extract_shop_item_info(e)
+                    
+                    local result = original_func(e, ...)
+                    
+                    -- Send status update for purchase
+                    self:send_status_update("shop_purchase", {
+                        item_name = item_info.name,
+                        item_type = item_info.type,
+                        cost = item_info.cost,
+                        function_used = func_name
+                    })
+                    
+                    -- Send updated game state
+                    self:send_current_state()
+                    
+                    return result
+                end
+                print("BalatroMCP: Hooked shop function: " .. func_name)
+            end
+        end
+        
+        -- Hook reroll shop function
+        local original_reroll = G.FUNCS.reroll_shop
+        if original_reroll then
+            G.FUNCS.reroll_shop = function(...)
+                print("BalatroMCP: Shop reroll detected")
+                
+                local result = original_reroll(...)
+                
+                self:send_status_update("shop_reroll", {})
+                self:send_current_state()
+                
+                return result
+            end
+            print("BalatroMCP: Hooked reroll_shop function")
         end
         
         self:setup_shop_state_detection()
@@ -615,39 +710,57 @@ function BalatroMCP:send_current_state()
 end
 
 function BalatroMCP:send_state_update(state)
+    -- Consolidate all game data into a single comprehensive message
+    -- to prevent data flow confusion between hand_cards, deck_cards, and remaining_deck
+    
+    local comprehensive_state = {
+        -- Core game state (ante, money, phase, etc.)
+        core_state = {
+            session_id = state.session_id,
+            current_phase = state.current_phase,
+            ante = state.ante,
+            money = state.money,
+            hands_remaining = state.hands_remaining,
+            discards_remaining = state.discards_remaining,
+            available_actions = state.available_actions,
+            current_blind = state.current_blind,
+            shop_contents = state.shop_contents,
+            jokers = state.jokers,
+            consumables = state.consumables,
+            post_hand_joker_reorder_available = state.post_hand_joker_reorder_available
+        },
+        
+        -- Card data with clear separation and labeling
+        card_data = {
+            -- Current hand (cards player is holding and can play/discard right now)
+            hand_cards = state.hand_cards or {},
+            
+            -- Full deck (all 52 cards that were in the deck at start, including enhancements/editions)
+            full_deck_cards = self.state_extractor:extract_deck_cards(),
+            
+            -- Remaining deck (cards still in deck that can be drawn)
+            remaining_deck_cards = self.state_extractor:extract_remaining_deck_cards()
+        }
+    }
+    
     local state_message = {
-        message_type = "state_update",
+        message_type = "comprehensive_state_update",
         timestamp = os.time(),
         sequence = self.message_manager:get_next_sequence_id(),
-        state = state
+        state = comprehensive_state
     }
     
     self.message_manager:write_game_state(state_message)
-    print("BalatroMCP: State update sent")
     
-    -- Extract and send deck state alongside game state
-    local deck_cards = self.state_extractor:extract_deck_cards()
-    local deck_message = {
-        message_type = "deck_update",
-        timestamp = os.time(),
-        sequence = self.message_manager:get_next_sequence_id(),
-        deck_cards = deck_cards
-    }
+    local hand_count = #(state.hand_cards or {})
+    local full_deck_count = #(comprehensive_state.card_data.full_deck_cards or {})
+    local remaining_deck_count = #(comprehensive_state.card_data.remaining_deck_cards or {})
     
-    self.message_manager:write_deck_state(deck_message)
-    print("BalatroMCP: Deck state sent with " .. #deck_cards .. " cards")
-    
-    -- Extract and send remaining deck state alongside game state
-    local remaining_deck_cards = self.state_extractor:extract_remaining_deck_cards()
-    local remaining_deck_message = {
-        message_type = "remaining_deck_update",
-        timestamp = os.time(),
-        sequence = self.message_manager:get_next_sequence_id(),
-        remaining_deck_cards = remaining_deck_cards
-    }
-    
-    self.message_manager:write_remaining_deck(remaining_deck_message)
-    print("BalatroMCP: Remaining deck state sent with " .. #remaining_deck_cards .. " cards")
+    print("BalatroMCP: Comprehensive state update sent")
+    print("  - Hand cards: " .. hand_count)
+    print("  - Full deck cards: " .. full_deck_count)
+    print("  - Remaining deck cards: " .. remaining_deck_count)
+    print("  - Phase: " .. (state.current_phase or "unknown"))
 end
 
 function BalatroMCP:calculate_state_hash(state)
@@ -682,6 +795,20 @@ function BalatroMCP:calculate_state_hash(state)
     return final_hash
 end
 
+function BalatroMCP:send_status_update(status_type, status_data)
+    -- Send status updates for intermediate game actions
+    local status_message = {
+        message_type = "status_update",
+        timestamp = os.time(),
+        sequence = self.message_manager:get_next_sequence_id(),
+        status_type = status_type,
+        status_data = status_data or {}
+    }
+    
+    self.message_manager:write_game_state(status_message)
+    print("BalatroMCP: Status update sent - " .. status_type)
+end
+
 function BalatroMCP:on_hand_played()
     print("BalatroMCP: Hand played event")
     self:send_current_state()
@@ -693,25 +820,33 @@ function BalatroMCP:on_cards_discarded()
 end
 
 function BalatroMCP:on_blind_selected()
-    print("BalatroMCP: Blind selection transition detected")
+    print("BalatroMCP: Blind selection transition detected - sending immediate update")
     
     self.blind_transition_cooldown = 3.0
     
-    self.delayed_blind_state_capture = true
-    self.delayed_blind_capture_timer = 1.0  -- Wait 1 second for transition to complete
+    -- Send immediate state update instead of delayed capture
+    -- Game state should be stable when this event fires
+    self:send_current_state()
 end
 
 function BalatroMCP:on_shop_entered()
-    print("BalatroMCP: Shop entered event - delaying state capture for shop population")
+    print("BalatroMCP: Shop entered event - sending immediate update")
     
     local current_state = self.state_extractor:extract_current_state()
     local phase = current_state and current_state.current_phase or "unknown"
     local money = current_state and current_state.money or "unknown"
     local shop_items = current_state and current_state.shop_contents and #current_state.shop_contents or 0
-    print("BalatroMCP: DEBUG - Hook fired with state: phase=" .. phase .. ", money=" .. tostring(money) .. ", shop_items=" .. tostring(shop_items))
+    print("BalatroMCP: DEBUG - Shop state: phase=" .. phase .. ", money=" .. tostring(money) .. ", shop_items=" .. tostring(shop_items))
     
-    self.delayed_shop_state_capture = true
-    self.delayed_shop_capture_timer = 1.0  -- Wait 1.0 seconds for shop to populate
+    -- Send immediate state update - shop contents should be available
+    self:send_current_state()
+    
+    -- Send status update for shop entry
+    self:send_status_update("shop_entered", {
+        shop_item_count = shop_items,
+        money = money,
+        phase = phase
+    })
 end
 
 function BalatroMCP:setup_shop_state_detection()
@@ -762,9 +897,6 @@ function BalatroMCP:detect_shop_state_transition()
         return
     end
     
-    if self.delayed_shop_state_capture then
-        return
-    end
     
     local was_not_shop = (self.last_shop_state ~= G.STATES.SHOP)
     local is_shop = (current_state == G.STATES.SHOP)
@@ -782,6 +914,72 @@ function BalatroMCP:detect_shop_state_transition()
     end
     
     self.last_shop_state = current_state
+end
+
+function BalatroMCP:extract_shop_item_info(element)
+    -- Extract information about shop item from UI element
+    local item_info = {
+        name = "Unknown",
+        type = "unknown",
+        cost = 0
+    }
+    
+    if not element then
+        return item_info
+    end
+    
+    -- Try to extract from element.config.card if it exists
+    if element.config and element.config.card then
+        local card = element.config.card
+        if card.ability then
+            item_info.name = card.ability.name or "Unknown"
+            item_info.type = card.ability.set or "unknown"
+        end
+        item_info.cost = card.cost or 0
+    end
+    
+    return item_info
+end
+
+function BalatroMCP:extract_blind_selection_info_from_element(element)
+    -- Extract information about blind from UI element
+    local blind_info = {
+        name = "Unknown",
+        type = "small",
+        requirement = 0,
+        reward = 0
+    }
+    
+    if not element then
+        return blind_info
+    end
+    
+    -- Try to extract from element.config.blind if it exists
+    if element.config and element.config.blind then
+        local blind = element.config.blind
+        blind_info.name = blind.name or "Unknown"
+        blind_info.requirement = blind.chips or 0
+        blind_info.reward = blind.dollars or 0
+        
+        -- Determine blind type
+        if blind.boss then
+            blind_info.type = "boss"
+        elseif string.find(blind.name or "", "Big") then
+            blind_info.type = "big"
+        else
+            blind_info.type = "small"
+        end
+    end
+    
+    -- Try to extract from element.area if it's a blind selection UI element
+    if element.area and element.area.config then
+        local area_config = element.area.config
+        if area_config.type then
+            blind_info.type = string.lower(area_config.type)
+        end
+    end
+    
+    return blind_info
 end
 
 function BalatroMCP:on_game_started()
