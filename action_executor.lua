@@ -364,13 +364,57 @@ function ActionExecutor:execute_sell_consumable(action_data)
 end
 
 function ActionExecutor:execute_reorder_jokers(action_data)
-    local new_order = action_data.new_order
+    local from_index = action_data.from_index
+    local to_index = action_data.to_index
     
-    if not new_order or #new_order == 0 then
-        return false, "No new order specified"
+    -- Validate from_index parameter
+    if from_index == nil or from_index < 0 then
+        return false, "Invalid from index"
     end
     
-    return self.joker_manager:reorder_jokers(new_order)
+    -- Validate to_index parameter
+    if to_index == nil or to_index < 0 then
+        return false, "Invalid to index"
+    end
+    
+    print("BalatroMCP: Reordering jokers from index " .. from_index .. " to index " .. to_index)
+    
+    -- Check if jokers collection exists
+    if not G or not G.jokers or not G.jokers.cards then
+        return false, "No jokers available"
+    end
+    
+    local joker_count = #G.jokers.cards
+    
+    -- Handle edge cases
+    if joker_count == 0 then
+        return false, "No jokers to reorder"
+    end
+    
+    if joker_count == 1 then
+        return false, "Cannot reorder with only one joker"
+    end
+    
+    -- Validate indices are within bounds
+    if from_index >= joker_count then
+        return false, "From index out of bounds: " .. from_index .. " (max: " .. (joker_count - 1) .. ")"
+    end
+    
+    if to_index >= joker_count then
+        return false, "To index out of bounds: " .. to_index .. " (max: " .. (joker_count - 1) .. ")"
+    end
+    
+    -- Convert to 1-based indexing for Lua
+    local from_lua_index = from_index + 1
+    local to_lua_index = to_index + 1
+    
+    -- Perform the swap
+    local temp_joker = G.jokers.cards[from_lua_index]
+    G.jokers.cards[from_lua_index] = G.jokers.cards[to_lua_index]
+    G.jokers.cards[to_lua_index] = temp_joker
+    
+    print("BalatroMCP: Joker reordering successful!")
+    return true, nil
 end
 
 function ActionExecutor:execute_select_blind(action_data)
@@ -609,7 +653,51 @@ function ActionExecutor:execute_move_playing_card(action_data)
         return false, "Invalid to index"
     end
     
-    return false, "Move playing card action not yet implemented"
+    print("BalatroMCP: Moving playing card from index " .. from_index .. " to index " .. to_index)
+    
+    -- Check if hand exists
+    if not G or not G.hand or not G.hand.cards then
+        return false, "No hand available"
+    end
+    
+    local hand_size = #G.hand.cards
+    
+    -- Handle edge cases
+    if hand_size == 0 then
+        return false, "No cards in hand to move"
+    end
+    
+    if hand_size == 1 then
+        return false, "Cannot move with only one card in hand"
+    end
+    
+    -- Validate indices are within bounds
+    if from_index >= hand_size then
+        return false, "From index out of bounds: " .. from_index .. " (max: " .. (hand_size - 1) .. ")"
+    end
+    
+    if to_index >= hand_size then
+        return false, "To index out of bounds: " .. to_index .. " (max: " .. (hand_size - 1) .. ")"
+    end
+    
+    -- Convert to 1-based indexing for Lua
+    local from_lua_index = from_index + 1
+    local to_lua_index = to_index + 1
+    
+    -- Perform the swap
+    local temp_card = G.hand.cards[from_lua_index]
+    G.hand.cards[from_lua_index] = G.hand.cards[to_lua_index]
+    G.hand.cards[to_lua_index] = temp_card
+    
+    -- Update card positions for visual consistency
+    for i, card in ipairs(G.hand.cards) do
+        if card.T then
+            card.T.x = (i - 1) * G.CARD_W * 0.7
+        end
+    end
+    
+    print("BalatroMCP: Playing card move successful!")
+    return true, nil
 end
 
 function ActionExecutor:execute_skip_blind(action_data)

@@ -161,12 +161,17 @@ switch ($Action) {
     }
     
     "reorder_jokers" {
-        if (-not $NewOrder) {
-            Write-Error "NewOrder is required for reorder_jokers action"
+        if (-not $Cards) {
+            Write-Error "Cards parameter is required for reorder_jokers action (format: from_index,to_index)"
             exit 1
         }
-        $jokerIds = $NewOrder -split "," | ForEach-Object { [double]$_.Trim() }
-        $actionData.new_order = $jokerIds
+        $indices = $Cards -split "," | ForEach-Object { [int]$_.Trim() }
+        if ($indices.Length -ne 2) {
+            Write-Error "reorder_jokers requires exactly 2 indices: from_index,to_index"
+            exit 1
+        }
+        $actionData.from_index = $indices[0]
+        $actionData.to_index = $indices[1]
     }
 }
 
