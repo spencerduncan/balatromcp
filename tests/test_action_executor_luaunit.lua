@@ -302,11 +302,14 @@ function testActionExecutorSkipBlindFunctionError()
                 error("Test skip function error")
             end
         },
+        game = {
+            blind_on_deck = "Big"
+        },
         blind_select_opts = {
-            skip = {
+            big = {
                 get_UIE_by_ID = function(self, id)
-                    if id == "skip_blind_button" then
-                        return {config = {button = "skip_blind"}}
+                    if id == "tag_container" then
+                        return {config = {button = "tag_container"}}
                     end
                     return nil
                 end
@@ -342,11 +345,14 @@ function testActionExecutorSkipBlindSuccessful()
                 return true
             end
         },
+        game = {
+            blind_on_deck = "Small"
+        },
         blind_select_opts = {
-            skip = {
+            small = {
                 get_UIE_by_ID = function(self, id)
-                    if id == "skip_blind_button" then
-                        return {config = {button = "skip_blind"}}
+                    if id == "tag_container" then
+                        return {config = {button = "tag_container"}}
                     end
                     return nil
                 end
