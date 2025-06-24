@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Balatro MCP - Game State Manager</title>
+    <link rel="stylesheet" href="/web/style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🃏 Balatro MCP - Game State Manager</h1>
+            <div class="server-status">
+                <span id="connectionStatus" class="status-indicator connecting">Connecting...</span>
+                <button id="refreshToggle" class="btn btn-primary">Auto Refresh: ON</button>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <!-- Game State Overview -->
+            <section class="game-overview">
+                <div class="stat-card">
+                    <h3>Game Status</h3>
+                    <div class="stat-grid">
+                        <div class="stat-item">
+                            <label>Phase:</label>
+                            <span id="currentPhase">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <label>Ante:</label>
+                            <span id="currentAnte">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <label>Money:</label>
+                            <span id="currentMoney">$-</span>
+                        </div>
+                        <div class="stat-item">
+                            <label>Hands:</label>
+                            <span id="handsRemaining">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <label>Discards:</label>
+                            <span id="discardsRemaining">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <label>Session ID:</label>
+                            <span id="sessionId">-</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Current Hand Cards -->
+            <section class="hand-section">
+                <h2>Current Hand</h2>
+                <div id="handCards" class="card-container">
+                    <div class="no-data">No hand cards available</div>
+                </div>
+            </section>
+
+            <!-- Jokers -->
+            <section class="jokers-section">
+                <h2>Jokers</h2>
+                <div id="jokersList" class="jokers-container">
+                    <div class="no-data">No jokers available</div>
+                </div>
+            </section>
+
+            <!-- Consumables -->
+            <section class="consumables-section">
+                <h2>Consumables</h2>
+                <div id="consumablesList" class="consumables-container">
+                    <div class="no-data">No consumables available</div>
+                </div>
+            </section>
+
+            <!-- Current Blind -->
+            <section class="blind-section">
+                <h2>Current Blind</h2>
+                <div id="blindInfo" class="blind-container">
+                    <div class="no-data">No blind information available</div>
+                </div>
+            </section>
+
+            <!-- Shop Contents -->
+            <section class="shop-section">
+                <h2>Shop Contents</h2>
+                <div id="shopContents" class="shop-container">
+                    <div class="no-data">Shop not available</div>
+                </div>
+            </section>
+
+            <!-- Available Actions -->
+            <section class="actions-section">
+                <h2>Available Actions</h2>
+                <div id="availableActions" class="actions-container">
+                    <div class="no-data">No actions available</div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Command Execution Panel -->
+        <aside class="command-panel">
+            <h2>Command Execution</h2>
+            
+            <!-- Command Categories -->
+            <div class="command-categories">
+                <!-- Blind Management -->
+                <div class="command-group">
+                    <h3>Blind Management</h3>
+                    <div class="command-buttons">
+                        <button class="btn btn-action" onclick="executeCommand('skip_blind')">Skip Blind</button>
+                        <button class="btn btn-action" onclick="executeCommand('select_blind')">Select Blind</button>
+                        <button class="btn btn-action" onclick="executeCommand('reroll_boss')">Reroll Boss</button>
+                    </div>
+                </div>
+
+                <!-- Card Actions -->
+                <div class="command-group">
+                    <h3>Card Actions</h3>
+                    <div class="command-buttons">
+                        <button class="btn btn-action" onclick="showCardForm('play_hand')">Play Hand</button>
+                        <button class="btn btn-action" onclick="showCardForm('discard_cards')">Discard Cards</button>
+                        <button class="btn btn-action" onclick="showCardForm('move_playing_card')">Move Card</button>
+                        <button class="btn btn-action" onclick="executeCommand('sort_hand_by_rank')">Sort by Rank</button>
+                        <button class="btn btn-action" onclick="executeCommand('sort_hand_by_suit')">Sort by Suit</button>
+                    </div>
+                </div>
+
+                <!-- Shop Operations -->
+                <div class="command-group">
+                    <h3>Shop Operations</h3>
+                    <div class="command-buttons">
+                        <button class="btn btn-action" onclick="executeCommand('go_to_shop')">Go to Shop</button>
+                        <button class="btn btn-action" onclick="showIndexForm('buy_item')">Buy Item</button>
+                        <button class="btn btn-action" onclick="executeCommand('reroll_shop')">Reroll Shop</button>
+                    </div>
+                </div>
+
+                <!-- Joker Management -->
+                <div class="command-group">
+                    <h3>Joker Management</h3>
+                    <div class="command-buttons">
+                        <button class="btn btn-action" onclick="showIndexForm('sell_joker')">Sell Joker</button>
+                        <button class="btn btn-action" onclick="showReorderForm()">Reorder Jokers</button>
+                    </div>
+                </div>
+
+                <!-- Consumable Operations -->
+                <div class="command-group">
+                    <h3>Consumable Operations</h3>
+                    <div class="command-buttons">
+                        <button class="btn btn-action" onclick="showIndexForm('use_consumable')">Use Consumable</button>
+                        <button class="btn btn-action" onclick="showIndexForm('sell_consumable')">Sell Consumable</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Command Form Modal -->
+            <div id="commandModal" class="modal">
+                <div class="modal-content">
+                    <span class="close" onclick="closeModal()">&times;</span>
+                    <h3 id="modalTitle">Command Parameters</h3>
+                    <div id="modalBody"></div>
+                    <div class="modal-actions">
+                        <button class="btn btn-primary" onclick="submitCommand()">Execute</button>
+                        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action History -->
+            <div class="action-history">
+                <h3>Action History</h3>
+                <div id="actionLog" class="log-container">
+                    <div class="log-entry info">Ready for commands</div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script src="/web/script.js"></script>
+</body>
+</html>
