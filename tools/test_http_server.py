@@ -10,39 +10,115 @@ import urllib.parse
 from datetime import datetime
 
 
+def _summarize_value(value, max_items=3):
+    """
+    Helper function to create a concise summary of any value.
+    Shows structure and sample content for complex types.
+    """
+    if value is None:
+        return "null"
+    elif isinstance(value, (str, int, float, bool)):
+        return value
+    elif isinstance(value, list):
+        if len(value) == 0:
+            return "[]"
+        elif len(value) <= max_items:
+            return [_summarize_value(item, max_items) for item in value]
+        else:
+            sample = [_summarize_value(item, max_items) for item in value[:max_items]]
+            return {"type": "array", "length": len(value), "sample": sample}
+    elif isinstance(value, dict):
+        if len(value) == 0:
+            return "{}"
+        elif len(value) <= max_items:
+            return {k: _summarize_value(v, max_items) for k, v in value.items()}
+        else:
+            sample_keys = list(value.keys())[:max_items]
+            sample = {k: _summarize_value(value[k], max_items) for k in sample_keys}
+            return {"type": "object", "keys": len(value), "sample": sample}
+    else:
+        return {"type": type(value).__name__, "value": str(value)[:100]}
+
+
 def create_summarized_output(data):
     """
-    Create a summarized version of game data for console output.
-    Extracts key information while reducing verbosity.
+    Create a comprehensive but concise summary of game data for console output.
+    Shows structure and sample content for complex data while maintaining readability.
     """
     if not isinstance(data, dict):
         return {"summary": "Invalid data format", "type": type(data).__name__}
 
-    summary = {"timestamp": data.get("timestamp", "unknown"), "data_type": "game_data"}
+    summary = {
+        "timestamp": data.get("timestamp", "unknown"),
+        "data_type": "game_data",
+        "total_keys": len(data),
+    }
 
     # Summarize deck information if present
     if "deck" in data:
         deck = data["deck"]
         if isinstance(deck, dict):
-            summary["deck"] = {
+            deck_summary = {
                 "card_count": len(deck.get("cards", [])),
                 "joker_count": len(deck.get("jokers", [])),
                 "consumable_count": len(deck.get("consumables", [])),
             }
 
+            # Add sample cards if present
+            if "cards" in deck and deck["cards"]:
+                deck_summary["sample_cards"] = _summarize_value(deck["cards"], 2)
+
+            # Add sample jokers if present
+            if "jokers" in deck and deck["jokers"]:
+                deck_summary["sample_jokers"] = _summarize_value(deck["jokers"], 2)
+
+            # Add other deck properties
+            deck_keys = [
+                k for k in deck.keys() if k not in ["cards", "jokers", "consumables"]
+            ]
+            if deck_keys:
+                deck_summary["other_properties"] = {
+                    k: _summarize_value(deck[k]) for k in deck_keys[:3]
+                }
+
+            summary["deck"] = deck_summary
+
     # Summarize game state if present
     if "game_state" in data:
         state = data["game_state"]
         if isinstance(state, dict):
-            summary["game_state"] = {
+            state_summary = {
                 "round": state.get("round", "unknown"),
                 "ante": state.get("ante", "unknown"),
                 "dollars": state.get("dollars", "unknown"),
                 "hands": state.get("hands", "unknown"),
             }
 
-    # Include top-level keys for reference
-    summary["data_keys"] = list(data.keys()) if isinstance(data, dict) else []
+            # Add other state properties
+            state_keys = [
+                k
+                for k in state.keys()
+                if k not in ["round", "ante", "dollars", "hands"]
+            ]
+            if state_keys:
+                state_summary["other_properties"] = {
+                    k: _summarize_value(state[k]) for k in state_keys[:4]
+                }
+
+            summary["game_state"] = state_summary
+
+    # Summarize other top-level keys
+    processed_keys = {"timestamp", "deck", "game_state"}
+    other_keys = [k for k in data.keys() if k not in processed_keys]
+
+    if other_keys:
+        summary["other_data"] = {}
+        for key in other_keys[:5]:  # Limit to first 5 other keys
+            summary["other_data"][key] = _summarize_value(data[key])
+
+    # Include metadata
+    summary["data_keys"] = list(data.keys())
+    summary["data_size_bytes"] = len(json.dumps(data).encode("utf-8"))
 
     return summary
 
