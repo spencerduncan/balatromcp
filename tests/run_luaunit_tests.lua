@@ -27,9 +27,10 @@ local luaunit_test_modules = {
     {name = "test_sequence_id_processing_luaunit", description = "Sequence ID processing bug fixes and validation"},
     {name = "test_blind_selection_diagnostics_luaunit", description = "Blind selection diagnostics and SMODS integration"},
     
-    -- Refactored architecture modules (51 tests total)
+    -- Refactored architecture modules (88 tests total)
     {name = "test_message_manager_luaunit", description = "MessageManager message creation and metadata management"},
     {name = "test_file_transport_luaunit", description = "FileTransport file-based I/O operations and path handling"},
+    {name = "test_https_transport_luaunit", description = "HttpsTransport HTTPS-based I/O operations and network communication"},
 }
 
 -- Set up a minimal environment for testing
