@@ -83,6 +83,8 @@ function ActionExecutor:execute_action(action_data)
         success, error_message = self:execute_move_playing_card(action_data)
     elseif action_type == "skip_blind" then
         success, error_message = self:execute_skip_blind(action_data)
+    elseif action_type == "go_next" then
+        success, error_message = self:execute_go_next(action_data)
     elseif action_type == "diagnose_blind_progression" then
         success, error_message = self:execute_diagnose_blind_progression(action_data)
     elseif action_type == "diagnose_blind_activation" then
@@ -662,6 +664,38 @@ function ActionExecutor:execute_skip_blind(action_data)
         return true, nil
     else
         return false, "Skip blind failed: " .. tostring(error_result)
+    end
+end
+
+function ActionExecutor:execute_go_next(action_data)
+    print("BalatroMCP: Executing go next")
+    
+    local success, error_message = self:validate_game_state()
+    if not success then
+        return false, error_message
+    end
+    
+    if not G.FUNCS or not G.FUNCS.toggle_shop then
+        return false, "Toggle shop function not available"
+    end
+    
+    -- Create a button with toggle_shop id following the established pattern
+    local toggle_button = {
+        config = {
+            button = "toggle_shop"
+        }
+    }
+    
+    print("BalatroMCP: Calling G.FUNCS.toggle_shop")
+    local call_success, error_result = pcall(function()
+        G.FUNCS.toggle_shop(toggle_button)
+    end)
+    
+    if call_success then
+        print("BalatroMCP: Go next successful!")
+        return true, nil
+    else
+        return false, "Go next failed: " .. tostring(error_result)
     end
 end
 
