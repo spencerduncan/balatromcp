@@ -11,12 +11,12 @@ print("BalatroMCP: MAIN FILE LOADING STARTED")
 
 -- Transport Configuration
 -- Can be overridden by external configuration or options menu
-local USE_HTTP_TRANSPORT = false -- Set to true to enable HTTP transport instead of file transport
+local USE_HTTP_TRANSPORT = true -- Set to true to enable HTTP transport instead of file transport
 
 -- HTTP Transport Configuration
 -- These can be overridden by external configuration
 local HTTP_CONFIG = {
-    base_url = "http://localhost:8000",  -- Default test server URL
+    base_url = "http://localhost:8080",  -- Default test server URL
     game_data_endpoint = "/game-data",
     actions_endpoint = "/actions",
     timeout = 5
