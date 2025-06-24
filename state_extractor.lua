@@ -624,6 +624,7 @@ function StateExtractor:get_available_actions()
         table.insert(actions, "reroll_shop")
         table.insert(actions, "reorder_jokers")
         table.insert(actions, "use_consumable")
+        table.insert(actions, "go_next")
     elseif phase == "blind_selection" then
         table.insert(actions, "select_blind")
         table.insert(actions, "reroll_boss")
