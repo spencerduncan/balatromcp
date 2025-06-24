@@ -238,8 +238,8 @@ function testActionExecutorSkipBlindCorrectStateButNYI()
     local action_data = {}
     
     local success, error_message = executor:execute_skip_blind(action_data)
-    luaunit.assertEquals(false, success, "Should return false when blind selection options not available")
-    luaunit.assertEquals("Blind selection options not available", error_message, "Should return blind selection options not available error message")
+    luaunit.assertEquals(false, success, "Should return false when skip function not available")
+    luaunit.assertEquals("Skip blind function not available", error_message, "Should return skip function not available error message")
     tearDown()
 end
 
@@ -263,7 +263,7 @@ function testActionExecutorSkipBlindMissingFuncs()
     
     local success, error_message = executor:execute_skip_blind(action_data)
     luaunit.assertEquals(false, success, "Should return false when G.FUNCS is missing")
-    luaunit.assertEquals("Blind selection options not available", error_message, "Should return correct error message")
+    luaunit.assertEquals("Skip blind function not available", error_message, "Should return correct error message")
     tearDown()
 end
 
@@ -287,119 +287,7 @@ function testActionExecutorSkipBlindMissingSkipFunction()
     
     local success, error_message = executor:execute_skip_blind(action_data)
     luaunit.assertEquals(false, success, "Should return false when skip_blind function is missing")
-    luaunit.assertEquals("Blind selection options not available", error_message, "Should return correct error message")
-    tearDown()
-end
-
-function testActionExecutorSkipBlindMissingBlindSelectOpts()
-    setUp()
-    G = luaunit_helpers.create_mock_g({
-        has_state = true,
-        state_value = 2, -- BLIND_SELECT
-        states = {BLIND_SELECT = 2, SELECTING_HAND = 1},
-        funcs = {skip_blind = function() end}
-        -- Missing blind_select_opts
-    })
-    local ActionExecutor = require("action_executor")
-    local StateExtractor = require("state_extractor")
-    local JokerManager = require("joker_manager")
-    
-    local state_extractor = StateExtractor.new()
-    local joker_manager = JokerManager.new()
-    local executor = ActionExecutor.new(state_extractor, joker_manager)
-    
-    local action_data = {}
-    
-    local success, error_message = executor:execute_skip_blind(action_data)
-    luaunit.assertEquals(false, success, "Should return false when blind_select_opts is missing")
-    luaunit.assertEquals("Blind selection options not available", error_message, "Should return correct error message")
-    tearDown()
-end
-
-function testActionExecutorSkipBlindMissingSkipOption()
-    setUp()
-    G = luaunit_helpers.create_mock_g({
-        has_state = true,
-        state_value = 2, -- BLIND_SELECT
-        states = {BLIND_SELECT = 2, SELECTING_HAND = 1},
-        funcs = {skip_blind = function() end},
-        blind_select_opts = {
-            small = {},
-            big = {}
-            -- Missing skip option
-        }
-    })
-    local ActionExecutor = require("action_executor")
-    local StateExtractor = require("state_extractor")
-    local JokerManager = require("joker_manager")
-    
-    local state_extractor = StateExtractor.new()
-    local joker_manager = JokerManager.new()
-    local executor = ActionExecutor.new(state_extractor, joker_manager)
-    
-    local action_data = {}
-    
-    local success, error_message = executor:execute_skip_blind(action_data)
-    luaunit.assertEquals(false, success, "Should return false when skip option is not available")
-    luaunit.assertEquals("Skip blind option not available in current blind selection", error_message, "Should return correct error message")
-    tearDown()
-end
-
-function testActionExecutorSkipBlindMissingUIMethod()
-    setUp()
-    G = luaunit_helpers.create_mock_g({
-        has_state = true,
-        state_value = 2, -- BLIND_SELECT
-        states = {BLIND_SELECT = 2, SELECTING_HAND = 1},
-        funcs = {skip_blind = function() end},
-        blind_select_opts = {
-            skip = {} -- Missing get_UIE_by_ID method
-        }
-    })
-    local ActionExecutor = require("action_executor")
-    local StateExtractor = require("state_extractor")
-    local JokerManager = require("joker_manager")
-    
-    local state_extractor = StateExtractor.new()
-    local joker_manager = JokerManager.new()
-    local executor = ActionExecutor.new(state_extractor, joker_manager)
-    
-    local action_data = {}
-    
-    local success, error_message = executor:execute_skip_blind(action_data)
-    luaunit.assertEquals(false, success, "Should return false when UI method is missing")
-    luaunit.assertEquals("Skip option missing UI access method", error_message, "Should return correct error message")
-    tearDown()
-end
-
-function testActionExecutorSkipBlindMissingButton()
-    setUp()
-    G = luaunit_helpers.create_mock_g({
-        has_state = true,
-        state_value = 2, -- BLIND_SELECT
-        states = {BLIND_SELECT = 2, SELECTING_HAND = 1},
-        funcs = {skip_blind = function() end},
-        blind_select_opts = {
-            skip = {
-                get_UIE_by_ID = function(id)
-                    return nil -- Button not found
-                end
-            }
-        }
-    })
-    local ActionExecutor = require("action_executor")
-    local StateExtractor = require("state_extractor")
-    local JokerManager = require("joker_manager")
-    
-    local state_extractor = StateExtractor.new()
-    local joker_manager = JokerManager.new()
-    local executor = ActionExecutor.new(state_extractor, joker_manager)
-    
-    local action_data = {}
-    
-    local success, error_message = executor:execute_skip_blind(action_data)
-    luaunit.assertEquals(false, success, "Should return false when skip button is not found")
-    luaunit.assertEquals("Skip blind button not found in UI", error_message, "Should return correct error message")
+    luaunit.assertEquals("Skip blind function not available", error_message, "Should return correct error message")
     tearDown()
 end
 
@@ -413,13 +301,6 @@ function testActionExecutorSkipBlindFunctionError()
             skip_blind = function()
                 error("Test skip function error")
             end
-        },
-        blind_select_opts = {
-            skip = {
-                get_UIE_by_ID = function(id)
-                    return {id = id} -- Mock button
-                end
-            }
         }
     })
     local ActionExecutor = require("action_executor")
@@ -446,17 +327,10 @@ function testActionExecutorSkipBlindSuccessful()
         state_value = 2, -- BLIND_SELECT
         states = {BLIND_SELECT = 2, SELECTING_HAND = 1},
         funcs = {
-            skip_blind = function(button)
+            skip_blind = function()
                 skip_called = true
                 return true
             end
-        },
-        blind_select_opts = {
-            skip = {
-                get_UIE_by_ID = function(id)
-                    return {id = id} -- Mock button
-                end
-            }
         }
     })
     local ActionExecutor = require("action_executor")
@@ -525,7 +399,7 @@ function testActionExecutorExecuteActionSkipBlind()
     
     local result = executor:execute_action(action_data)
     luaunit.assertEquals(false, result.success, "Should return false when function not available")
-    luaunit.assertEquals("Blind selection options not available", result.error_message, "Should return function not available error message")
+    luaunit.assertEquals("Skip blind function not available", result.error_message, "Should return function not available error message")
     luaunit.assertNil(result.new_state, "Should not return new state on failure")
     tearDown()
 end
@@ -544,10 +418,6 @@ return {
     testActionExecutorSkipBlindCorrectStateButNYI = testActionExecutorSkipBlindCorrectStateButNYI,
     testActionExecutorSkipBlindMissingFuncs = testActionExecutorSkipBlindMissingFuncs,
     testActionExecutorSkipBlindMissingSkipFunction = testActionExecutorSkipBlindMissingSkipFunction,
-    testActionExecutorSkipBlindMissingBlindSelectOpts = testActionExecutorSkipBlindMissingBlindSelectOpts,
-    testActionExecutorSkipBlindMissingSkipOption = testActionExecutorSkipBlindMissingSkipOption,
-    testActionExecutorSkipBlindMissingUIMethod = testActionExecutorSkipBlindMissingUIMethod,
-    testActionExecutorSkipBlindMissingButton = testActionExecutorSkipBlindMissingButton,
     testActionExecutorSkipBlindFunctionError = testActionExecutorSkipBlindFunctionError,
     testActionExecutorSkipBlindSuccessful = testActionExecutorSkipBlindSuccessful,
     testActionExecutorExecuteActionMovePlayingCard = testActionExecutorExecuteActionMovePlayingCard,
