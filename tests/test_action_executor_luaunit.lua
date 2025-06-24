@@ -298,9 +298,19 @@ function testActionExecutorSkipBlindFunctionError()
         state_value = 2, -- BLIND_SELECT
         states = {BLIND_SELECT = 2, SELECTING_HAND = 1},
         funcs = {
-            skip_blind = function()
+            skip_blind = function(button)
                 error("Test skip function error")
             end
+        },
+        blind_select_opts = {
+            skip = {
+                get_UIE_by_ID = function(self, id)
+                    if id == "skip_blind_button" then
+                        return {config = {button = "skip_blind"}}
+                    end
+                    return nil
+                end
+            }
         }
     })
     local ActionExecutor = require("action_executor")
@@ -327,10 +337,20 @@ function testActionExecutorSkipBlindSuccessful()
         state_value = 2, -- BLIND_SELECT
         states = {BLIND_SELECT = 2, SELECTING_HAND = 1},
         funcs = {
-            skip_blind = function()
+            skip_blind = function(button)
                 skip_called = true
                 return true
             end
+        },
+        blind_select_opts = {
+            skip = {
+                get_UIE_by_ID = function(self, id)
+                    if id == "skip_blind_button" then
+                        return {config = {button = "skip_blind"}}
+                    end
+                    return nil
+                end
+            }
         }
     })
     local ActionExecutor = require("action_executor")
