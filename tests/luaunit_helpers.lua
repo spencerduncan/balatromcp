@@ -111,8 +111,13 @@ function luaunit_helpers.create_mock_g(options)
     end
     
     -- Add FUNCS if requested
-    if options.has_funcs then
+    if options.has_funcs or options.funcs then
         mock_g.FUNCS = options.funcs or {}
+    end
+    
+    -- Add blind_select_opts if requested
+    if options.blind_select_opts then
+        mock_g.blind_select_opts = options.blind_select_opts
     end
     
     return mock_g

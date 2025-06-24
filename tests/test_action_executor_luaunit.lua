@@ -238,8 +238,8 @@ function testActionExecutorSkipBlindCorrectStateButNYI()
     local action_data = {}
     
     local success, error_message = executor:execute_skip_blind(action_data)
-    luaunit.assertEquals(false, success, "Should return false when functions not available")
-    luaunit.assertEquals("Skip blind function not available", error_message, "Should return function not available error message")
+    luaunit.assertEquals(false, success, "Should return false when blind selection options not available")
+    luaunit.assertEquals("Blind selection options not available", error_message, "Should return blind selection options not available error message")
     tearDown()
 end
 
@@ -525,7 +525,7 @@ function testActionExecutorExecuteActionSkipBlind()
     
     local result = executor:execute_action(action_data)
     luaunit.assertEquals(false, result.success, "Should return false when function not available")
-    luaunit.assertEquals("Skip blind function not available", result.error_message, "Should return function not available error message")
+    luaunit.assertEquals("Blind selection options not available", result.error_message, "Should return function not available error message")
     luaunit.assertNil(result.new_state, "Should not return new state on failure")
     tearDown()
 end

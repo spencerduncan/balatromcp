@@ -593,61 +593,30 @@ function ActionExecutor:execute_skip_blind(action_data)
         return false, "Blind selection options not available"
     end
     
-    -- Debug: Log available blind selection options
-    print("BalatroMCP: DEBUG - Available blind selection options:")
-    for key, value in pairs(G.blind_select_opts) do
-        print("BalatroMCP: DEBUG -   Key: " .. tostring(key) .. ", Value type: " .. type(value))
+    -- Check if skip function is available
+    if not G.FUNCS or not G.FUNCS.skip_blind then
+        return false, "Skip blind function not available"
     end
     
-    -- Determine which blind to skip based on game progression
-    -- If we're at big blind selection, skip by selecting "big"
-    -- If we're at small blind selection, skip by selecting "small"
-    local blind_to_skip = nil
-    
-    -- Check current blind progression to determine what we're skipping
-    if G.GAME and G.GAME.blind_on_deck then
-        blind_to_skip = string.lower(G.GAME.blind_on_deck)
-        print("BalatroMCP: DEBUG - Blind on deck: " .. G.GAME.blind_on_deck .. ", will skip: " .. blind_to_skip)
-    else
-        -- Fallback: assume we're skipping big blind if both small and big are available
-        if G.blind_select_opts["big"] and G.blind_select_opts["small"] then
-            blind_to_skip = "big"
-            print("BalatroMCP: DEBUG - No blind_on_deck found, defaulting to skip big blind")
-        elseif G.blind_select_opts["small"] then
-            blind_to_skip = "small"
-            print("BalatroMCP: DEBUG - Only small blind available, skipping small")
-        else
-            return false, "Cannot determine which blind to skip"
-        end
+    -- Look for skip option in blind selection options
+    local skip_option = G.blind_select_opts.skip
+    if not skip_option then
+        return false, "Skip blind option not available in current blind selection"
     end
     
-    local blind_option = G.blind_select_opts[blind_to_skip]
-    if not blind_option then
-        local available_keys = {}
-        for key, _ in pairs(G.blind_select_opts) do
-            table.insert(available_keys, tostring(key))
-        end
-        return false, "Blind option '" .. blind_to_skip .. "' not found. Available: " .. table.concat(available_keys, ", ")
+    -- Get the skip button from the skip option UI
+    if not skip_option.get_UIE_by_ID then
+        return false, "Skip option missing UI access method"
     end
     
-    -- Get the select button from the blind option UI
-    if not blind_option.get_UIE_by_ID then
-        return false, "Blind option missing UI access method"
+    local skip_button = skip_option:get_UIE_by_ID("skip_blind_button")
+    if not skip_button then
+        return false, "Skip blind button not found in UI"
     end
     
-    local select_button = blind_option:get_UIE_by_ID("select_blind_button")
-    if not select_button then
-        return false, "Select blind button not found in UI"
-    end
-    
-    -- Use select_blind function to skip the blind
-    if not G.FUNCS or not G.FUNCS.select_blind then
-        return false, "Blind selection function not available"
-    end
-    
-    print("BalatroMCP: Skipping " .. blind_to_skip .. " blind by selecting it")
+    print("BalatroMCP: Calling G.FUNCS.skip_blind with skip button")
     local call_success, error_result = pcall(function()
-        G.FUNCS.select_blind(select_button)
+        G.FUNCS.skip_blind(skip_button)
     end)
     
     if call_success then
