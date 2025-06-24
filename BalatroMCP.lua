@@ -270,6 +270,158 @@ function BalatroMCP.new()
     return self
 end
 
+function BalatroMCP:defer_state_extraction(extraction_type, context_data)
+    -- Queue a state extraction to be performed after a delay
+    local delay = self.extraction_delays[extraction_type] or 0.1
+    local extraction_entry = {
+        type = extraction_type,
+        timestamp = love.timer and love.timer.getTime() or os.clock(),
+        delay = delay,
+        context = context_data or {},
+        triggered = false
+    }
+    
+    -- Remove any existing extraction of the same type to avoid duplicates
+    for i = #self.deferred_extractions, 1, -1 do
+        if self.deferred_extractions[i].type == extraction_type then
+            table.remove(self.deferred_extractions, i)
+        end
+    end
+    
+    table.insert(self.deferred_extractions, extraction_entry)
+    print("BalatroMCP: Deferred " .. extraction_type .. " extraction queued (delay: " .. delay .. "s)")
+end
+
+function BalatroMCP:process_deferred_extractions(dt)
+    local current_time = love.timer and love.timer.getTime() or os.clock()
+    
+    for i = #self.deferred_extractions, 1, -1 do
+        local extraction = self.deferred_extractions[i]
+        local elapsed = current_time - extraction.timestamp
+        
+        if elapsed >= extraction.delay and not extraction.triggered then
+            extraction.triggered = true
+            
+            print("BalatroMCP: Processing deferred " .. extraction.type .. " extraction")
+            
+            -- Validate state before extraction based on type
+            if self:validate_extraction_timing(extraction.type) then
+                self:execute_deferred_extraction(extraction)
+            else
+                -- Extend delay if state not ready
+                extraction.timestamp = current_time
+                extraction.delay = extraction.delay * 1.5 -- Increase delay by 50%
+                extraction.triggered = false
+                print("BalatroMCP: State not ready, extending delay for " .. extraction.type)
+                
+                -- Prevent infinite delays
+                if extraction.delay > 1.0 then
+                    print("BalatroMCP: Maximum delay reached, forcing extraction for " .. extraction.type)
+                    self:execute_deferred_extraction(extraction)
+                    table.remove(self.deferred_extractions, i)
+                end
+            end
+        elseif extraction.triggered then
+            -- Remove completed extractions
+            table.remove(self.deferred_extractions, i)
+        end
+    end
+end
+
+function BalatroMCP:validate_extraction_timing(extraction_type)
+    -- Validate that game state is ready for extraction
+    if not G or G.STATE == -1 then
+        return false
+    end
+    
+    if extraction_type == "hand_action" then
+        -- Validate hand state is stable
+        local current_state = self.state_extractor:extract_current_state()
+        if not current_state or not current_state.hand_cards then
+            return false
+        end
+        -- Additional validation: check if hand count seems reasonable
+        local hand_count = #current_state.hand_cards
+        return hand_count > 0 or G.STATE == G.STATES.SELECTING_HAND
+        
+    elseif extraction_type == "shop_entry" then
+        -- Validate shop contents are populated
+        local current_state = self.state_extractor:extract_current_state()
+        if not current_state or not current_state.shop_contents then
+            return false
+        end
+        return G.STATE == G.STATES.SHOP
+        
+    elseif extraction_type == "hand_dealing" then
+        -- Validate hand dealing is complete
+        local current_state = self.state_extractor:extract_current_state()
+        if not current_state or not current_state.hand_cards then
+            return false
+        end
+        -- Hand should have cards after dealing
+        return #current_state.hand_cards > 0
+        
+    end
+    
+    return true -- Default to ready for other extraction types
+end
+
+function BalatroMCP:execute_deferred_extraction(extraction)
+    local context = extraction.context
+    
+    if extraction.type == "hand_action" then
+        self:send_current_state()
+        if context.action_type then
+            self:send_status_update(context.action_type .. "_completed", context)
+        end
+        
+    elseif extraction.type == "shop_entry" then
+        local current_state = self.state_extractor:extract_current_state()
+        local shop_items = current_state and current_state.shop_contents and #current_state.shop_contents or 0
+        print("BalatroMCP: Deferred shop entry - shop items: " .. shop_items)
+        
+        self:send_current_state()
+        self:send_status_update("shop_entered", {
+            shop_item_count = shop_items,
+            money = current_state and current_state.money or 0,
+            phase = current_state and current_state.current_phase or "unknown"
+        })
+        
+    elseif extraction.type == "shop_exit" then
+        self:send_current_state()
+        self:send_status_update("shop_exited", {})
+        
+    elseif extraction.type == "blind_selection" then
+        self:send_current_state()
+        
+    elseif extraction.type == "round_completion" then
+        self:send_current_state()
+        self:send_status_update("round_completed", context)
+        
+    elseif extraction.type == "ante_advancement" then
+        self:send_current_state()
+        self:send_status_update("ante_advanced", context)
+        
+    elseif extraction.type == "hand_dealing" then
+        local current_state = self.state_extractor:extract_current_state()
+        local hand_count = current_state and current_state.hand_cards and #current_state.hand_cards or 0
+        print("BalatroMCP: Deferred hand dealing - hand size: " .. hand_count)
+        
+        self:send_current_state()
+        self:send_status_update("hand_dealt", {
+            hand_size = hand_count
+        })
+        
+    elseif extraction.type == "game_over" then
+        self:send_current_state()
+        self:send_status_update("game_over", context)
+        
+    else
+        -- Default: just send current state
+        self:send_current_state()
+    end
+end
+
 function BalatroMCP:start()
     print("BalatroMCP: Starting MCP integration")
     
@@ -329,157 +481,7 @@ function BalatroMCP:update(dt)
             self.crash_diagnostics:monitor_joker_operations()
         end
         
-        function BalatroMCP:defer_state_extraction(extraction_type, context_data)
-            -- Queue a state extraction to be performed after a delay
-            local delay = self.extraction_delays[extraction_type] or 0.1
-            local extraction_entry = {
-                type = extraction_type,
-                timestamp = love.timer and love.timer.getTime() or os.clock(),
-                delay = delay,
-                context = context_data or {},
-                triggered = false
-            }
-            
-            -- Remove any existing extraction of the same type to avoid duplicates
-            for i = #self.deferred_extractions, 1, -1 do
-                if self.deferred_extractions[i].type == extraction_type then
-                    table.remove(self.deferred_extractions, i)
-                end
-            end
-            
-            table.insert(self.deferred_extractions, extraction_entry)
-            print("BalatroMCP: Deferred " .. extraction_type .. " extraction queued (delay: " .. delay .. "s)")
-        end
-        
-        function BalatroMCP:process_deferred_extractions(dt)
-            local current_time = love.timer and love.timer.getTime() or os.clock()
-            
-            for i = #self.deferred_extractions, 1, -1 do
-                local extraction = self.deferred_extractions[i]
-                local elapsed = current_time - extraction.timestamp
-                
-                if elapsed >= extraction.delay and not extraction.triggered then
-                    extraction.triggered = true
-                    
-                    print("BalatroMCP: Processing deferred " .. extraction.type .. " extraction")
-                    
-                    -- Validate state before extraction based on type
-                    if self:validate_extraction_timing(extraction.type) then
-                        self:execute_deferred_extraction(extraction)
-                    else
-                        -- Extend delay if state not ready
-                        extraction.timestamp = current_time
-                        extraction.delay = extraction.delay * 1.5 -- Increase delay by 50%
-                        extraction.triggered = false
-                        print("BalatroMCP: State not ready, extending delay for " .. extraction.type)
-                        
-                        -- Prevent infinite delays
-                        if extraction.delay > 1.0 then
-                            print("BalatroMCP: Maximum delay reached, forcing extraction for " .. extraction.type)
-                            self:execute_deferred_extraction(extraction)
-                            table.remove(self.deferred_extractions, i)
-                        end
-                    end
-                elseif extraction.triggered then
-                    -- Remove completed extractions
-                    table.remove(self.deferred_extractions, i)
-                end
-            end
-        end
-        
-        function BalatroMCP:validate_extraction_timing(extraction_type)
-            -- Validate that game state is ready for extraction
-            if not G or G.STATE == -1 then
-                return false
-            end
-            
-            if extraction_type == "hand_action" then
-                -- Validate hand state is stable
-                local current_state = self.state_extractor:extract_current_state()
-                if not current_state or not current_state.hand_cards then
-                    return false
-                end
-                -- Additional validation: check if hand count seems reasonable
-                local hand_count = #current_state.hand_cards
-                return hand_count > 0 or G.STATE == G.STATES.SELECTING_HAND
-                
-            elseif extraction_type == "shop_entry" then
-                -- Validate shop contents are populated
-                local current_state = self.state_extractor:extract_current_state()
-                if not current_state or not current_state.shop_contents then
-                    return false
-                end
-                return G.STATE == G.STATES.SHOP
-                
-            elseif extraction_type == "hand_dealing" then
-                -- Validate hand dealing is complete
-                local current_state = self.state_extractor:extract_current_state()
-                if not current_state or not current_state.hand_cards then
-                    return false
-                end
-                -- Hand should have cards after dealing
-                return #current_state.hand_cards > 0
-                
-            end
-            
-            return true -- Default to ready for other extraction types
-        end
-        
-        function BalatroMCP:execute_deferred_extraction(extraction)
-            local context = extraction.context
-            
-            if extraction.type == "hand_action" then
-                self:send_current_state()
-                if context.action_type then
-                    self:send_status_update(context.action_type .. "_completed", context)
-                end
-                
-            elseif extraction.type == "shop_entry" then
-                local current_state = self.state_extractor:extract_current_state()
-                local shop_items = current_state and current_state.shop_contents and #current_state.shop_contents or 0
-                print("BalatroMCP: Deferred shop entry - shop items: " .. shop_items)
-                
-                self:send_current_state()
-                self:send_status_update("shop_entered", {
-                    shop_item_count = shop_items,
-                    money = current_state and current_state.money or 0,
-                    phase = current_state and current_state.current_phase or "unknown"
-                })
-                
-            elseif extraction.type == "shop_exit" then
-                self:send_current_state()
-                self:send_status_update("shop_exited", {})
-                
-            elseif extraction.type == "blind_selection" then
-                self:send_current_state()
-                
-            elseif extraction.type == "round_completion" then
-                self:send_current_state()
-                self:send_status_update("round_completed", context)
-                
-            elseif extraction.type == "ante_advancement" then
-                self:send_current_state()
-                self:send_status_update("ante_advanced", context)
-                
-            elseif extraction.type == "hand_dealing" then
-                local current_state = self.state_extractor:extract_current_state()
-                local hand_count = current_state and current_state.hand_cards and #current_state.hand_cards or 0
-                print("BalatroMCP: Deferred hand dealing - hand size: " .. hand_count)
-                
-                self:send_current_state()
-                self:send_status_update("hand_dealt", {
-                    hand_size = hand_count
-                })
-                
-            elseif extraction.type == "game_over" then
-                self:send_current_state()
-                self:send_status_update("game_over", context)
-                
-            else
-                -- Default: just send current state
-                self:send_current_state()
-            end
-        end
+        -- Nested method definitions moved to proper class methods
         
         -- Process deferred state extractions
         self:process_deferred_extractions(dt)
@@ -1029,7 +1031,6 @@ end
 
 function BalatroMCP:on_blind_selected()
     print("BalatroMCP: Blind selection transition detected - deferring state extraction")
-    
     self.blind_transition_cooldown = 3.0
     self:defer_state_extraction("blind_selection", { action_type = "blind_selected" })
 end
