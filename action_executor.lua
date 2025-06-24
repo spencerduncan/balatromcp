@@ -593,23 +593,26 @@ function ActionExecutor:execute_skip_blind(action_data)
         return false, "Skip blind function not available"
     end
     
-    -- Check if we have blind selection options
-    if not G.blind_select_opts then
-        return false, "Blind selection options not available"
+    if not G.GAME.blind_on_deck then
+        return false, "Missing Blind"
+    end
+
+    local blind_choice = string.lower(G.GAME.blind_on_deck)
+    local blind_option = G.blind_select_opts[blind_choice]
+
+    if not blind_option then
+        local available_blinds = {}
+        for key, _ in pairs(G.blind_select_opts) do
+            table.insert(available_blinds, key)
+        end
+        return false, "Blind option '" .. blind_choice .. "' not found. Available: " .. table.concat(available_blinds, ", ")
     end
     
-    -- Look for skip option in blind selection options
-    local skip_option = G.blind_select_opts.skip
-    if not skip_option then
-        return false, "Skip blind option not available in current blind selection"
+    if not blind_option.get_UIE_by_ID then
+        return false, "Blind option missing get_UIE_by_ID method"
     end
     
-    -- Get the skip button from the skip option UI
-    if not skip_option.get_UIE_by_ID then
-        return false, "Skip option missing UI access method"
-    end
-    
-    local skip_button = skip_option:get_UIE_by_ID("skip_blind_button")
+    local skip_button = blind_option:get_UIE_by_ID("tag_container")
     if not skip_button then
         return false, "Skip blind button not found in UI"
     end

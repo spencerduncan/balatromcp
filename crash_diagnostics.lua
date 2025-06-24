@@ -321,4 +321,42 @@ function CrashDiagnostics:get_crash_context()
     }
 end
 
+function CrashDiagnostics:create_safe_state_extraction_wrapper(state_extractor)
+    -- Create a safe wrapper around state extraction to prevent crashes
+    if not state_extractor then
+        self:log("ERROR: Cannot wrap nil state_extractor")
+        return
+    end
+    
+    self:log("INFO: Creating safe state extraction wrapper")
+    
+    -- Store original method
+    local original_extract = state_extractor.extract_current_state
+    if not original_extract then
+        self:log("ERROR: state_extractor missing extract_current_state method")
+        return
+    end
+    
+    -- Create wrapped version with crash protection
+    state_extractor.extract_current_state = function(self_extractor)
+        local success, result = pcall(function()
+            return original_extract(self_extractor)
+        end)
+        
+        if success then
+            return result
+        else
+            self:log("ERROR: State extraction failed: " .. tostring(result))
+            self:emergency_state_dump()
+            -- Return minimal safe state
+            return {
+                current_phase = "error",
+                extraction_errors = {"State extraction crashed: " .. tostring(result)}
+            }
+        end
+    end
+    
+    self:log("INFO: Safe state extraction wrapper created successfully")
+end
+
 return CrashDiagnostics
