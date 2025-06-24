@@ -61,14 +61,74 @@ class MCPTestHandler(http.server.BaseHTTPRequestHandler):
             }, 404)
     
     def do_POST(self):
-        """Handle POST requests (main MCP endpoint)"""
+        """Handle POST requests"""
+        parsed_path = urllib.parse.urlparse(self.path)
         content_length = int(self.headers.get('Content-Length', 0))
         post_data = self.rfile.read(content_length)
         
+        # Handle /game-data endpoint for BalatroMCP
+        if parsed_path.path == '/game-data':
+            try:
+                # Parse and echo the request data
+                request_data = json.loads(post_data.decode('utf-8'))
+                print(f"\n[GAME-DATA] Received POST to /game-data:")
+                print(f"{json.dumps(request_data, indent=2)}")
+                
+                # Send simple success response
+                response = {
+                    "status": "success",
+                    "message": "Game data received",
+                    "timestamp": datetime.now().isoformat(),
+                    "data_size": len(post_data)
+                }
+                self._send_json_response(response)
+                
+            except json.JSONDecodeError as e:
+                print(f"\n[GAME-DATA] JSON parse error: {e}")
+                print(f"Raw data: {post_data.decode('utf-8', errors='replace')}")
+                error_response = {
+                    "status": "error",
+                    "message": "Invalid JSON data",
+                    "error": str(e)
+                }
+                self._send_json_response(error_response, 400)
+            except Exception as e:
+                print(f"\n[GAME-DATA] Unexpected error: {e}")
+                error_response = {
+                    "status": "error",
+                    "message": "Internal server error",
+                    "error": str(e)
+                }
+                self._send_json_response(error_response, 500)
+            return
+        
+        # Handle /actions endpoint for BalatroMCP
+        if parsed_path.path == '/actions':
+            try:
+                # Return sample actions for testing
+                response = {
+                    "status": "success",
+                    "sequence_id": 1,
+                    "actions": [],
+                    "timestamp": datetime.now().isoformat()
+                }
+                self._send_json_response(response)
+                
+            except Exception as e:
+                print(f"\n[ACTIONS] Error: {e}")
+                error_response = {
+                    "status": "error",
+                    "message": "Internal server error",
+                    "error": str(e)
+                }
+                self._send_json_response(error_response, 500)
+            return
+        
+        # Handle JSON-RPC requests (original functionality)
         try:
             # Parse JSON request
             request_data = json.loads(post_data.decode('utf-8'))
-            print(f"Received request: {json.dumps(request_data, indent=2)}")
+            print(f"Received JSON-RPC request: {json.dumps(request_data, indent=2)}")
             
             # Handle different MCP request types
             if request_data.get('method') == 'ping':
@@ -135,7 +195,9 @@ def run_server(port=8080):
         print(f"MCP Test Server starting on port {port}")
         print(f"Health check: http://localhost:{port}/health")
         print(f"Test endpoint: http://localhost:{port}/test")
-        print(f"Main endpoint: http://localhost:{port}/ (POST)")
+        print(f"Game data endpoint: http://localhost:{port}/game-data (POST)")
+        print(f"Actions endpoint: http://localhost:{port}/actions (POST)")
+        print(f"JSON-RPC endpoint: http://localhost:{port}/ (POST)")
         print("Press Ctrl+C to stop the server")
         
         try:
