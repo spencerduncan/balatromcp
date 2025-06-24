@@ -600,8 +600,8 @@ function ActionExecutor:execute_use_consumable(action_data)
         return false, "Consumable not found at index: " .. consumable_index
     end
     
-    if consumable.can_use_consumable(false, false) then
-        consumable:use()
+    if consumable:can_use_consumeable(false, false) then
+        G.FUNCS.use_card({config = {ref_table = consumable}})
         return true, nil
     else
         return false, "Consumable cannot be used"
