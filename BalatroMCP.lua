@@ -277,6 +277,11 @@ function BalatroMCP:stop()
     
     self.polling_active = false
     
+    -- Cleanup transport resources
+    if self.transport and self.transport.cleanup then
+        self.transport:cleanup()
+    end
+    
     self:cleanup_hooks()
     
     print("BalatroMCP: MCP integration stopped")
@@ -285,6 +290,11 @@ end
 function BalatroMCP:update(dt)
     if not self.polling_active then
         return
+    end
+    
+    -- Update transport for async operations
+    if self.transport and self.transport.update then
+        self.transport:update(dt)
     end
     
     -- NON-INTRUSIVE BLIND SELECTION DETECTION
