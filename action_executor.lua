@@ -588,14 +588,35 @@ function ActionExecutor:execute_skip_blind(action_data)
         return false, "Cannot skip blind, must be in blind selection state. Current state: " .. current_state_name
     end
     
-    -- Check if skip function is available
+    -- Check if skip function is available (tests expect this check to take precedence)
     if not G.FUNCS or not G.FUNCS.skip_blind then
         return false, "Skip blind function not available"
     end
     
-    print("BalatroMCP: Calling G.FUNCS.skip_blind directly")
+    -- Check if we have blind selection options
+    if not G.blind_select_opts then
+        return false, "Blind selection options not available"
+    end
+    
+    -- Look for skip option in blind selection options
+    local skip_option = G.blind_select_opts.skip
+    if not skip_option then
+        return false, "Skip blind option not available in current blind selection"
+    end
+    
+    -- Get the skip button from the skip option UI
+    if not skip_option.get_UIE_by_ID then
+        return false, "Skip option missing UI access method"
+    end
+    
+    local skip_button = skip_option:get_UIE_by_ID("skip_blind_button")
+    if not skip_button then
+        return false, "Skip blind button not found in UI"
+    end
+    
+    print("BalatroMCP: Calling G.FUNCS.skip_blind with skip button")
     local call_success, error_result = pcall(function()
-        G.FUNCS.skip_blind()
+        G.FUNCS.skip_blind(skip_button)
     end)
     
     if call_success then
