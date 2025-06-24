@@ -441,7 +441,42 @@ function ActionExecutor:execute_select_pack_offer(action_data)
         return false, "Invalid pack index"
     end
     
-    return false, "Pack selection not yet implemented"
+    print("BalatroMCP: Selecting pack offer at index: " .. pack_index)
+    
+    local success, error_message = self:validate_game_state()
+    if not success then
+        return false, error_message
+    end
+    
+    if not G.FUNCS or not G.FUNCS.use_card then
+        return false, "Use card function not available"
+    end
+    
+    -- Pack offers are typically stored in G.pack_cards when available
+    if not G.pack_cards or not G.pack_cards.cards then
+        return false, "No pack offers available"
+    end
+    
+    if pack_index >= #G.pack_cards.cards then
+        return false, "Pack offer not found at index: " .. pack_index .. " (max: " .. (#G.pack_cards.cards - 1) .. ")"
+    end
+    
+    local pack_card = G.pack_cards.cards[pack_index + 1] -- Lua 1-based indexing
+    if not pack_card then
+        return false, "Pack offer not found at index: " .. pack_index
+    end
+    
+    print("BalatroMCP: Calling G.FUNCS.use_card for pack offer")
+    local call_success, error_result = pcall(function()
+        G.FUNCS.use_card({config = {ref_table = pack_card}})
+    end)
+    
+    if call_success then
+        print("BalatroMCP: Pack offer selection successful!")
+        return true, nil
+    else
+        return false, "Pack offer selection failed: " .. tostring(error_result)
+    end
 end
 
 function ActionExecutor:execute_reroll_boss(action_data)
