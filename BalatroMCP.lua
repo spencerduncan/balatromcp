@@ -237,6 +237,19 @@ function BalatroMCP.new()
     self.pending_state_extraction = false
     self.pending_action_result = nil
     
+    -- Deferred state extraction system
+    self.deferred_extractions = {}
+    self.extraction_delays = {
+        hand_action = 0.1,      -- 100ms delay for hand play/discard
+        shop_entry = 0.2,       -- 200ms delay for shop content population
+        shop_exit = 0.1,        -- 100ms delay for shop exit
+        blind_selection = 0.15, -- 150ms delay for blind selection
+        round_completion = 0.25, -- 250ms delay for round end processing
+        ante_advancement = 0.3,  -- 300ms delay for ante progression
+        hand_dealing = 0.2,     -- 200ms delay for hand dealing completion
+        game_over = 0.2         -- 200ms delay for game over state
+    }
+    
     if init_success then
         if self.transport_type == "FILE" then
             self.debug_logger:test_file_communication()
@@ -294,11 +307,13 @@ function BalatroMCP:update(dt)
         self.transport:update(dt)
     end
     
-    -- NON-INTRUSIVE BLIND SELECTION DETECTION
+    -- NON-INTRUSIVE STATE TRANSITION DETECTION
     self:detect_blind_selection_transition()
-    
-    -- NON-INTRUSIVE SHOP STATE DETECTION
     self:detect_shop_state_transition()
+    self:detect_round_completion_transition()
+    self:detect_ante_advancement_transition()
+    self:detect_hand_dealing_transition()
+    self:detect_game_over_transition()
     
     -- Update blind transition cooldown
     if self.blind_transition_cooldown > 0 then
@@ -313,6 +328,161 @@ function BalatroMCP:update(dt)
         if self.crash_diagnostics then
             self.crash_diagnostics:monitor_joker_operations()
         end
+        
+        function BalatroMCP:defer_state_extraction(extraction_type, context_data)
+            -- Queue a state extraction to be performed after a delay
+            local delay = self.extraction_delays[extraction_type] or 0.1
+            local extraction_entry = {
+                type = extraction_type,
+                timestamp = love.timer and love.timer.getTime() or os.clock(),
+                delay = delay,
+                context = context_data or {},
+                triggered = false
+            }
+            
+            -- Remove any existing extraction of the same type to avoid duplicates
+            for i = #self.deferred_extractions, 1, -1 do
+                if self.deferred_extractions[i].type == extraction_type then
+                    table.remove(self.deferred_extractions, i)
+                end
+            end
+            
+            table.insert(self.deferred_extractions, extraction_entry)
+            print("BalatroMCP: Deferred " .. extraction_type .. " extraction queued (delay: " .. delay .. "s)")
+        end
+        
+        function BalatroMCP:process_deferred_extractions(dt)
+            local current_time = love.timer and love.timer.getTime() or os.clock()
+            
+            for i = #self.deferred_extractions, 1, -1 do
+                local extraction = self.deferred_extractions[i]
+                local elapsed = current_time - extraction.timestamp
+                
+                if elapsed >= extraction.delay and not extraction.triggered then
+                    extraction.triggered = true
+                    
+                    print("BalatroMCP: Processing deferred " .. extraction.type .. " extraction")
+                    
+                    -- Validate state before extraction based on type
+                    if self:validate_extraction_timing(extraction.type) then
+                        self:execute_deferred_extraction(extraction)
+                    else
+                        -- Extend delay if state not ready
+                        extraction.timestamp = current_time
+                        extraction.delay = extraction.delay * 1.5 -- Increase delay by 50%
+                        extraction.triggered = false
+                        print("BalatroMCP: State not ready, extending delay for " .. extraction.type)
+                        
+                        -- Prevent infinite delays
+                        if extraction.delay > 1.0 then
+                            print("BalatroMCP: Maximum delay reached, forcing extraction for " .. extraction.type)
+                            self:execute_deferred_extraction(extraction)
+                            table.remove(self.deferred_extractions, i)
+                        end
+                    end
+                elseif extraction.triggered then
+                    -- Remove completed extractions
+                    table.remove(self.deferred_extractions, i)
+                end
+            end
+        end
+        
+        function BalatroMCP:validate_extraction_timing(extraction_type)
+            -- Validate that game state is ready for extraction
+            if not G or G.STATE == -1 then
+                return false
+            end
+            
+            if extraction_type == "hand_action" then
+                -- Validate hand state is stable
+                local current_state = self.state_extractor:extract_current_state()
+                if not current_state or not current_state.hand_cards then
+                    return false
+                end
+                -- Additional validation: check if hand count seems reasonable
+                local hand_count = #current_state.hand_cards
+                return hand_count > 0 or G.STATE == G.STATES.SELECTING_HAND
+                
+            elseif extraction_type == "shop_entry" then
+                -- Validate shop contents are populated
+                local current_state = self.state_extractor:extract_current_state()
+                if not current_state or not current_state.shop_contents then
+                    return false
+                end
+                return G.STATE == G.STATES.SHOP
+                
+            elseif extraction_type == "hand_dealing" then
+                -- Validate hand dealing is complete
+                local current_state = self.state_extractor:extract_current_state()
+                if not current_state or not current_state.hand_cards then
+                    return false
+                end
+                -- Hand should have cards after dealing
+                return #current_state.hand_cards > 0
+                
+            end
+            
+            return true -- Default to ready for other extraction types
+        end
+        
+        function BalatroMCP:execute_deferred_extraction(extraction)
+            local context = extraction.context
+            
+            if extraction.type == "hand_action" then
+                self:send_current_state()
+                if context.action_type then
+                    self:send_status_update(context.action_type .. "_completed", context)
+                end
+                
+            elseif extraction.type == "shop_entry" then
+                local current_state = self.state_extractor:extract_current_state()
+                local shop_items = current_state and current_state.shop_contents and #current_state.shop_contents or 0
+                print("BalatroMCP: Deferred shop entry - shop items: " .. shop_items)
+                
+                self:send_current_state()
+                self:send_status_update("shop_entered", {
+                    shop_item_count = shop_items,
+                    money = current_state and current_state.money or 0,
+                    phase = current_state and current_state.current_phase or "unknown"
+                })
+                
+            elseif extraction.type == "shop_exit" then
+                self:send_current_state()
+                self:send_status_update("shop_exited", {})
+                
+            elseif extraction.type == "blind_selection" then
+                self:send_current_state()
+                
+            elseif extraction.type == "round_completion" then
+                self:send_current_state()
+                self:send_status_update("round_completed", context)
+                
+            elseif extraction.type == "ante_advancement" then
+                self:send_current_state()
+                self:send_status_update("ante_advanced", context)
+                
+            elseif extraction.type == "hand_dealing" then
+                local current_state = self.state_extractor:extract_current_state()
+                local hand_count = current_state and current_state.hand_cards and #current_state.hand_cards or 0
+                print("BalatroMCP: Deferred hand dealing - hand size: " .. hand_count)
+                
+                self:send_current_state()
+                self:send_status_update("hand_dealt", {
+                    hand_size = hand_count
+                })
+                
+            elseif extraction.type == "game_over" then
+                self:send_current_state()
+                self:send_status_update("game_over", context)
+                
+            else
+                -- Default: just send current state
+                self:send_current_state()
+            end
+        end
+        
+        -- Process deferred state extractions
+        self:process_deferred_extractions(dt)
         
         if self.pending_state_extraction then
             print("BalatroMCP: PROCESSING_DELAYED_EXTRACTION")
@@ -338,6 +508,37 @@ function BalatroMCP:setup_game_hooks()
     self:hook_shop_interactions()
     
     self:hook_joker_interactions()
+    
+    -- Initialize state tracking for non-intrusive detection
+    self:initialize_state_tracking()
+end
+
+function BalatroMCP:initialize_state_tracking()
+    print("BalatroMCP: Initializing state tracking for non-intrusive detection")
+    
+    -- Blind selection tracking
+    self.last_blind_state = G and G.STATE or nil
+    self.blind_transition_detected = false
+    self.blind_transition_cooldown = 0
+    
+    -- Shop state tracking
+    self.last_shop_state = nil
+    self.shop_state_initialized = false
+    
+    -- Round completion tracking
+    self.last_round_state = nil
+    
+    -- Ante advancement tracking
+    self.last_ante = G and G.GAME and G.GAME.round_resets and G.GAME.round_resets.ante or 0
+    
+    -- Hand dealing tracking
+    self.last_hand_dealing_state = nil
+    self.last_hand_count = 0
+    
+    -- Game over tracking
+    self.last_game_over_state = nil
+    
+    print("BalatroMCP: State tracking initialized")
 end
 
 function BalatroMCP:hook_hand_evaluation()
@@ -394,10 +595,6 @@ end
 
 function BalatroMCP:hook_blind_selection()
     print("BalatroMCP: Setting up blind selection hooks")
-    
-    self.last_blind_state = G and G.STATE or nil
-    self.blind_transition_detected = false
-    self.blind_transition_cooldown = 0
     
     if G.FUNCS then
         -- Hook blind selection functions
@@ -552,7 +749,6 @@ function BalatroMCP:hook_shop_interactions()
             print("BalatroMCP: Hooked reroll_shop function")
         end
         
-        self:setup_shop_state_detection()
     end
 end
 
@@ -810,51 +1006,52 @@ function BalatroMCP:send_status_update(status_type, status_data)
 end
 
 function BalatroMCP:on_hand_played()
-    print("BalatroMCP: Hand played event")
-    self:send_current_state()
+    print("BalatroMCP: Hand played event - deferring state extraction")
+    self:defer_state_extraction("hand_action", { action_type = "hand_played" })
 end
 
 function BalatroMCP:on_cards_discarded()
-    print("BalatroMCP: Cards discarded event")
-    self:send_current_state()
+    print("BalatroMCP: Cards discarded event - deferring state extraction")
+    self:defer_state_extraction("hand_action", { action_type = "cards_discarded" })
 end
 
 function BalatroMCP:on_blind_selected()
-    print("BalatroMCP: Blind selection transition detected - sending immediate update")
+    print("BalatroMCP: Blind selection transition detected - deferring state extraction")
     
     self.blind_transition_cooldown = 3.0
-    
-    -- Send immediate state update instead of delayed capture
-    -- Game state should be stable when this event fires
-    self:send_current_state()
+    self:defer_state_extraction("blind_selection", { action_type = "blind_selected" })
 end
 
 function BalatroMCP:on_shop_entered()
-    print("BalatroMCP: Shop entered event - sending immediate update")
-    
-    local current_state = self.state_extractor:extract_current_state()
-    local phase = current_state and current_state.current_phase or "unknown"
-    local money = current_state and current_state.money or "unknown"
-    local shop_items = current_state and current_state.shop_contents and #current_state.shop_contents or 0
-    print("BalatroMCP: DEBUG - Shop state: phase=" .. phase .. ", money=" .. tostring(money) .. ", shop_items=" .. tostring(shop_items))
-    
-    -- Send immediate state update - shop contents should be available
-    self:send_current_state()
-    
-    -- Send status update for shop entry
-    self:send_status_update("shop_entered", {
-        shop_item_count = shop_items,
-        money = money,
-        phase = phase
-    })
+    print("BalatroMCP: Shop entered event - deferring state extraction")
+    self:defer_state_extraction("shop_entry", { action_type = "shop_entered" })
 end
 
-function BalatroMCP:setup_shop_state_detection()
-    print("BalatroMCP: Setting up shop state detection")
-    
-    self.last_shop_state = nil
-    self.shop_state_initialized = false
+function BalatroMCP:on_shop_exited()
+    print("BalatroMCP: Shop exited event - deferring state extraction")
+    self:defer_state_extraction("shop_exit", { action_type = "shop_exited" })
 end
+
+function BalatroMCP:on_round_completed()
+    print("BalatroMCP: Round completed event - deferring state extraction")
+    self:defer_state_extraction("round_completion", { action_type = "round_completed" })
+end
+
+function BalatroMCP:on_ante_advanced()
+    print("BalatroMCP: Ante advanced event - deferring state extraction")
+    self:defer_state_extraction("ante_advancement", { action_type = "ante_advanced" })
+end
+
+function BalatroMCP:on_hand_dealt()
+    print("BalatroMCP: Hand dealt event - deferring state extraction")
+    self:defer_state_extraction("hand_dealing", { action_type = "hand_dealt" })
+end
+
+function BalatroMCP:on_game_over()
+    print("BalatroMCP: Game over event - deferring state extraction")
+    self:defer_state_extraction("game_over", { action_type = "game_over" })
+end
+
 
 function BalatroMCP:detect_blind_selection_transition()
     if not G or not G.STATE or not G.STATES then
@@ -897,10 +1094,11 @@ function BalatroMCP:detect_shop_state_transition()
         return
     end
     
-    
-    local was_not_shop = (self.last_shop_state ~= G.STATES.SHOP)
+    local was_shop = (self.last_shop_state == G.STATES.SHOP)
     local is_shop = (current_state == G.STATES.SHOP)
+    local was_not_shop = not was_shop
     
+    -- Shop entry detection
     if was_not_shop and is_shop and not self.shop_state_initialized then
         print("BalatroMCP: NON_INTRUSIVE_DETECTION - Shop state entered: " ..
               tostring(self.last_shop_state) .. " -> " .. tostring(current_state))
@@ -909,11 +1107,133 @@ function BalatroMCP:detect_shop_state_transition()
         self:on_shop_entered()
     end
     
+    -- Shop exit detection
+    if was_shop and not is_shop and self.shop_state_initialized then
+        print("BalatroMCP: NON_INTRUSIVE_DETECTION - Shop state exited: " ..
+              tostring(self.last_shop_state) .. " -> " .. tostring(current_state))
+        
+        self.shop_state_initialized = false
+        self:on_shop_exited()
+    end
+    
     if current_state ~= G.STATES.SHOP then
         self.shop_state_initialized = false
     end
     
     self.last_shop_state = current_state
+end
+
+function BalatroMCP:detect_round_completion_transition()
+    if not G or not G.STATE or not G.STATES then
+        return
+    end
+    
+    local current_state = G.STATE
+    
+    if not self.last_round_state then
+        self.last_round_state = current_state
+        self.last_ante = G.GAME and G.GAME.round_resets and G.GAME.round_resets.ante or 0
+        return
+    end
+    
+    -- Detect round completion by looking for transitions to shop or next round states
+    local was_playing = (self.last_round_state == G.STATES.SELECTING_HAND or
+                        self.last_round_state == G.STATES.HAND_PLAYED or
+                        self.last_round_state == G.STATES.DRAW_TO_HAND)
+    local is_round_end = (current_state == G.STATES.SHOP or
+                         current_state == G.STATES.ROUND_EVAL or
+                         current_state == G.STATES.NEW_ROUND)
+    
+    if was_playing and is_round_end then
+        print("BalatroMCP: NON_INTRUSIVE_DETECTION - Round completed: " ..
+              tostring(self.last_round_state) .. " -> " .. tostring(current_state))
+        self:on_round_completed()
+    end
+    
+    self.last_round_state = current_state
+end
+
+function BalatroMCP:detect_ante_advancement_transition()
+    if not G or not G.GAME or not G.GAME.round_resets then
+        return
+    end
+    
+    local current_ante = G.GAME.round_resets.ante or 0
+    
+    if not self.last_ante then
+        self.last_ante = current_ante
+        return
+    end
+    
+    if current_ante > self.last_ante then
+        print("BalatroMCP: NON_INTRUSIVE_DETECTION - Ante advanced: " ..
+              tostring(self.last_ante) .. " -> " .. tostring(current_ante))
+        self:on_ante_advanced()
+    end
+    
+    self.last_ante = current_ante
+end
+
+function BalatroMCP:detect_hand_dealing_transition()
+    if not G or not G.STATE or not G.STATES then
+        return
+    end
+    
+    local current_state = G.STATE
+    
+    if not self.last_hand_dealing_state then
+        self.last_hand_dealing_state = current_state
+        self.last_hand_count = 0
+        return
+    end
+    
+    -- Extract current hand count
+    local current_hand_count = 0
+    if G.hand and G.hand.cards then
+        current_hand_count = #G.hand.cards
+    end
+    
+    -- Detect hand dealing completion
+    local was_drawing = (self.last_hand_dealing_state == G.STATES.DRAW_TO_HAND or
+                        self.last_hand_dealing_state == G.STATES.NEW_ROUND)
+    local is_hand_ready = (current_state == G.STATES.SELECTING_HAND)
+    local hand_size_increased = (current_hand_count > self.last_hand_count)
+    
+    if was_drawing and is_hand_ready and hand_size_increased then
+        print("BalatroMCP: NON_INTRUSIVE_DETECTION - Hand dealing completed: " ..
+              tostring(self.last_hand_dealing_state) .. " -> " .. tostring(current_state) ..
+              " (hand: " .. tostring(self.last_hand_count) .. " -> " .. tostring(current_hand_count) .. ")")
+        self:on_hand_dealt()
+    end
+    
+    self.last_hand_dealing_state = current_state
+    self.last_hand_count = current_hand_count
+end
+
+function BalatroMCP:detect_game_over_transition()
+    if not G or not G.STATE or not G.STATES then
+        return
+    end
+    
+    local current_state = G.STATE
+    
+    if not self.last_game_over_state then
+        self.last_game_over_state = current_state
+        return
+    end
+    
+    -- Detect game over states
+    local was_playing = (self.last_game_over_state ~= G.STATES.GAME_OVER and
+                        self.last_game_over_state ~= G.STATES.SMODS_BOOSTER_OPENED)
+    local is_game_over = (current_state == G.STATES.GAME_OVER)
+    
+    if was_playing and is_game_over then
+        print("BalatroMCP: NON_INTRUSIVE_DETECTION - Game over detected: " ..
+              tostring(self.last_game_over_state) .. " -> " .. tostring(current_state))
+        self:on_game_over()
+    end
+    
+    self.last_game_over_state = current_state
 end
 
 function BalatroMCP:extract_shop_item_info(element)
