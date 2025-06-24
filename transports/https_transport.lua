@@ -1,7 +1,7 @@
 -- HTTPS Transport - Concrete implementation of IMessageTransport for HTTPS-based I/O
 -- Handles all HTTP operations, endpoint management, and network communication
 -- Follows Single Responsibility Principle - focused solely on HTTPS I/O operations
--- Uses async HTTP requests to prevent UI thread blocking
+-- Uses SMODS.https for reliable HTTP operations in Balatro environment
 
 local HttpsTransport = {}
 HttpsTransport.__index = HttpsTransport
@@ -27,20 +27,10 @@ function HttpsTransport.new(config)
     self.component_name = "HTTPS_TRANSPORT"
     self.request_count = 0
     
-    -- Async request management
-    self.pending_requests = {}
-    self.completed_requests = {}
-    self.request_threads = {}
-    self.max_concurrent_requests = 3
-    self.active_request_count = 0
-    
     -- Cached results for interface compatibility
     self.cached_availability = nil
     self.cached_availability_time = 0
     self.availability_cache_duration = 30 -- Cache for 30 seconds
-    
-    self.cached_read_result = nil
-    self.last_read_time = 0
     
     -- Load required libraries
     self:initialize_libraries()
@@ -64,223 +54,19 @@ function HttpsTransport:initialize_libraries()
         error("Failed to load required JSON library")
     end
     
-    -- Check for Love2D threading support for async operations
-    if love and love.thread then
-        self.async_enabled = true
-        self:log("Love2D threading available - async HTTP operations enabled")
+    -- Check for SMODS.https availability
+    if SMODS and SMODS.https then
+        self.http_client = SMODS.https
+        self:log("SMODS.https available - HTTP operations enabled")
     else
-        self.async_enabled = false
-        self:log("Love2D threading not available - falling back to synchronous operations")
+        error("SMODS.https not available - HTTPS transport cannot function")
     end
     
-    -- Load HTTP library (luasocket)
-    local http_success, http = pcall(require, "socket.http")
-    if not http_success then
-        self:log("WARNING: socket.http not available, trying alternative HTTP implementation")
-        -- Try alternative HTTP implementation using love.thread if available
-        self.http = self:create_fallback_http()
-    else
-        self.http = http
-        -- Also load ltn12 for body handling
-        local ltn12_success, ltn12 = pcall(require, "ltn12")
-        if ltn12_success then
-            self.ltn12 = ltn12
-        end
-    end
-    
-    if not self.http then
-        error("No HTTP implementation available - HTTPS transport cannot function")
-    end
-    
-    self:log("HTTPS transport initialized with base URL: " .. self.base_url .. " (async: " .. tostring(self.async_enabled) .. ")")
-end
-
-function HttpsTransport:create_fallback_http()
-    -- Fallback HTTP implementation using love.filesystem and love.thread if available
-    -- This is a simplified implementation for environments without luasocket
-    self:log("Creating fallback HTTP implementation")
-    
-    local fallback_http = {}
-    
-    function fallback_http.request(url, body)
-        -- This would need to be implemented using love.thread and external tools
-        -- For now, return an error to indicate unavailability
-        return nil, "Fallback HTTP not implemented - requires luasocket"
-    end
-    
-    return fallback_http
-end
-
--- Async request management methods
-function HttpsTransport:create_http_thread_code()
-    -- Return Lua code that will run in the thread for HTTP requests
-    return [[
--- Thread-safe HTTP request execution
-local http_success, http = pcall(require, "socket.http")
-if not http_success then
-    love.thread.getChannel("http_response_output"):push({
-        request_id = -1,
-        success = false,
-        response = "",
-        status_code = 0,
-        error_message = "socket.http not available in thread"
-    })
-    return
-end
-
-local ltn12_success, ltn12 = pcall(require, "ltn12")
-if not ltn12_success then
-    ltn12 = nil
-end
-
--- Get thread input
-local request_data = love.thread.getChannel("http_request_input"):pop()
-if not request_data then
-    return
-end
-
-local response_body = {}
-local result, status_code, response_headers
-local start_time = love.timer.getTime()
-
-if ltn12 then
-    -- Use luasocket with proper body handling
-    result, status_code, response_headers = http.request({
-        url = request_data.url,
-        method = request_data.method,
-        headers = request_data.headers,
-        source = request_data.body and ltn12.source.string(request_data.body) or nil,
-        sink = ltn12.sink.table(response_body)
-    })
-else
-    -- Fallback to simple request
-    if request_data.method == "POST" and request_data.body then
-        result, status_code = http.request(request_data.url, request_data.body)
-    else
-        result, status_code = http.request(request_data.url)
-    end
-    
-    if result then
-        response_body = {result}
-    end
-end
-
-local end_time = love.timer.getTime()
-
--- Send result back to main thread
-local response_data = {
-    request_id = request_data.request_id,
-    success = result ~= nil,
-    response = table.concat(response_body),
-    status_code = status_code,
-    error_message = result and nil or tostring(status_code),
-    thread_duration = end_time - start_time
-}
-
-love.thread.getChannel("http_response_output"):push(response_data)
-]]
-end
-
-function HttpsTransport:start_async_request(method, url, body, headers)
-    if not self.async_enabled or self.active_request_count >= self.max_concurrent_requests then
-        -- Fall back to synchronous request
-        return self:make_sync_request(method, url, body, headers)
-    end
-    
-    self.request_count = self.request_count + 1
-    local request_id = self.request_count
-    
-    -- Create thread for HTTP request
-    local thread = love.thread.newThread(self:create_http_thread_code())
-    
-    -- Prepare request data
-    local request_data = {
-        request_id = request_id,
-        method = method,
-        url = url,
-        body = body,
-        headers = headers
-    }
-    
-    -- Start the thread
-    love.thread.getChannel("http_request_input"):push(request_data)
-    thread:start()
-    
-    -- Track the request
-    self.request_threads[request_id] = {
-        thread = thread,
-        start_time = love.timer.getTime(),
-        method = method,
-        url = url
-    }
-    
-    self.active_request_count = self.active_request_count + 1
-    self:log("Started async " .. method .. " request #" .. request_id .. " to: " .. url)
-    
-    return request_id, true -- Return request ID and async flag
-end
-
-function HttpsTransport:check_completed_requests()
-    local response_channel = love.thread.getChannel("http_response_output")
-    local response_data = response_channel:pop()
-    
-    while response_data do
-        local request_id = response_data.request_id
-        local thread_info = self.request_threads[request_id]
-        
-        if thread_info then
-            local duration = love.timer.getTime() - thread_info.start_time
-            self:log("Async request #" .. request_id .. " completed in " .. string.format("%.3f", duration) .. "s")
-            
-            -- Store completed request result
-            self.completed_requests[request_id] = {
-                success = response_data.success,
-                response = response_data.response,
-                status_code = response_data.status_code,
-                error_message = response_data.error_message,
-                completion_time = love.timer.getTime()
-            }
-            
-            -- Clean up thread
-            self.request_threads[request_id] = nil
-            self.active_request_count = self.active_request_count - 1
-        end
-        
-        -- Check for more responses
-        response_data = response_channel:pop()
-    end
-end
-
-function HttpsTransport:get_async_result(request_id, timeout)
-    local start_time = love.timer.getTime()
-    timeout = timeout or self.timeout
-    
-    while (love.timer.getTime() - start_time) < timeout do
-        self:check_completed_requests()
-        
-        local result = self.completed_requests[request_id]
-        if result then
-            -- Clean up completed request
-            self.completed_requests[request_id] = nil
-            
-            if result.success then
-                return result.response, result.status_code
-            else
-                return nil, result.status_code or result.error_message
-            end
-        end
-        
-        -- Small delay to prevent busy waiting
-        love.timer.sleep(0.01)
-    end
-    
-    -- Timeout occurred
-    self:log("ERROR: Async request #" .. request_id .. " timed out after " .. timeout .. "s")
-    return nil, "timeout"
+    self:log("HTTPS transport initialized with base URL: " .. self.base_url .. " (using SMODS.https)")
 end
 
 function HttpsTransport:log(message)
-    local log_msg = "BalatroMCP [" .. self.component_name .. "]: " .. message
+    local log_msg = "[G] BalatroMCP [" .. self.component_name .. "]: " .. message
     print(log_msg)
     
     -- Try to write to debug log if possible
@@ -298,7 +84,7 @@ function HttpsTransport:log(message)
         end)
         
         if not success then
-            print("BalatroMCP [HTTPS_TRANSPORT]: Failed to write debug log: " .. tostring(err))
+            print("[G] BalatroMCP [HTTPS_TRANSPORT]: Failed to write debug log: " .. tostring(err))
         end
     end
 end
@@ -330,100 +116,75 @@ function HttpsTransport:prepare_headers(additional_headers)
     return headers
 end
 
--- Private method - make HTTP request with timeout and error handling (async-aware)
+-- Private method - make HTTP request using SMODS.https
 function HttpsTransport:make_request(method, url, body, headers)
-    -- Always check for completed async requests first
-    if self.async_enabled then
-        self:check_completed_requests()
-    end
-    
-    if self.async_enabled and self.active_request_count < self.max_concurrent_requests then
-        -- Use async request
-        local request_id, is_async = self:start_async_request(method, url, body, headers)
-        if is_async then
-            return self:get_async_result(request_id, self.timeout)
-        end
-    end
-    
-    -- Fall back to synchronous request
-    return self:make_sync_request(method, url, body, headers)
-end
-
--- Private method - synchronous HTTP request (fallback)
-function HttpsTransport:make_sync_request(method, url, body, headers)
     self.request_count = self.request_count + 1
     local request_id = self.request_count
     
-    self:log("Making sync " .. method .. " request #" .. request_id .. " to: " .. url)
+    self:log("Making " .. method .. " request #" .. request_id .. " to: " .. url)
     
-    local start_time = love.timer and love.timer.getTime() or os.clock()
-    local response_body = {}
-    local result, status_code, response_headers
+    local start_time = os.clock()
     
-    if self.ltn12 then
-        -- Use luasocket with proper body handling
-        result, status_code, response_headers = self.http.request({
-            url = url,
-            method = method,
-            headers = headers,
-            source = body and self.ltn12.source.string(body) or nil,
-            sink = self.ltn12.sink.table(response_body)
-        })
-    else
-        -- Fallback to simple request
-        if method == "POST" and body then
-            result, status_code = self.http.request(url, body)
-        else
-            result, status_code = self.http.request(url)
-        end
-        
-        if result then
-            response_body = {result}
-        end
+    -- Prepare SMODS.https request parameters
+    local request_params = {
+        method = method,
+        url = url,
+        headers = headers,
+        timeout = self.timeout
+    }
+    
+    -- Add body for POST requests
+    if method == "POST" and body then
+        request_params.data = body
     end
     
-    local end_time = love.timer and love.timer.getTime() or os.clock()
+    -- Make the HTTP request using SMODS.https
+    local success, response = pcall(self.http_client.request, request_params)
+    
+    local end_time = os.clock()
     local duration = end_time - start_time
     
-    self:log("Sync request #" .. request_id .. " completed in " .. string.format("%.3f", duration) .. "s, status: " .. tostring(status_code))
-    
-    if not result then
-        self:log("ERROR: HTTP request failed: " .. tostring(status_code))
-        return nil, status_code or "network_error"
+    if not success then
+        self:log("ERROR: HTTP request failed: " .. tostring(response))
+        return nil, "request_failed"
     end
     
-    local response_text = table.concat(response_body)
+    if not response then
+        self:log("ERROR: No response received")
+        return nil, "no_response"
+    end
+    
+    -- Extract response data based on SMODS.https response format
+    local response_body = response.body or response.data or ""
+    local status_code = response.status or response.code or 0
+    
+    self:log("Request #" .. request_id .. " completed in " .. string.format("%.3f", duration) .. "s, status: " .. tostring(status_code))
     
     -- Check for successful HTTP status codes
-    if status_code and (status_code < 200 or status_code >= 300) then
+    if status_code > 0 and (status_code < 200 or status_code >= 300) then
         self:log("ERROR: HTTP request returned error status: " .. status_code)
-        self:log("Response body: " .. string.sub(response_text, 1, 200))
+        self:log("Response body: " .. string.sub(response_body, 1, 200))
         return nil, status_code
     end
     
-    return response_text, status_code, response_headers
+    return response_body, status_code, response.headers
 end
 
 -- IMessageTransport interface implementation
 function HttpsTransport:is_available()
     -- Check cached availability to prevent frequent blocking calls
-    local current_time = love.timer and love.timer.getTime() or os.time()
+    local current_time = os.time()
     if self.cached_availability ~= nil and (current_time - self.cached_availability_time) < self.availability_cache_duration then
         return self.cached_availability
-    end
-    
-    -- Process any pending async requests first
-    if self.async_enabled then
-        self:check_completed_requests()
     end
     
     -- Test connectivity with a lightweight request
     local test_url = self:get_endpoint_url("/health")
     local headers = self:prepare_headers()
     
-    local start_time = love.timer and love.timer.getTime() or os.clock()
+    local start_time = os.clock()
     local response, status_code = self:make_request("GET", test_url, nil, headers)
-    local end_time = love.timer and love.timer.getTime() or os.clock()
+    local end_time = os.clock()
     
     -- 404 is acceptable (no health endpoint), so check status directly
     local available = (response ~= nil and status_code == 200) or status_code == 404
@@ -562,58 +323,19 @@ function HttpsTransport:cleanup_old_messages(max_age_seconds)
     return true
 end
 
--- Async management methods (should be called regularly by main application)
+-- Update method - simplified since no async operations to manage
 function HttpsTransport:update(dt)
-    -- Process completed async requests
-    if self.async_enabled then
-        self:check_completed_requests()
-        
-        -- Clean up old completed requests (older than 60 seconds)
-        local current_time = love.timer.getTime()
-        for request_id, result in pairs(self.completed_requests) do
-            if (current_time - result.completion_time) > 60 then
-                self.completed_requests[request_id] = nil
-                self:log("Cleaned up old completed request #" .. request_id)
-            end
-        end
-        
-        -- Clean up abandoned threads (older than timeout * 2)
-        for request_id, thread_info in pairs(self.request_threads) do
-            if (current_time - thread_info.start_time) > (self.timeout * 2) then
-                self:log("WARNING: Cleaning up abandoned async request #" .. request_id)
-                self.request_threads[request_id] = nil
-                self.active_request_count = math.max(0, self.active_request_count - 1)
-            end
-        end
-    end
+    -- SMODS.https handles all HTTP operations synchronously
+    -- No async management needed
 end
 
+-- Cleanup method - simplified since no async resources to manage
 function HttpsTransport:cleanup()
-    -- Clean up all async resources
-    if self.async_enabled then
-        self:log("Cleaning up " .. self.active_request_count .. " active async requests")
-        
-        -- Wait for active requests to complete (with timeout)
-        local cleanup_start = love.timer.getTime()
-        local cleanup_timeout = 2.0 -- 2 seconds max cleanup time
-        
-        while self.active_request_count > 0 and (love.timer.getTime() - cleanup_start) < cleanup_timeout do
-            self:check_completed_requests()
-            love.timer.sleep(0.1)
-        end
-        
-        -- Force cleanup remaining requests
-        for request_id, thread_info in pairs(self.request_threads) do
-            self:log("Force cleaning up request #" .. request_id)
-        end
-        
-        self.request_threads = {}
-        self.completed_requests = {}
-        self.pending_requests = {}
-        self.active_request_count = 0
-        
-        self:log("Async cleanup completed")
-    end
+    -- Clear caches
+    self.cached_availability = nil
+    self.cached_availability_time = 0
+    
+    self:log("HTTPS transport cleanup completed")
 end
 
 return HttpsTransport
