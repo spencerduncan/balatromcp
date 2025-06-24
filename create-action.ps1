@@ -120,7 +120,7 @@ switch ($Action) {
         }
         $actionData.shop_index = [int]$Target
         if ($BuyAndUse) {
-            $actionData.buy_and_use = $true
+            $actionData.buy_and_use = "true"
         }
     }
     
