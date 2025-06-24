@@ -15,6 +15,8 @@
     Comma-separated list of card indices for play_hand/discard_cards actions, or from_index,to_index for move_playing_card
 .PARAMETER BlindType
     Type of blind to select (small, big, boss) for select_blind action
+.PARAMETER BuyAndUse
+    For buy_item action: if specified, attempts to buy and immediately use a consumable (bypasses inventory)
 .PARAMETER NewOrder
     Comma-separated list of joker IDs in new order for reorder_jokers action
 .PARAMETER OutputPath
@@ -31,6 +33,8 @@
     .\create-action.ps1 -Action sell_joker -Sequence 39 -Target 0
 .EXAMPLE
     .\create-action.ps1 -Action buy_item -Sequence 40 -Target 0
+.EXAMPLE
+    .\create-action.ps1 -Action buy_item -Sequence 40 -Target 0 -BuyAndUse
 .EXAMPLE
     .\create-action.ps1 -Action use_consumable -Sequence 41 -Target 123456
 .EXAMPLE
@@ -54,6 +58,9 @@ param(
     [Parameter(Mandatory=$false)]
     [ValidateSet("small", "big", "boss")]
     [string]$BlindType,
+    
+    [Parameter(Mandatory=$false)]
+    [switch]$BuyAndUse,
     
     [Parameter(Mandatory=$false)]
     [string]$NewOrder,
@@ -112,6 +119,9 @@ switch ($Action) {
             exit 1
         }
         $actionData.shop_index = [int]$Target
+        if ($BuyAndUse) {
+            $actionData.buy_and_use = $true
+        }
     }
     
     "sell_joker" {
