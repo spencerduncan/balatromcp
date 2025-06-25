@@ -237,8 +237,7 @@ function BalatroMCP.new()
     self.pending_state_extraction = false
     self.pending_action_result = nil
     
-    -- Deferred state extraction system
-    self.deferred_extractions = {}
+    -- Extraction delays for event system timing
     self.extraction_delays = {
         hand_action = 0.1,      -- 100ms delay for hand play/discard
         shop_entry = 0.2,       -- 200ms delay for shop content population
@@ -271,105 +270,45 @@ function BalatroMCP.new()
 end
 
 function BalatroMCP:defer_state_extraction(extraction_type, context_data)
-    -- Queue a state extraction to be performed after a delay
+    -- Use Balatro's Event Manager for deferred state extraction
     local delay = self.extraction_delays[extraction_type] or 0.1
-    local extraction_entry = {
-        type = extraction_type,
-        timestamp = love.timer and love.timer.getTime() or os.clock(),
+    local context = context_data or {}
+    
+    if not G or not G.E_MANAGER then
+        print("BalatroMCP: ERROR - G.E_MANAGER not available, falling back to immediate extraction")
+        self:execute_deferred_extraction({type = extraction_type, context = context})
+        return
+    end
+    
+    print("BalatroMCP: Scheduling " .. extraction_type .. " extraction via G.E_MANAGER (delay: " .. delay .. "s)")
+    
+    -- Create event for deferred extraction using Balatro's Event System
+    G.E_MANAGER:add_event(Event({
+        trigger = "after",
         delay = delay,
-        context = context_data or {},
-        triggered = false
-    }
-    
-    -- Remove any existing extraction of the same type to avoid duplicates
-    for i = #self.deferred_extractions, 1, -1 do
-        if self.deferred_extractions[i].type == extraction_type then
-            table.remove(self.deferred_extractions, i)
+        blockable = false,
+        blocking = false,
+        func = function()
+            print("BalatroMCP: Processing event-based " .. extraction_type .. " extraction")
+            self:execute_deferred_extraction({
+                type = extraction_type,
+                context = context
+            })
         end
-    end
-    
-    table.insert(self.deferred_extractions, extraction_entry)
-    print("BalatroMCP: Deferred " .. extraction_type .. " extraction queued (delay: " .. delay .. "s)")
+    }))
 end
 
-function BalatroMCP:process_deferred_extractions(dt)
-    local current_time = love.timer and love.timer.getTime() or os.clock()
-    
-    for i = #self.deferred_extractions, 1, -1 do
-        local extraction = self.deferred_extractions[i]
-        local elapsed = current_time - extraction.timestamp
-        
-        if elapsed >= extraction.delay and not extraction.triggered then
-            extraction.triggered = true
-            
-            print("BalatroMCP: Processing deferred " .. extraction.type .. " extraction")
-            
-            -- Validate state before extraction based on type
-            if self:validate_extraction_timing(extraction.type) then
-                self:execute_deferred_extraction(extraction)
-            else
-                -- Extend delay if state not ready
-                extraction.timestamp = current_time
-                extraction.delay = extraction.delay * 1.5 -- Increase delay by 50%
-                extraction.triggered = false
-                print("BalatroMCP: State not ready, extending delay for " .. extraction.type)
-                
-                -- Prevent infinite delays
-                if extraction.delay > 1.0 then
-                    print("BalatroMCP: Maximum delay reached, forcing extraction for " .. extraction.type)
-                    self:execute_deferred_extraction(extraction)
-                    table.remove(self.deferred_extractions, i)
-                end
-            end
-        elseif extraction.triggered then
-            -- Remove completed extractions
-            table.remove(self.deferred_extractions, i)
-        end
-    end
-end
-
-function BalatroMCP:validate_extraction_timing(extraction_type)
-    -- Validate that game state is ready for extraction
-    if not G or G.STATE == -1 then
-        return false
-    end
-    
-    if extraction_type == "hand_action" then
-        -- Validate hand state is stable
-        local current_state = self.state_extractor:extract_current_state()
-        if not current_state or not current_state.hand_cards then
-            return false
-        end
-        -- Additional validation: check if hand count seems reasonable
-        local hand_count = #current_state.hand_cards
-        return hand_count > 0 or G.STATE == G.STATES.SELECTING_HAND
-        
-    elseif extraction_type == "shop_entry" then
-        -- Validate shop contents are populated
-        local current_state = self.state_extractor:extract_current_state()
-        if not current_state or not current_state.shop_contents then
-            return false
-        end
-        return G.STATE == G.STATES.SHOP
-        
-    elseif extraction_type == "hand_dealing" then
-        -- Validate hand dealing is complete
-        local current_state = self.state_extractor:extract_current_state()
-        if not current_state or not current_state.hand_cards then
-            return false
-        end
-        -- Hand should have cards after dealing
-        return #current_state.hand_cards > 0
-        
-    end
-    
-    return true -- Default to ready for other extraction types
-end
 
 function BalatroMCP:execute_deferred_extraction(extraction)
     local context = extraction.context
     
+    -- ADD DIAGNOSTIC LOGGING FOR STATE TRANSMISSION
+    print("BalatroMCP: [DEBUG_STALE_STATE] Executing deferred extraction: " .. extraction.type)
+    print("BalatroMCP: [DEBUG_STALE_STATE] Transport type: " .. (self.transport_type or "UNKNOWN"))
+    print("BalatroMCP: [DEBUG_STALE_STATE] Transport available: " .. tostring(self.transport and self.transport:is_available() or false))
+    
     if extraction.type == "hand_action" then
+        print("BalatroMCP: [DEBUG_STALE_STATE] Sending current state for hand_action")
         self:send_current_state()
         if context.action_type then
             self:send_status_update(context.action_type .. "_completed", context)
@@ -380,6 +319,7 @@ function BalatroMCP:execute_deferred_extraction(extraction)
         local shop_items = current_state and current_state.shop_contents and #current_state.shop_contents or 0
         print("BalatroMCP: Deferred shop entry - shop items: " .. shop_items)
         
+        print("BalatroMCP: [DEBUG_STALE_STATE] Sending current state for shop_entry")
         self:send_current_state()
         self:send_status_update("shop_entered", {
             shop_item_count = shop_items,
@@ -482,9 +422,6 @@ function BalatroMCP:update(dt)
         end
         
         -- Nested method definitions moved to proper class methods
-        
-        -- Process deferred state extractions
-        self:process_deferred_extractions(dt)
         
         if self.pending_state_extraction then
             print("BalatroMCP: PROCESSING_DELAYED_EXTRACTION")
@@ -920,6 +857,22 @@ function BalatroMCP:send_current_state()
 end
 
 function BalatroMCP:send_state_update(state)
+    -- ADD COMPREHENSIVE DIAGNOSTIC LOGGING FOR STATE TRANSMISSION
+    print("BalatroMCP: [DEBUG_STALE_STATE] === ATTEMPTING STATE TRANSMISSION ===")
+    print("BalatroMCP: [DEBUG_STALE_STATE] Transport type: " .. (self.transport_type or "UNKNOWN"))
+    print("BalatroMCP: [DEBUG_STALE_STATE] Transport object: " .. tostring(self.transport))
+    
+    if self.transport then
+        local available = self.transport:is_available()
+        print("BalatroMCP: [DEBUG_STALE_STATE] Transport availability: " .. tostring(available))
+        
+        if not available then
+            print("BalatroMCP: [DEBUG_STALE_STATE] *** TRANSPORT NOT AVAILABLE - STATE WILL NOT BE SENT ***")
+        end
+    else
+        print("BalatroMCP: [DEBUG_STALE_STATE] *** NO TRANSPORT OBJECT - STATE CANNOT BE SENT ***")
+    end
+    
     -- Consolidate all game data into a single comprehensive message
     -- to prevent data flow confusion between hand_cards, deck_cards, and remaining_deck
     
@@ -960,7 +913,14 @@ function BalatroMCP:send_state_update(state)
         state = comprehensive_state
     }
     
-    self.message_manager:write_game_state(state_message)
+    -- DIAGNOSTIC LOGGING BEFORE MESSAGE SEND
+    print("BalatroMCP: [DEBUG_STALE_STATE] About to call message_manager:write_game_state")
+    print("BalatroMCP: [DEBUG_STALE_STATE] Message manager: " .. tostring(self.message_manager))
+    
+    local send_result = self.message_manager:write_game_state(state_message)
+    
+    print("BalatroMCP: [DEBUG_STALE_STATE] Message send result: " .. tostring(send_result))
+    print("BalatroMCP: [DEBUG_STALE_STATE] === STATE TRANSMISSION COMPLETED ===")
     
     local hand_count = #(state.hand_cards or {})
     local full_deck_count = #(comprehensive_state.card_data.full_deck_cards or {})
