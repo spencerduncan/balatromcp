@@ -215,20 +215,34 @@ class MCPTestHandler(http.server.BaseHTTPRequestHandler):
                 }
             )
         elif parsed_path.path == "/state":
-            # Return the current game state
-            if self.current_game_state is not None:
-                response = {
-                    "status": "success",
-                    "data": self.current_game_state,
+            # Return the current game state with error handling
+            try:
+                if self.current_game_state is not None:
+                    # Test JSON serialization first
+                    test_json = json.dumps(self.current_game_state)
+                    response = {
+                        "status": "success",
+                        "data": self.current_game_state,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                    print(f"[DEBUG] Sending game state response, size: {len(test_json)} bytes")
+                else:
+                    response = {
+                        "status": "no_data",
+                        "message": "No game state data available",
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                    print("[DEBUG] No game state data available")
+                self._send_json_response(response)
+            except Exception as e:
+                print(f"[ERROR] Failed to process /state request: {e}")
+                error_response = {
+                    "status": "error",
+                    "message": "Failed to serialize game state data",
+                    "error": str(e),
                     "timestamp": datetime.now().isoformat(),
                 }
-            else:
-                response = {
-                    "status": "no_data",
-                    "message": "No game state data available",
-                    "timestamp": datetime.now().isoformat(),
-                }
-            self._send_json_response(response)
+                self._send_json_response(error_response, 500)
         elif parsed_path.path == "/web":
             # Serve the main web UI HTML page
             self._serve_web_ui()
