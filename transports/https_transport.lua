@@ -122,6 +122,7 @@ function HttpsTransport:make_request(method, url, body, headers)
     local request_id = self.request_count
     
     self:log("Making " .. method .. " request #" .. request_id .. " to: " .. url)
+    print("[DEBUG_STALE_STATE] HttpsTransport:make_request - " .. method .. " to " .. url)
     
     local start_time = os.clock()
     
@@ -137,13 +138,19 @@ function HttpsTransport:make_request(method, url, body, headers)
     end
     
     -- Make the HTTP request using SMODS.https (url, options)
+    print("[DEBUG_STALE_STATE] Calling SMODS.https.request with URL: " .. url)
+    print("[DEBUG_STALE_STATE] HTTP client available: " .. tostring(self.http_client ~= nil))
+    
     local success, status_code, response_body, response_headers = pcall(self.http_client.request, url, options)
     
     local end_time = os.clock()
     local duration = end_time - start_time
     
+    print("[DEBUG_STALE_STATE] SMODS.https.request result - success: " .. tostring(success) .. ", status: " .. tostring(status_code))
+    
     if not success then
         self:log("ERROR: HTTP request failed: " .. tostring(status_code))
+        print("[DEBUG_STALE_STATE] *** SMODS.https.request FAILED ***")
         return nil, "request_failed"
     end
     
@@ -196,13 +203,20 @@ function HttpsTransport:is_available()
 end
 
 function HttpsTransport:write_message(message_data, message_type)
+    -- ADD COMPREHENSIVE DIAGNOSTIC LOGGING FOR STALE STATE DEBUG
+    print("[DEBUG_STALE_STATE] HttpsTransport:write_message called")
+    print("[DEBUG_STALE_STATE] message_type: " .. tostring(message_type))
+    print("[DEBUG_STALE_STATE] message_data type: " .. type(message_data))
+    
     if not message_data then
         self:log("ERROR: No message data provided")
+        print("[DEBUG_STALE_STATE] *** WRITE_MESSAGE FAILED - NO DATA ***")
         return false
     end
     
     if not message_type then
         self:log("ERROR: No message type provided")
+        print("[DEBUG_STALE_STATE] *** WRITE_MESSAGE FAILED - NO MESSAGE TYPE ***")
         return false
     end
     
@@ -244,14 +258,21 @@ function HttpsTransport:write_message(message_data, message_type)
     local url = self:get_endpoint_url(self.game_data_endpoint)
     local headers = self:prepare_headers()
     
+    print("[DEBUG_STALE_STATE] About to make HTTP POST request to: " .. url)
+    print("[DEBUG_STALE_STATE] Payload size: " .. #json_payload .. " bytes")
+    
     local response, status_code = self:make_request("POST", url, json_payload, headers)
+    
+    print("[DEBUG_STALE_STATE] HTTP POST result - response: " .. tostring(response ~= nil) .. ", status: " .. tostring(status_code))
     
     if not response then
         self:log("ERROR: Failed to write message via HTTPS")
+        print("[DEBUG_STALE_STATE] *** HTTP POST FAILED - NO RESPONSE ***")
         return false
     end
     
     self:log("Message written successfully to: " .. url)
+    print("[DEBUG_STALE_STATE] *** HTTP POST SUCCESS ***")
     return true
 end
 

@@ -75,45 +75,67 @@ end
 
 -- High-level message operations
 function MessageManager:write_game_state(state_data)
+    -- ADD COMPREHENSIVE DIAGNOSTIC LOGGING FOR STALE STATE DEBUG
+    print("[DEBUG_STALE_STATE] MessageManager:write_game_state called")
     self:log("Attempting to write game state")
     
     if not state_data then
         self:log("ERROR: No state data provided")
+        print("[DEBUG_STALE_STATE] *** WRITE_GAME_STATE FAILED - NO STATE DATA ***")
         return false
     end
     
-    if not self.transport:is_available() then
+    print("[DEBUG_STALE_STATE] State data received, checking transport availability")
+    print("[DEBUG_STALE_STATE] Transport object: " .. tostring(self.transport))
+    
+    local transport_available = self.transport:is_available()
+    print("[DEBUG_STALE_STATE] Transport available: " .. tostring(transport_available))
+    
+    if not transport_available then
         self:log("ERROR: Transport is not available")
+        print("[DEBUG_STALE_STATE] *** WRITE_GAME_STATE FAILED - TRANSPORT NOT AVAILABLE ***")
         return false
     end
     
+    print("[DEBUG_STALE_STATE] Creating message structure")
     local message = self:create_message(state_data, "game_state")
     self:log("Created message structure with sequence_id: " .. message.sequence_id)
     
     -- Encode message to JSON
+    print("[DEBUG_STALE_STATE] Encoding message to JSON")
     local encode_success, encoded_data = pcall(self.json.encode, message)
     if not encode_success then
         self:log("ERROR: JSON encoding failed: " .. tostring(encoded_data))
+        print("[DEBUG_STALE_STATE] *** JSON ENCODING FAILED ***")
         return false
     end
     
     self:log("JSON encoding successful, data length: " .. #encoded_data)
+    print("[DEBUG_STALE_STATE] JSON encoded, calling transport:write_message")
     
     -- Delegate to transport
     local write_success = self.transport:write_message(encoded_data, "game_state")
+    
+    print("[DEBUG_STALE_STATE] Transport write_message result: " .. tostring(write_success))
+    
     if not write_success then
         self:log("ERROR: Transport write failed")
+        print("[DEBUG_STALE_STATE] *** TRANSPORT WRITE FAILED ***")
         return false
     end
+    
+    print("[DEBUG_STALE_STATE] Transport write successful, performing verification")
     
     -- Verify through transport
     local verify_success = self.transport:verify_message(encoded_data, "game_state")
     if not verify_success then
         self:log("ERROR: Message verification failed")
+        print("[DEBUG_STALE_STATE] *** MESSAGE VERIFICATION FAILED ***")
         return false
     end
     
     self:log("Game state written and verified successfully")
+    print("[DEBUG_STALE_STATE] *** WRITE_GAME_STATE COMPLETED SUCCESSFULLY ***")
     return true
 end
 
