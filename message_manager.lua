@@ -225,15 +225,20 @@ function MessageManager:write_remaining_deck(remaining_deck_data)
 end
 
 function MessageManager:read_actions()
+    self:log("ACTION_POLLING - Checking transport availability")
     if not self.transport:is_available() then
-        self:log("ERROR: Transport is not available")
+        self:log("ERROR: Transport is not available for action polling")
         return nil
     end
     
+    self:log("ACTION_POLLING - Calling transport:read_message('actions')")
     local message_data = self.transport:read_message("actions")
     if not message_data then
+        self:log("ACTION_POLLING - No actions available from transport")
         return nil
     end
+    
+    self:log("ACTION_POLLING - Actions data received from transport")
     
     -- Decode JSON
     local decode_success, decoded_data = pcall(self.json.decode, message_data)

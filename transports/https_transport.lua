@@ -279,20 +279,23 @@ end
 function HttpsTransport:read_message(message_type)
     -- Only poll actions_endpoint for "actions" message type
     if message_type ~= "actions" then
+        self:log("ACTION_POLLING - Ignoring non-actions message type: " .. tostring(message_type))
         return nil -- Other message types are write-only to server
     end
     
+    self:log("ACTION_POLLING - Polling actions endpoint")
     local url = self:get_endpoint_url(self.actions_endpoint)
     local headers = self:prepare_headers()
     
+    self:log("ACTION_POLLING - Making GET request to: " .. url)
     local response, status_code = self:make_request("GET", url, nil, headers)
     
     if not response then
-        self:log("No actions available or connection failed")
+        self:log("ACTION_POLLING - No actions available or connection failed")
         return nil
     end
     
-    self:log("Actions response received, size: " .. #response .. " bytes")
+    self:log("ACTION_POLLING - Actions response received, size: " .. #response .. " bytes")
     
     -- Parse response
     local parse_success, data = pcall(self.json.decode, response)

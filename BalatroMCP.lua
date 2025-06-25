@@ -229,7 +229,11 @@ function BalatroMCP.new()
     self.last_state_hash = nil
     self.polling_active = false
     self.update_timer = 0
-    self.update_interval = 0.5 -- Check for actions every 0.5 seconds
+    self.update_interval = 0.5 -- Check for state updates every 0.5 seconds
+    
+    -- Add separate action polling timer
+    self.action_polling_timer = 0
+    self.action_polling_interval = 1.5 -- Poll for actions every 1.5 seconds
     
     self.processing_action = false
     self.last_action_sequence = 0
@@ -412,8 +416,20 @@ function BalatroMCP:update(dt)
         self.blind_transition_cooldown = self.blind_transition_cooldown - dt
     end
     
+    -- Update both timers
     self.update_timer = self.update_timer + dt
+    self.action_polling_timer = self.action_polling_timer + dt
     
+    -- Handle action polling on separate timer
+    if (self.action_polling_timer >= self.action_polling_interval) and
+       self.transport and self.transport:is_available() and G.STATE ~= -1 then
+        self.action_polling_timer = 0
+        
+        print("BalatroMCP: ACTION_POLLING - Checking for pending actions")
+        self:process_pending_actions()
+    end
+    
+    -- Handle state updates on original timer
     if (self.update_timer >= self.update_interval) and G.STATE ~= -1 then
         self.update_timer = 0
         
@@ -421,14 +437,10 @@ function BalatroMCP:update(dt)
             self.crash_diagnostics:monitor_joker_operations()
         end
         
-        -- Nested method definitions moved to proper class methods
-        
         if self.pending_state_extraction then
             print("BalatroMCP: PROCESSING_DELAYED_EXTRACTION")
             self:handle_delayed_state_extraction()
         end
-        
-        self:process_pending_actions()
         
         self:check_and_send_state_update()
     end
@@ -756,13 +768,18 @@ end
 
 function BalatroMCP:process_pending_actions()
     if self.processing_action then
+        print("BalatroMCP: ACTION_POLLING - Skipping, already processing action")
         return
     end
     
+    print("BalatroMCP: ACTION_POLLING - Calling message_manager:read_actions()")
     local message_data = self.message_manager:read_actions()
     if not message_data then
+        print("BalatroMCP: ACTION_POLLING - No actions available")
         return
     end
+    
+    print("BalatroMCP: ACTION_POLLING - Actions received, processing...")
     
     -- Extract action data from message wrapper
     local action_data = message_data.data
