@@ -40,9 +40,6 @@ function StateExtractor.new()
     self:register_extractor(ActionExtractor.new())
     self:register_extractor(JokerReorderExtractor.new())
     
-    -- Initialize session_id for backward compatibility
-    self.session_id = nil
-    
     -- Immediately test G object availability and structure
     self:validate_g_object()
     
@@ -97,13 +94,23 @@ function StateExtractor:merge_extraction_results(state, extractor_result)
     end
 end
 
-
--- Backward compatibility methods - delegate to appropriate extractors
+-- Backward compatibility method for session ID access
 function StateExtractor:get_session_id()
-    -- Maintain session_id for backward compatibility
-    if not self.session_id then
-        self.session_id = "session_" .. tostring(os.time()) .. "_" .. tostring(math.random(1000, 9999))
+    -- Use existing session_id if available
+    if self.session_id then
+        return self.session_id
     end
+    
+    -- Find SessionExtractor and delegate to it
+    for _, extractor in ipairs(self.extractors) do
+        if extractor:get_name() == "session_extractor" then
+            self.session_id = extractor:get_session_id()
+            return self.session_id
+        end
+    end
+    
+    -- Fallback if SessionExtractor not found
+    self.session_id = "session_" .. tostring(os.time()) .. "_" .. tostring(math.random(1000, 9999))
     return self.session_id
 end
 
