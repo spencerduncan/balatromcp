@@ -36,86 +36,77 @@ function BlindExtractor:extract()
     end
 end
 
-function BlindExtractor:get_current_phase()
-    -- Validate G object structure
-    if not StateExtractorUtils.safe_check_path(G, {"STATE"}) then
-        return "hand_selection"
-    end
-    
-    if not StateExtractorUtils.safe_check_path(G, {"STATES"}) then
-        return "hand_selection"
-    end
-    
-    -- Use consistent direct access to G object
-    local current_state = G.STATE
-    local states = G.STATES
-    
-    -- Comprehensive state mapping using G.STATES constants
-    -- Hand/Card Selection States
-    if current_state == states.SELECTING_HAND then
-        return "hand_selection"
-    elseif current_state == states.DRAW_TO_HAND then
-        return "drawing_cards"
-    elseif current_state == states.HAND_PLAYED then
-        return "hand_played"
-    
-    -- Shop and Purchase States
-    elseif current_state == states.SHOP then
-        return "shop"
-    
-    -- Blind Selection and Round States
-    elseif current_state == states.BLIND_SELECT then
-        return "blind_selection"
-    elseif current_state == states.NEW_ROUND then
-        return "new_round"
-    elseif current_state == states.ROUND_EVAL then
-        return "round_evaluation"
-    
-    -- Pack Opening States
-    elseif current_state == states.STANDARD_PACK then
-        return "pack_opening"
-    elseif current_state == states.BUFFOON_PACK then
-        return "pack_opening"
-    elseif current_state == states.TAROT_PACK then
-        return "pack_opening"
-    elseif current_state == states.PLANET_PACK then
-        return "pack_opening"
-    elseif current_state == states.SPECTRAL_PACK then
-        return "pack_opening"
-    elseif current_state == states.SMODS_BOOSTER_OPENED then
-        return "pack_opening"
-    
-    -- Consumable Usage States
-    elseif current_state == states.PLAY_TAROT then
-        return "using_consumable"
-    
-    -- Menu and Navigation States
-    elseif current_state == states.MENU then
-        return "menu"
-    elseif current_state == states.SPLASH then
-        return "splash"
-    elseif current_state == states.TUTORIAL then
-        return "tutorial"
-    elseif current_state == states.DEMO_CTA then
-        return "demo_prompt"
-    
-    -- Game End States
-    elseif current_state == states.GAME_OVER then
-        return "game_over"
-    
-    -- Special Game Modes
-    elseif current_state == states.SANDBOX then
-        return "sandbox"
-    
-    -- Fallback for unknown states
-    else
-        return "hand_selection" -- Safe default
-    end
-end
 
 function BlindExtractor:extract_current_blind()
     -- Extract current blind information with CIRCULAR REFERENCE SAFE access
-    local current_phase = self:get_current_phase()
+    -- Inline phase detection logic
+    local current_phase = "hand_selection" -- Safe default
+    if StateExtractorUtils.safe_check_path(G, {"STATE"}) and StateExtractorUtils.safe_check_path(G, {"STATES"}) then
+        local current_state = G.STATE
+        local states = G.STATES
+        
+        -- Comprehensive state mapping using G.STATES constants
+        -- Hand/Card Selection States
+        if current_state == states.SELECTING_HAND then
+            current_phase = "hand_selection"
+        elseif current_state == states.DRAW_TO_HAND then
+            current_phase = "drawing_cards"
+        elseif current_state == states.HAND_PLAYED then
+            current_phase = "hand_played"
+        
+        -- Shop and Purchase States
+        elseif current_state == states.SHOP then
+            current_phase = "shop"
+        
+        -- Blind Selection and Round States
+        elseif current_state == states.BLIND_SELECT then
+            current_phase = "blind_selection"
+        elseif current_state == states.NEW_ROUND then
+            current_phase = "new_round"
+        elseif current_state == states.ROUND_EVAL then
+            current_phase = "round_evaluation"
+        
+        -- Pack Opening States
+        elseif current_state == states.STANDARD_PACK then
+            current_phase = "pack_opening"
+        elseif current_state == states.BUFFOON_PACK then
+            current_phase = "pack_opening"
+        elseif current_state == states.TAROT_PACK then
+            current_phase = "pack_opening"
+        elseif current_state == states.PLANET_PACK then
+            current_phase = "pack_opening"
+        elseif current_state == states.SPECTRAL_PACK then
+            current_phase = "pack_opening"
+        elseif current_state == states.SMODS_BOOSTER_OPENED then
+            current_phase = "pack_opening"
+        
+        -- Consumable Usage States
+        elseif current_state == states.PLAY_TAROT then
+            current_phase = "using_consumable"
+        
+        -- Menu and Navigation States
+        elseif current_state == states.MENU then
+            current_phase = "menu"
+        elseif current_state == states.SPLASH then
+            current_phase = "splash"
+        elseif current_state == states.TUTORIAL then
+            current_phase = "tutorial"
+        elseif current_state == states.DEMO_CTA then
+            current_phase = "demo_prompt"
+        
+        -- Game End States
+        elseif current_state == states.GAME_OVER then
+            current_phase = "game_over"
+        
+        -- Special Game Modes
+        elseif current_state == states.SANDBOX then
+            current_phase = "sandbox"
+        
+        -- Fallback for unknown states
+        else
+            current_phase = "hand_selection" -- Safe default
+        end
+    end
     
     -- During blind selection phase, extract information from blind selection options
     if current_phase == "blind_selection" then
