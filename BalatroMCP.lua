@@ -282,6 +282,7 @@ function BalatroMCP:defer_state_extraction(extraction_type, context_data)
                 type = extraction_type,
                 context = context
             })
+            return true  -- Signal event completion to prevent infinite loops
         end
     }))
 end
