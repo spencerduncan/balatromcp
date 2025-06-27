@@ -194,5 +194,4 @@ function StateExtractor:validate_states()
         return
     end
 end
-
 return StateExtractor
