@@ -239,7 +239,7 @@ end
 -- Mock SMODS environment setup (enhanced for StateExtractor compatibility)
 function luaunit_helpers.setup_mock_smods()
     if not _G.SMODS then
-        -- Create mock SMODS object that handles both JSON and StateExtractor modules
+        -- Create mock SMODS object that handles JSON, StateExtractor, and HTTPS modules
         _G.SMODS = {
             load_file = function(filename)
                 -- Mock implementation that mimics SMODS.load_file behavior
@@ -259,16 +259,36 @@ function luaunit_helpers.setup_mock_smods()
                 else
                     error("Mock SMODS: File not found: " .. filename)
                 end
-            end
+            end,
+            -- Mock HTTPS module for transport compatibility  
+            https = {
+                request = function(url, options)
+                    -- Mock HTTPS request implementation
+                    -- Returns: status_code, response_body, response_headers
+                    return 200, '{"result": "mock_response"}', {}
+                end,
+                post = function(url, data, headers)
+                    return 200, '{"result": "mock_post_response"}', {}
+                end,
+                get = function(url, headers)
+                    return 200, '{"result": "mock_get_response"}', {}
+                end
+            }
         }
+    end
+    
+    -- Make SMODS.https available as a module for require()
+    if not package.loaded["SMODS.https"] then
+        package.loaded["SMODS.https"] = _G.SMODS.https
     end
     
     return _G.SMODS
 end
 
--- Clean up SMODS mock (preserves exact functionality from test_file_io.lua)
+-- Clean up SMODS mock (enhanced to clean up SMODS.https module)
 function luaunit_helpers.cleanup_mock_smods()
     _G.SMODS = nil
+    package.loaded["SMODS.https"] = nil
 end
 
 -- Clean up Love2D filesystem mock

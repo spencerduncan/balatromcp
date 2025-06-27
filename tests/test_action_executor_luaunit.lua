@@ -133,7 +133,7 @@ function testActionExecutorMovePlayingCardNYIError()
     
     local success, error_message = executor:execute_move_playing_card(action_data)
     luaunit.assertEquals(false, success, "Should return false for NYI implementation")
-    luaunit.assertEquals("Move playing card action not yet implemented", error_message, "Should return NYI error message")
+    luaunit.assertEquals("No hand available", error_message, "Should return validation error message")
     tearDown()
 end
 
@@ -403,7 +403,7 @@ function testActionExecutorExecuteActionMovePlayingCard()
     
     local result = executor:execute_action(action_data)
     luaunit.assertEquals(false, result.success, "Should return false for NYI action")
-    luaunit.assertEquals("Move playing card action not yet implemented", result.error_message, "Should return NYI error message")
+    luaunit.assertEquals("No hand available", result.error_message, "Should return validation error message")
     luaunit.assertNil(result.new_state, "Should not return new state on failure")
     tearDown()
 end
