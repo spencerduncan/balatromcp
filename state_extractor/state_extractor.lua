@@ -25,6 +25,7 @@ function StateExtractor.new()
     local self = setmetatable({}, StateExtractor)
     self.component_name = "STATE_EXTRACTOR"
     self.extractors = {}
+    self.extractor_lookup = {}
     
     -- Initialize and register all extractors in correct order
     self:register_extractor(SessionExtractor.new())
@@ -53,6 +54,12 @@ function StateExtractor:register_extractor(extractor)
     -- Validate extractor implements required interface
     if IExtractor.validate_implementation(extractor) then
         table.insert(self.extractors, extractor)
+        
+        -- Add to lookup table for O(1) access
+        local extractor_name = extractor:get_name()
+        if extractor_name then
+            self.extractor_lookup[extractor_name] = extractor
+        end
     else
         error("Extractor must implement IExtractor interface (extract() and get_name() methods required)")
     end
@@ -101,17 +108,34 @@ function StateExtractor:get_session_id()
         return self.session_id
     end
     
-    -- Find SessionExtractor and delegate to it
-    for _, extractor in ipairs(self.extractors) do
-        if extractor:get_name() == "session_extractor" then
-            self.session_id = extractor:get_session_id()
-            return self.session_id
-        end
+    -- Use O(1) lookup instead of O(n) search
+    local extractor = self.extractor_lookup["session_extractor"]
+    if extractor and extractor.get_session_id then
+        self.session_id = extractor:get_session_id()
+        return self.session_id
     end
     
     -- Fallback if SessionExtractor not found
     self.session_id = "session_" .. tostring(os.time()) .. "_" .. tostring(math.random(1000, 9999))
     return self.session_id
+end
+
+-- Delegation method for deck cards extraction
+function StateExtractor:extract_deck_cards()
+    local extractor = self.extractor_lookup["deck_card_extractor"]
+    if extractor and extractor.extract_deck_cards then
+        return extractor:extract_deck_cards()
+    end
+    return {}
+end
+
+-- Delegation method for remaining deck cards extraction
+function StateExtractor:extract_remaining_deck_cards()
+    local extractor = self.extractor_lookup["deck_card_extractor"]
+    if extractor and extractor.extract_remaining_deck_cards then
+        return extractor:extract_remaining_deck_cards()
+    end
+    return {}
 end
 
 -- Original validation methods preserved for backward compatibility

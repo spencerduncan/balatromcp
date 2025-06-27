@@ -19,7 +19,11 @@
       "Bash(gh pr create:*)",
       "Bash(gh pr:*)",
       "Bash(gh issue close:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(rg:*)",
+      "Bash(lua:*)",
+      "Bash(git pull:*)",
+      "Bash(git merge:*)"
     ],
     "deny": []
   },
