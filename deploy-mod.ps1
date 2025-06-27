@@ -15,17 +15,17 @@ $DestinationPath = "$env:APPDATA\Balatro\mods\BalatroMCP"
 $IncludeFiles = @(
     "action_executor.lua",
     "BalatroMCP.lua",
-    "crash_diagnostics.lua"
+    "crash_diagnostics.lua",
     "debug_logger.lua", 
     "joker_manager.lua",
     "manifest.json",
-    "message_manager.lua",
-    "state_extractor.lua"
+    "message_manager.lua"
 )
 
 $IncludeDirectories = @(
     "compatibility",
     "interfaces", 
+    "state_extractor",
     "transports"
 )
 
