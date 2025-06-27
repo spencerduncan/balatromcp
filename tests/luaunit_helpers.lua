@@ -64,8 +64,8 @@ function luaunit_helpers.create_mock_g(options)
         mock_g.STATES = options.states or luaunit_helpers.create_mock_states()
     end
     
-    -- Add GAME object if requested
-    if options.has_game then
+    -- Add GAME object if requested (either has_game flag or game data provided)
+    if options.has_game or options.game then
         mock_g.GAME = {
             dollars = options.dollars or 100,
             current_round = options.current_round or {
@@ -83,6 +83,13 @@ function luaunit_helpers.create_mock_g(options)
                 config = {}
             }
         }
+        
+        -- Merge any additional game data provided
+        if options.game then
+            for key, value in pairs(options.game) do
+                mock_g.GAME[key] = value
+            end
+        end
     end
     
     -- Add card areas if requested
@@ -263,15 +270,43 @@ function luaunit_helpers.setup_mock_smods()
             -- Mock HTTPS module for transport compatibility  
             https = {
                 request = function(url, options)
-                    -- Mock HTTPS request implementation
-                    -- Returns: status_code, response_body, response_headers
-                    return 200, '{"result": "mock_response"}', {}
+                    -- Integrate with existing HTTP test mocking infrastructure
+                    options = options or {}
+                    local method = options.method or "GET"
+                    local headers = options.headers or {}
+                    local body = options.data
+                    
+                    -- Log the request (compatible with existing test infrastructure)
+                    if _G.mock_http_request_log then
+                        table.insert(_G.mock_http_request_log, {
+                            url = url,
+                            method = method,
+                            headers = headers,
+                            body = body
+                        })
+                    end
+                    
+                    -- Check for mock failures
+                    if _G.mock_http_should_fail then
+                        error(_G.mock_http_failure_reason or "network_error")
+                    end
+                    
+                    -- Return mock response (check for URL-specific responses)
+                    local response = '{"result": "mock_response"}'
+                    local status = 200
+                    
+                    if _G.mock_http_responses then
+                        response = _G.mock_http_responses[url] or response
+                        status = _G.mock_http_responses[url .. "_status"] or status
+                    end
+                    
+                    return status, response, {}
                 end,
                 post = function(url, data, headers)
-                    return 200, '{"result": "mock_post_response"}', {}
+                    return _G.SMODS.https.request(url, {method = "POST", data = data, headers = headers})
                 end,
                 get = function(url, headers)
-                    return 200, '{"result": "mock_get_response"}', {}
+                    return _G.SMODS.https.request(url, {method = "GET", headers = headers})
                 end
             }
         }

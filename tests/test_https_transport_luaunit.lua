@@ -17,11 +17,17 @@ local mock_http_failure_reason = "network_error"
 local function setUp()
     luaunit_helpers.setup_mock_smods()
     
-    -- Reset mock state
-    mock_http_responses = {}
-    mock_http_request_log = {}
-    mock_http_should_fail = false
-    mock_http_failure_reason = "network_error"
+    -- Reset mock state (use globals for SMODS.https compatibility)
+    _G.mock_http_responses = {}
+    _G.mock_http_request_log = {}
+    _G.mock_http_should_fail = false
+    _G.mock_http_failure_reason = "network_error"
+    
+    -- Also set local variables for backward compatibility
+    mock_http_responses = _G.mock_http_responses
+    mock_http_request_log = _G.mock_http_request_log
+    mock_http_should_fail = _G.mock_http_should_fail
+    mock_http_failure_reason = _G.mock_http_failure_reason
     
     -- Set up mock HTTP environment
     setup_mock_http_environment()
@@ -125,20 +131,20 @@ end
 
 -- Helper to set mock HTTP response for a URL
 local function set_mock_response(url, response, status_code)
-    mock_http_responses[url] = response
+    _G.mock_http_responses[url] = response
     if status_code then
-        mock_http_responses[url .. "_status"] = status_code
+        _G.mock_http_responses[url .. "_status"] = status_code
     end
 end
 
 -- Helper to get last HTTP request made
 local function get_last_request()
-    return mock_http_request_log[#mock_http_request_log]
+    return _G.mock_http_request_log[#_G.mock_http_request_log]
 end
 
 -- Helper to clear request log
 local function clear_request_log()
-    mock_http_request_log = {}
+    _G.mock_http_request_log = {}
 end
 
 -- =============================================================================
