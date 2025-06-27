@@ -1,8 +1,8 @@
 -- Test file for ActionExtractor
 -- Tests available actions detection functionality
 
-local luaunit = require('luaunit')
-local ActionExtractor = require("state_extractor.extractors.action_extractor")
+local luaunit = require('libs.luaunit')
+local ActionExtractor = require('state_extractor.extractors.action_extractor')
 
 -- Test helper functions
 local function create_mock_g_with_phase(phase_key)

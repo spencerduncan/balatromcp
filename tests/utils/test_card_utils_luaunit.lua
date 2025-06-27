@@ -1,7 +1,7 @@
 -- Test file for CardUtils
 -- Tests card-specific utility functions for state extraction
 
-local luaunit = require('luaunit')
+local luaunit = require('libs.luaunit')
 local CardUtils = require("state_extractor.utils.card_utils")
 
 -- Test helper functions

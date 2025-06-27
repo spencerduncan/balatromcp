@@ -1,7 +1,7 @@
 -- Test file for ShopExtractor
 -- Tests shop contents extraction functionality
 
-local luaunit = require('luaunit')
+local luaunit = require('libs.luaunit')
 local ShopExtractor = require("state_extractor.extractors.shop_extractor")
 
 -- Test helper functions

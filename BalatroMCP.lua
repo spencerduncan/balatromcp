@@ -68,7 +68,7 @@ end
 
 local StateExtractor = nil
 local state_success, state_error = pcall(function()
-    StateExtractor = assert(SMODS.load_file("state_extractor.lua"))()
+    StateExtractor = assert(SMODS.load_file("state_extractor/state_extractor.lua"))()
     print("BalatroMCP: StateExtractor loaded successfully")
 end)
 if not state_success then

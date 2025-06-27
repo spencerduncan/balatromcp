@@ -1,7 +1,7 @@
 -- Test file for StateExtractorUtils
 -- Tests utility functions for safe state extraction
 
-local luaunit = require('luaunit')
+local luaunit = require('libs.luaunit')
 local StateExtractorUtils = require("state_extractor.utils.state_extractor_utils")
 
 -- Test StateExtractorUtils

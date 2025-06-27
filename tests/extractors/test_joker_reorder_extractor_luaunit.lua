@@ -1,7 +1,7 @@
 -- Test file for JokerReorderExtractor
 -- Tests joker reorder availability detection functionality
 
-local luaunit = require('luaunit')
+local luaunit = require('libs.luaunit')
 local JokerReorderExtractor = require("state_extractor.extractors.joker_reorder_extractor")
 
 -- Test helper functions

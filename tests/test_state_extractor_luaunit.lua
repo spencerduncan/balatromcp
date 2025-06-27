@@ -2,8 +2,9 @@
 -- Tests main orchestration functionality after modular refactor
 -- Individual extractor tests have been moved to separate files
 
-local luaunit = require('luaunit')
-local StateExtractor = require("state_extractor.state_extractor")
+local luaunit_helpers = require('tests.luaunit_helpers')
+local luaunit = require('libs.luaunit')
+local StateExtractor = require('state_extractor.state_extractor')
 
 -- Test StateExtractor orchestration
 TestStateExtractorOrchestration = {}

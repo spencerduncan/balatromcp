@@ -1,7 +1,7 @@
 -- Test file for StateExtractor orchestrator
 -- Tests main orchestration and coordination of all extractors
 
-local luaunit = require('luaunit')
+local luaunit = require('libs.luaunit')
 local StateExtractor = require("state_extractor.state_extractor")
 local IExtractor = require("state_extractor.extractors.i_extractor")
 
