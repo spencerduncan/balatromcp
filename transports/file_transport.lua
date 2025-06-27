@@ -28,11 +28,39 @@ while true do
         error = nil
     }
     
+    -- DIAGNOSTIC: Log content size received in worker thread
+    if request.operation == 'write' and request.content then
+        local received_size = string.len(request.content)
+        print("ASYNC_WORKER_DEBUG: Received write request with content size: " .. received_size)
+        if received_size > 1000 then
+            print("ASYNC_WORKER_DEBUG: Large content in worker - first 200 chars: " .. string.sub(request.content, 1, 200))
+        end
+        if received_size < 100 then
+            print("ASYNC_WORKER_DEBUG: SUSPICIOUS - Very small content: " .. request.content)
+        end
+    end
+    
     local ok, result = pcall(function()
         if request.operation == 'read' then
             return love.filesystem.read(request.filepath)
         elseif request.operation == 'write' then
-            return love.filesystem.write(request.filepath, request.content)
+            local write_result = love.filesystem.write(request.filepath, request.content)
+            -- DIAGNOSTIC: Verify the write actually succeeded
+            if write_result then
+                local verify_content = love.filesystem.read(request.filepath)
+                if verify_content then
+                    local written_size = string.len(verify_content)
+                    print("ASYNC_WORKER_DEBUG: File written and verified, final size: " .. written_size)
+                    if written_size ~= string.len(request.content) then
+                        print("ASYNC_WORKER_DEBUG: SIZE MISMATCH! Expected: " .. string.len(request.content) .. ", Got: " .. written_size)
+                    end
+                else
+                    print("ASYNC_WORKER_DEBUG: ERROR - File write succeeded but verification read failed")
+                end
+            else
+                print("ASYNC_WORKER_DEBUG: ERROR - File write operation failed")
+            end
+            return write_result
         elseif request.operation == 'remove' then
             return love.filesystem.remove(request.filepath)
         elseif request.operation == 'getInfo' then
@@ -199,6 +227,15 @@ function FileTransport:submit_async_request(operation, params, callback)
     
     self.request_id_counter = self.request_id_counter + 1
     local request_id = self.request_id_counter
+    
+    -- DIAGNOSTIC: Log content size before threading
+    if params.content then
+        local content_size = string.len(params.content)
+        self:log("ASYNC_DEBUG: Submitting " .. operation .. " request with content size: " .. content_size)
+        if content_size > 1000 then
+            self:log("ASYNC_DEBUG: Large content detected - first 200 chars: " .. string.sub(params.content, 1, 200))
+        end
+    end
     
     local request = {
         id = request_id,

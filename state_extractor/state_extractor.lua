@@ -69,11 +69,25 @@ function StateExtractor:extract_current_state()
     local state = {}
     local extraction_errors = {}
     
+    -- THREAD CONTEXT DIAGNOSTIC: Check if we're running in a worker thread
+    local is_main_thread = love and love.graphics and love.graphics.isActive
+    if is_main_thread then
+        print("StateExtractor: THREAD_DEBUG - Running in MAIN THREAD (good)")
+    else
+        print("StateExtractor: THREAD_DEBUG - Running in WORKER THREAD (BAD - G object not accessible)")
+        state.thread_context_error = "State extraction running in worker thread - G object inaccessible"
+    end
+    
     -- Add G object validation diagnostics before extraction
     local g_validation = self:validate_g_object_for_extraction()
     if not g_validation.valid then
         print("StateExtractor: G object validation failed - " .. g_validation.reason)
         state.g_object_validation_errors = g_validation.missing_properties
+        
+        -- Enhanced thread context debugging
+        if not is_main_thread then
+            print("StateExtractor: THREAD_DEBUG - G object failure likely due to worker thread context")
+        end
     end
     
     -- Extract from each registered extractor with error handling
