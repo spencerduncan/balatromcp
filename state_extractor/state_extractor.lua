@@ -26,6 +26,9 @@ function StateExtractor.new()
     self.component_name = "STATE_EXTRACTOR"
     self.extractors = {}
     
+    -- Load IExtractor once and cache it for all registrations
+    self.IExtractor = assert(SMODS.load_file("state_extractor/extractors/i_extractor.lua"))()
+    
     -- Initialize and register all extractors in correct order
     self:register_extractor(SessionExtractor.new())
     self:register_extractor(PhaseExtractor.new())
@@ -47,8 +50,8 @@ function StateExtractor.new()
 end
 
 function StateExtractor:register_extractor(extractor)
-    -- Import IExtractor for validation
-    local IExtractor = assert(SMODS.load_file("state_extractor/extractors/i_extractor.lua"))()
+    -- Use cached IExtractor for validation
+    local IExtractor = self.IExtractor
     
     -- Validate extractor implements required interface
     if IExtractor.validate_implementation(extractor) then
