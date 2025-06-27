@@ -55,7 +55,14 @@ local function setup_test_environment()
     -- Safely preserve original os functions before mocking
     local original_os = _G.os
     _G.os = setmetatable({
-        date = function(format) return "12:34:56" end,
+        date = function(format) 
+            -- Check if this is an ISO 8601 format request
+            if format and string.find(format, "%%Y.*%%m.*%%d.*T.*%%H.*%%M.*%%S.*Z") then
+                return "2025-06-27T12:34:56Z"
+            else
+                return "12:34:56"
+            end
+        end,
         time = function() return 1234567890 end,
         clock = original_os and original_os.clock or function() return 1234567890 end
     }, {
