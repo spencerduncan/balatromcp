@@ -991,13 +991,9 @@ function BalatroMCP:check_and_send_state_update()
     local money = current_state.money or "NIL"
     local ante = current_state.ante or "NIL"
     
-    local state_hash = self:calculate_state_hash(current_state)
-    
-    
-    if state_hash ~= self.last_state_hash then
-        self.last_state_hash = state_hash
-        self:send_state_update(current_state)
-    end
+    -- HACK: Always send state update since async transport should handle it efficiently
+    print("BalatroMCP: ALWAYS_SEND_HACK - Sending state update (phase=" .. phase .. ", money=" .. tostring(money) .. ")")
+    self:send_state_update(current_state)
 end
 
 function BalatroMCP:send_current_state()
