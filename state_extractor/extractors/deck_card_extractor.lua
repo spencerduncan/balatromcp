@@ -52,9 +52,29 @@ function DeckCardExtractor:validate_card_structure(card, card_name)
 end
 
 function DeckCardExtractor:extract_deck_cards()
-    -- Extract full deck cards from G.playing_cards with CIRCULAR REFERENCE SAFE access
+    -- Extract deck cards from G.deck.cards with CIRCULAR REFERENCE SAFE access
     local deck_cards = {}
     
+    -- Try G.deck.cards first (standard location)
+    if StateExtractorUtils.safe_check_path(G, {"deck", "cards"}) then
+        for i, card in ipairs(G.deck.cards) do
+            if card then
+                -- SAFE EXTRACTION: Only extract primitive values, avoid object references
+                local safe_card = {
+                    id = StateExtractorUtils.safe_primitive_value(card, "unique_val", "deck_card_" .. i),
+                    rank = StateExtractorUtils.safe_primitive_nested_value(card, {"base", "value"}, "A"),
+                    suit = StateExtractorUtils.safe_primitive_nested_value(card, {"base", "suit"}, "Spades"),
+                    enhancement = CardUtils.get_card_enhancement_safe(card),
+                    edition = CardUtils.get_card_edition_safe(card),
+                    seal = CardUtils.get_card_seal_safe(card)
+                }
+                table.insert(deck_cards, safe_card)
+            end
+        end
+        return deck_cards
+    end
+    
+    -- Fallback to G.playing_cards if deck.cards not available
     if not StateExtractorUtils.safe_check_path(G, {"playing_cards"}) then
         return deck_cards
     end

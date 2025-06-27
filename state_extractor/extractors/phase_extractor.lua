@@ -23,9 +23,9 @@ function PhaseExtractor:extract()
     end)
     
     if success then
-        return {current_phase = result}
+        return {phase = result}
     else
-        return {current_phase = "hand_selection"}
+        return {phase = "hand_selection"}
     end
 end
 

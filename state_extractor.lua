@@ -11,6 +11,20 @@
 --
 -- Original implementation preserved in: state_extractor_original.lua
 
-local StateExtractor = require("state_extractor.state_extractor")
+-- Load the main StateExtractor using SMODS for compatibility
+local StateExtractor = nil
+if SMODS then
+    local success, extractor_or_error = pcall(function()
+        return assert(SMODS.load_file("state_extractor/state_extractor.lua"))()
+    end)
+    
+    if success then
+        StateExtractor = extractor_or_error
+    else
+        error("Failed to load state_extractor/state_extractor.lua: " .. tostring(extractor_or_error))
+    end
+else
+    error("SMODS not available - StateExtractor requires SMODS framework")
+end
 
 return StateExtractor

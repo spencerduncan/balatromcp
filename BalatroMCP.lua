@@ -156,10 +156,18 @@ function BalatroMCP.new()
         self.debug_logger:info("FileTransport initialized with synchronous fallback (no threading)", "INIT")
     end
     
+    if not MessageManager then
+        error("MessageManager module not available - failed to load during startup")
+    end
+    
     self.message_manager = MessageManager.new(self.transport, "BALATRO_MCP")
     self.debug_logger:info("MessageManager component initialized successfully", "INIT")
     
     local state_success, state_error = pcall(function()
+        if not StateExtractor then
+            error("StateExtractor module not available - failed to load during startup")
+        end
+        
         self.state_extractor = StateExtractor.new()
         
         if self.crash_diagnostics then
@@ -176,6 +184,10 @@ function BalatroMCP.new()
     end
     
     local joker_success, joker_error = pcall(function()
+        if not JokerManager then
+            error("JokerManager module not available - failed to load during startup")
+        end
+        
         self.joker_manager = JokerManager.new()
         self.joker_manager:set_crash_diagnostics(self.crash_diagnostics)
         self.debug_logger:info("JokerManager component initialized successfully with crash diagnostics", "INIT")
@@ -187,6 +199,10 @@ function BalatroMCP.new()
     end
     
     local action_success, action_error = pcall(function()
+        if not ActionExecutor then
+            error("ActionExecutor module not available - failed to load during startup")
+        end
+        
         self.action_executor = ActionExecutor.new(self.state_extractor, self.joker_manager)
         self.debug_logger:info("ActionExecutor component initialized successfully", "INIT")
     end)

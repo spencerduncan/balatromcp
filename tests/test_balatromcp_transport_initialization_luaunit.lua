@@ -282,7 +282,7 @@ local function TestBalatroMCPConfigurationDefaults()
     
     -- Test defaults without configuration
     local mcp = BalatroMCP.new()
-    luaunit.assertEquals("FILE", mcp.transport_type, "Should default to file transport")
+    luaunit.assertEquals("ASYNC_FILE", mcp.transport_type, "Should default to async file transport")
     
     tearDown()
 end
