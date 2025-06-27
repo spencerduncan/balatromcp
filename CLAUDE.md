@@ -285,3 +285,8 @@ return {current_phase = "hand_selection"}
 -- Then fallback to G.playing_cards (actual game data)
 -- TODO: Reverse this priority for production accuracy
 ```
+
+## Review Lessons Documentation
+
+For detailed code review insights and patterns discovered during development, see:
+- [StateExtractor Review Lessons](state_extractor/STATE_EXTRACTOR_REVIEW_LESSONS.md) - Delegation pattern insights from PR #37
