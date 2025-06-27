@@ -75,3 +75,6 @@ local_config.lua
 # Steam Workshop files
 workshop_items/
 steam_workshop/
+
+# Claude Code configuration
+.claude/
