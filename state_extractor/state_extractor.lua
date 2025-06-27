@@ -1,22 +1,22 @@
 -- Main StateExtractor orchestrator class
 -- Manages collection of specialized extractors and provides unified interface
 
-local StateExtractorUtils = require("state_extractor.utils.state_extractor_utils")
-local CardUtils = require("state_extractor.utils.card_utils")
+local StateExtractorUtils = assert(SMODS.load_file("state_extractor/utils/state_extractor_utils.lua"))()
+local CardUtils = assert(SMODS.load_file("state_extractor/utils/card_utils.lua"))()
 
 -- Import all specialized extractors
-local SessionExtractor = require("state_extractor.extractors.session_extractor")
-local PhaseExtractor = require("state_extractor.extractors.phase_extractor")
-local GameStateExtractor = require("state_extractor.extractors.game_state_extractor")
-local RoundStateExtractor = require("state_extractor.extractors.round_state_extractor")
-local HandCardExtractor = require("state_extractor.extractors.hand_card_extractor")
-local JokerExtractor = require("state_extractor.extractors.joker_extractor")
-local ConsumableExtractor = require("state_extractor.extractors.consumable_extractor")
-local DeckCardExtractor = require("state_extractor.extractors.deck_card_extractor")
-local BlindExtractor = require("state_extractor.extractors.blind_extractor")
-local ShopExtractor = require("state_extractor.extractors.shop_extractor")
-local ActionExtractor = require("state_extractor.extractors.action_extractor")
-local JokerReorderExtractor = require("state_extractor.extractors.joker_reorder_extractor")
+local SessionExtractor = assert(SMODS.load_file("state_extractor/extractors/session_extractor.lua"))()
+local PhaseExtractor = assert(SMODS.load_file("state_extractor/extractors/phase_extractor.lua"))()
+local GameStateExtractor = assert(SMODS.load_file("state_extractor/extractors/game_state_extractor.lua"))()
+local RoundStateExtractor = assert(SMODS.load_file("state_extractor/extractors/round_state_extractor.lua"))()
+local HandCardExtractor = assert(SMODS.load_file("state_extractor/extractors/hand_card_extractor.lua"))()
+local JokerExtractor = assert(SMODS.load_file("state_extractor/extractors/joker_extractor.lua"))()
+local ConsumableExtractor = assert(SMODS.load_file("state_extractor/extractors/consumable_extractor.lua"))()
+local DeckCardExtractor = assert(SMODS.load_file("state_extractor/extractors/deck_card_extractor.lua"))()
+local BlindExtractor = assert(SMODS.load_file("state_extractor/extractors/blind_extractor.lua"))()
+local ShopExtractor = assert(SMODS.load_file("state_extractor/extractors/shop_extractor.lua"))()
+local ActionExtractor = assert(SMODS.load_file("state_extractor/extractors/action_extractor.lua"))()
+local JokerReorderExtractor = assert(SMODS.load_file("state_extractor/extractors/joker_reorder_extractor.lua"))()
 
 local StateExtractor = {}
 StateExtractor.__index = StateExtractor
@@ -48,7 +48,7 @@ end
 
 function StateExtractor:register_extractor(extractor)
     -- Import IExtractor for validation
-    local IExtractor = require("state_extractor.extractors.i_extractor")
+    local IExtractor = assert(SMODS.load_file("state_extractor/extractors/i_extractor.lua"))()
     
     -- Validate extractor implements required interface
     if IExtractor.validate_implementation(extractor) then
