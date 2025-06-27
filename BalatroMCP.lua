@@ -227,6 +227,9 @@ function BalatroMCP.new()
     self.pending_state_extraction = false
     self.pending_action_result = nil
     
+    -- Hook lifecycle management - store original function references
+    self.original_functions = {}
+    
     -- Extraction delays for event system timing
     self.extraction_delays = {
         hand_action = 0.1,      -- 100ms delay for hand play/discard
@@ -431,6 +434,23 @@ end
 function BalatroMCP:setup_game_hooks()
     print("BalatroMCP: Setting up game hooks")
     
+    -- Validate hook state before setting up
+    if not self:validate_hook_state() then
+        print("BalatroMCP: ERROR - Hook state validation failed, aborting hook setup")
+        return
+    end
+    
+    -- Check for existing hooks to prevent double-hooking
+    local existing_hook_count = 0
+    for _ in pairs(self.original_functions) do
+        existing_hook_count = existing_hook_count + 1
+    end
+    
+    if existing_hook_count > 0 then
+        print("BalatroMCP: WARNING - " .. existing_hook_count .. " hooks already exist, skipping setup to prevent double-hooking")
+        return
+    end
+    
     self:hook_game_start()
     
     self:hook_hand_evaluation()
@@ -443,6 +463,9 @@ function BalatroMCP:setup_game_hooks()
     
     -- Initialize state tracking for non-intrusive detection
     self:initialize_state_tracking()
+    
+    -- Validate final hook state
+    self:validate_hook_state()
 end
 
 function BalatroMCP:initialize_state_tracking()
@@ -480,6 +503,8 @@ function BalatroMCP:hook_hand_evaluation()
         
         local original_play_cards = G.FUNCS.play_cards_from_highlighted
         if original_play_cards then
+            -- Store original for cleanup
+            self.original_functions["play_cards_from_highlighted"] = original_play_cards
             if self.crash_diagnostics then
                 G.FUNCS.play_cards_from_highlighted = self.crash_diagnostics:create_safe_hook(
                     function(...)
@@ -504,6 +529,8 @@ function BalatroMCP:hook_hand_evaluation()
         
         local original_discard_cards = G.FUNCS.discard_cards_from_highlighted
         if original_discard_cards then
+            -- Store original for cleanup
+            self.original_functions["discard_cards_from_highlighted"] = original_discard_cards
             if self.crash_diagnostics then
                 G.FUNCS.discard_cards_from_highlighted = self.crash_diagnostics:create_safe_hook(
                     function(...)
@@ -545,6 +572,9 @@ function BalatroMCP:hook_blind_selection()
         for _, func_name in ipairs(blind_functions) do
             local original_func = G.FUNCS[func_name]
             if original_func then
+                -- Store original for cleanup
+                self.original_functions[func_name] = original_func
+                
                 G.FUNCS[func_name] = function(e, ...)
                     print("BalatroMCP: Blind selection detected via " .. func_name)
                     
@@ -574,6 +604,8 @@ function BalatroMCP:hook_blind_selection()
         -- Hook blind skip function
         local original_skip = G.FUNCS.skip_blind
         if original_skip then
+            -- Store original for cleanup
+            self.original_functions["skip_blind"] = original_skip
             G.FUNCS.skip_blind = function(e, ...)
                 print("BalatroMCP: Blind skip detected")
                 
@@ -590,6 +622,8 @@ function BalatroMCP:hook_blind_selection()
         -- Hook boss blind reroll function
         local original_reroll_boss = G.FUNCS.reroll_boss
         if original_reroll_boss then
+            -- Store original for cleanup
+            self.original_functions["reroll_boss"] = original_reroll_boss
             G.FUNCS.reroll_boss = function(...)
                 print("BalatroMCP: Boss blind reroll detected")
                 
@@ -613,6 +647,8 @@ function BalatroMCP:hook_shop_interactions()
         -- Hook cash_out for shop entry detection
         local original_cash_out = G.FUNCS.cash_out
         if original_cash_out then
+            -- Store original for cleanup
+            self.original_functions["cash_out"] = original_cash_out
             if self.crash_diagnostics then
                 G.FUNCS.cash_out = self.crash_diagnostics:create_safe_hook(
                     function(...)
@@ -649,6 +685,9 @@ function BalatroMCP:hook_shop_interactions()
         for _, func_name in ipairs(shop_functions) do
             local original_func = G.FUNCS[func_name]
             if original_func then
+                -- Store original for cleanup
+                self.original_functions[func_name] = original_func
+                
                 G.FUNCS[func_name] = function(e, ...)
                     print("BalatroMCP: Shop purchase detected via " .. func_name)
                     
@@ -677,6 +716,8 @@ function BalatroMCP:hook_shop_interactions()
         -- Hook reroll shop function
         local original_reroll = G.FUNCS.reroll_shop
         if original_reroll then
+            -- Store original for cleanup
+            self.original_functions["reroll_shop"] = original_reroll
             G.FUNCS.reroll_shop = function(...)
                 print("BalatroMCP: Shop reroll detected")
                 
@@ -715,6 +756,8 @@ function BalatroMCP:hook_game_start()
         for _, func_name in ipairs(game_start_functions) do
             local original_func = G.FUNCS[func_name]
             if original_func then
+                -- Store original for cleanup
+                self.original_functions[func_name] = original_func
                 
                 G.FUNCS[func_name] = function(...)
                     print("BalatroMCP: Game start detected via " .. func_name .. " - capturing state")
@@ -745,6 +788,110 @@ end
 
 function BalatroMCP:cleanup_hooks()
     print("BalatroMCP: Cleaning up game hooks")
+    
+    if not self.original_functions then
+        print("BalatroMCP: No original functions to restore")
+        return
+    end
+    
+    local restored_count = 0
+    local error_count = 0
+    
+    -- Restore all hooked functions to their original implementations
+    for func_name, original_func in pairs(self.original_functions) do
+        local restore_success, restore_error = pcall(function()
+            if G and G.FUNCS and original_func then
+                G.FUNCS[func_name] = original_func
+                restored_count = restored_count + 1
+                print("BalatroMCP: Restored function: " .. func_name)
+            else
+                error("Missing G.FUNCS or original function for " .. func_name)
+            end
+        end)
+        
+        if not restore_success then
+            error_count = error_count + 1
+            print("BalatroMCP: ERROR restoring " .. func_name .. ": " .. tostring(restore_error))
+        end
+    end
+    
+    -- Clear the original functions table
+    self.original_functions = {}
+    
+    print("BalatroMCP: Hook cleanup completed - " .. restored_count .. " functions restored, " .. error_count .. " errors")
+    
+    -- Verify cleanup by checking if functions are properly restored
+    self:verify_hook_cleanup()
+end
+
+function BalatroMCP:verify_hook_cleanup()
+    print("BalatroMCP: Verifying hook cleanup...")
+    
+    if not G or not G.FUNCS then
+        print("BalatroMCP: WARNING - G.FUNCS not available for verification")
+        return
+    end
+    
+    -- List of functions that should have been hooked and restored
+    local expected_functions = {
+        "play_cards_from_highlighted",
+        "discard_cards_from_highlighted", 
+        "select_blind",
+        "play_blind",
+        "choose_blind",
+        "skip_blind",
+        "reroll_boss",
+        "cash_out",
+        "buy_from_shop",
+        "purchase_item",
+        "shop_purchase",
+        "buy_joker",
+        "buy_card",
+        "reroll_shop",
+        "start_run",
+        "new_run",
+        "begin_run",
+        "start_game",
+        "new_game",
+        "init_run",
+        "setup_run"
+    }
+    
+    local verified_count = 0
+    local missing_count = 0
+    
+    for _, func_name in ipairs(expected_functions) do
+        if G.FUNCS[func_name] then
+            verified_count = verified_count + 1
+        else
+            missing_count = missing_count + 1
+            print("BalatroMCP: NOTE - Function not found (may not exist in this version): " .. func_name)
+        end
+    end
+    
+    print("BalatroMCP: Verification complete - " .. verified_count .. " functions verified, " .. missing_count .. " not found")
+end
+
+function BalatroMCP:validate_hook_state()
+    -- Validate current hook state to prevent double-hooking
+    if not self.original_functions then
+        print("BalatroMCP: Hook state validation failed - original_functions table missing")
+        return false
+    end
+    
+    local hook_count = 0
+    for _ in pairs(self.original_functions) do
+        hook_count = hook_count + 1
+    end
+    
+    print("BalatroMCP: Current hook state - " .. hook_count .. " functions hooked")
+    
+    if hook_count > 20 then
+        print("BalatroMCP: WARNING - Unusually high number of hooked functions detected")
+        return false
+    end
+    
+    return true
 end
 
 function BalatroMCP:process_pending_actions()
