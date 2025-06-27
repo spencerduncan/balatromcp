@@ -114,6 +114,31 @@ function StateExtractor:get_session_id()
     return self.session_id
 end
 
+-- Delegation methods for deck card extraction
+function StateExtractor:extract_deck_cards()
+    -- Find DeckCardExtractor and delegate to it
+    for _, extractor in ipairs(self.extractors) do
+        if extractor:get_name() == "deck_card_extractor" then
+            return extractor:extract_deck_cards()
+        end
+    end
+    
+    -- Fallback if DeckCardExtractor not found
+    return {}
+end
+
+function StateExtractor:extract_remaining_deck_cards()
+    -- Find DeckCardExtractor and delegate to it
+    for _, extractor in ipairs(self.extractors) do
+        if extractor:get_name() == "deck_card_extractor" then
+            return extractor:extract_remaining_deck_cards()
+        end
+    end
+    
+    -- Fallback if DeckCardExtractor not found
+    return {}
+end
+
 -- Original validation methods preserved for backward compatibility
 function StateExtractor:validate_g_object()
     if not G then
