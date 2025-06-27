@@ -1,9 +1,9 @@
 -- Hand cards extraction module
 -- Handles current hand cards extraction
 
-local IExtractor = require("state_extractor.extractors.i_extractor")
-local StateExtractorUtils = require("state_extractor.utils.state_extractor_utils")
-local CardUtils = require("state_extractor.utils.card_utils")
+local IExtractor = assert(SMODS.load_file("state_extractor/extractors/i_extractor.lua"))()
+local StateExtractorUtils = assert(SMODS.load_file("state_extractor/utils/state_extractor_utils.lua"))()
+local CardUtils = assert(SMODS.load_file("state_extractor/utils/card_utils.lua"))()
 
 local HandCardExtractor = {}
 HandCardExtractor.__index = HandCardExtractor
