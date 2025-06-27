@@ -64,6 +64,7 @@ local function setUp()
     _G.FileTransport = {
         new = function(base_path)
             return {
+                base_path = base_path or "shared",  -- Store the base_path parameter
                 is_available = function() return true end,
                 write_message = function(self, data, type) return true end,
                 read_message = function(self, type) return nil end,
