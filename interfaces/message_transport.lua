@@ -8,27 +8,39 @@ IMessageTransport.__index = IMessageTransport
 -- Interface contract documentation
 -- All concrete implementations must provide these methods:
 
--- write_message(message_data, message_type) -> boolean
+-- write_message(message_data, message_type, callback) -> boolean
 -- Writes a complete message to the transport medium
 -- @param message_data: table containing the full message structure
 -- @param message_type: string identifying the message type ("game_state", "deck_state", etc.)
--- @return: boolean - true on success, false on failure
+-- @param callback: optional function(success) - called when operation completes (for async implementations)
+-- @return: boolean - true on success/submitted, false on failure
 
--- read_message(message_type) -> table|nil
+-- read_message(message_type, callback) -> table|nil
 -- Reads the most recent unprocessed message of the specified type
 -- @param message_type: string identifying the message type to read
--- @return: table - message data on success, nil if no new messages
+-- @param callback: optional function(success, data) - called when operation completes (for async implementations)
+-- @return: table - message data on success, nil if no new messages (sync) or async operation initiated
 
--- verify_message(message_data, message_type) -> boolean
+-- verify_message(message_data, message_type, callback) -> boolean
 -- Verifies message integrity after write operation
 -- @param message_data: table containing the message to verify
 -- @param message_type: string identifying the message type
--- @return: boolean - true if verification successful, false otherwise
+-- @param callback: optional function(success) - called when operation completes (for async implementations)
+-- @return: boolean - true if verification successful/submitted, false otherwise
 
--- cleanup_old_messages(max_age_seconds) -> boolean
+-- cleanup_old_messages(max_age_seconds, callback) -> boolean
 -- Removes messages older than specified age
 -- @param max_age_seconds: number of seconds for message retention
--- @return: boolean - true on successful cleanup, false on failure
+-- @param callback: optional function(success, count) - called when operation completes (for async implementations)
+-- @return: boolean - true on successful cleanup/submitted, false on failure
+
+-- update() -> void (optional for async implementations)
+-- Processes pending async operations and responses
+-- Should be called regularly in the main loop for async transports
+
+-- cleanup() -> void (optional for async implementations)
+-- Cleans up async resources (threads, channels, etc.)
+-- Should be called when shutting down async transports
 
 -- is_available() -> boolean
 -- Checks if the transport medium is available and operational

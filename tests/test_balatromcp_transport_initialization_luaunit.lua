@@ -1,5 +1,5 @@
 -- LuaUnit tests for BalatroMCP transport initialization
--- Tests HTTP and File transport integration, configuration, and error handling
+-- Tests async file transport integration, configuration, and error handling
 
 local luaunit_helpers = require('tests.luaunit_helpers')
 local luaunit = require('libs.luaunit')
@@ -146,127 +146,45 @@ end
 -- FILE TRANSPORT INITIALIZATION TESTS
 -- =============================================================================
 
-local function TestBalatroMCPInitializationWithFileTransport()
+local function TestBalatroMCPInitializationWithAsyncFileTransport()
     setUp()
     
     local BalatroMCP = load_balatromcp()
     local mcp = BalatroMCP.new()
     
-    luaunit.assertNotNil(mcp, "BalatroMCP should initialize with file transport")
-    luaunit.assertEquals("FILE", mcp.transport_type, "Should set transport type to FILE")
+    luaunit.assertNotNil(mcp, "BalatroMCP should initialize with async file transport")
+    luaunit.assertEquals("ASYNC_FILE", mcp.transport_type, "Should set transport type to ASYNC_FILE")
     luaunit.assertNotNil(mcp.transport, "Should have transport instance")
     luaunit.assertNotNil(mcp.file_transport, "Should maintain backward compatibility reference")
     luaunit.assertEquals(mcp.transport, mcp.file_transport, "file_transport should reference the same transport")
     
-    tearDown()
-end
-
--- =============================================================================
--- HTTP TRANSPORT INITIALIZATION TESTS
--- =============================================================================
-
-local function TestBalatroMCPInitializationWithHttpTransport()
-    setUp()
-    
-    local BalatroMCP = load_balatromcp()
-    
-    -- Configure for HTTP transport
-    _G.BalatroMCP_Configure(true, {
-        base_url = "http://localhost:8000",
-        game_data_endpoint = "/game-data",
-        actions_endpoint = "/actions",
-        timeout = 10
-    })
-    
-    local mcp = BalatroMCP.new()
-    
-    luaunit.assertNotNil(mcp, "BalatroMCP should initialize with HTTP transport")
-    luaunit.assertEquals("HTTP", mcp.transport_type, "Should set transport type to HTTP")
-    luaunit.assertNotNil(mcp.transport, "Should have transport instance")
-    luaunit.assertEquals("http://localhost:8000", mcp.transport.base_url, "Should use configured base URL")
-    luaunit.assertNil(mcp.file_transport, "Should not have file_transport reference for HTTP")
+    -- Test async capability
+    if love.thread then
+        luaunit.assertNotNil(mcp.transport.async_enabled, "Should have async_enabled property")
+    end
     
     tearDown()
 end
 
-local function TestBalatroMCPHttpTransportConfigurationOverride()
+-- =============================================================================
+-- ASYNC FILE TRANSPORT CONFIGURATION TESTS
+-- =============================================================================
+
+local function TestBalatroMCPAsyncFileTransportConfiguration()
     setUp()
     
     local BalatroMCP = load_balatromcp()
     
     -- Test configuration override
-    _G.BalatroMCP_Configure(true, {
-        base_url = "https://custom-server.com:8443",
-        game_data_endpoint = "/custom-data",
-        timeout = 30
+    _G.BalatroMCP_Configure({
+        base_path = "custom_shared",
+        enable_async = true
     })
     
     local mcp = BalatroMCP.new()
     
-    luaunit.assertEquals("HTTP", mcp.transport_type, "Should use HTTP transport")
-    luaunit.assertEquals("https://custom-server.com:8443", mcp.transport.base_url, "Should use custom base URL")
-    
-    tearDown()
-end
-
-local function TestBalatroMCPHttpTransportUnavailableServer()
-    setUp()
-    
-    -- Mock HTTP transport to report unavailable
-    _G.HttpsTransport = {
-        new = function(config)
-            return {
-                base_url = config.base_url,
-                is_available = function() return false end,
-                write_message = function(self, data, type) return true end,
-                read_message = function(self, type) return nil end,
-                verify_message = function(self, data, type) return true end,
-                cleanup_old_messages = function(self, max_age) return true end
-            }
-        end
-    }
-    
-    local BalatroMCP = load_balatromcp()
-    
-    -- Configure for HTTP transport
-    _G.BalatroMCP_Configure(true, {
-        base_url = "http://unreachable-server:8000"
-    })
-    
-    -- Should not fail hard - should initialize with warning
-    local mcp = BalatroMCP.new()
-    
-    luaunit.assertNotNil(mcp, "Should initialize even with unavailable server")
-    luaunit.assertEquals("HTTP", mcp.transport_type, "Should still use HTTP transport type")
-    
-    tearDown()
-end
-
-local function TestBalatroMCPHttpTransportInitializationFailure()
-    setUp()
-    
-    -- Mock HTTP transport to fail initialization
-    _G.HttpsTransport = {
-        new = function(config)
-            error("Network initialization failed")
-        end
-    }
-    
-    local BalatroMCP = load_balatromcp()
-    
-    -- Configure for HTTP transport
-    _G.BalatroMCP_Configure(true, {
-        base_url = "http://localhost:8000"
-    })
-    
-    -- Should handle initialization failure gracefully
-    local success, result = pcall(function()
-        return BalatroMCP.new()
-    end)
-    
-    -- In this case it should fail because HTTP transport can't be created
-    luaunit.assertFalse(success, "Should fail when HTTP transport can't be initialized")
-    luaunit.assertStrContains(tostring(result), "Network initialization failed", "Should show HTTP transport error")
+    luaunit.assertEquals("ASYNC_FILE", mcp.transport_type, "Should use async file transport")
+    luaunit.assertEquals("custom_shared", mcp.transport.base_path, "Should use custom base path")
     
     tearDown()
 end
@@ -308,47 +226,6 @@ local function TestBalatroMCPFileTransportCommunicationTest()
     tearDown()
 end
 
-local function TestBalatroMCPHttpTransportCommunicationTest()
-    setUp()
-    
-    local test_file_communication_called = false
-    local test_transport_communication_called = false
-    local transport_passed = nil
-    
-    -- Mock debug logger to track which test is called
-    _G.DebugLogger = {
-        new = function(...)
-            return {
-                info = function(self, msg, component) end,
-                error = function(self, msg, component) end,
-                warn = function(self, msg, component) end,
-                test_environment = function(self) end,
-                test_file_communication = function(self) 
-                    test_file_communication_called = true
-                end,
-                test_transport_communication = function(self, transport) 
-                    test_transport_communication_called = true
-                    transport_passed = transport
-                end
-            }
-        end
-    }
-    
-    local BalatroMCP = load_balatromcp()
-    
-    -- Configure for HTTP transport
-    _G.BalatroMCP_Configure(true, {
-        base_url = "http://localhost:8000"
-    })
-    
-    local mcp = BalatroMCP.new()
-    
-    luaunit.assertFalse(test_file_communication_called, "Should not call file communication test for HTTP transport")
-    luaunit.assertTrue(test_transport_communication_called, "Should call transport communication test for HTTP transport")
-    luaunit.assertEquals(mcp.transport, transport_passed, "Should pass the transport instance to the test")
-    
-    tearDown()
-end
 
 -- =============================================================================
 -- BACKWARD COMPATIBILITY TESTS
@@ -371,23 +248,6 @@ local function TestBalatroMCPFileTransportBackwardCompatibility()
     tearDown()
 end
 
-local function TestBalatroMCPHttpTransportNoFileTransportReference()
-    setUp()
-    
-    local BalatroMCP = load_balatromcp()
-    
-    -- Configure for HTTP transport
-    _G.BalatroMCP_Configure(true, {
-        base_url = "http://localhost:8000"
-    })
-    
-    local mcp = BalatroMCP.new()
-    
-    luaunit.assertNil(mcp.file_transport, "Should not have file_transport reference when using HTTP transport")
-    luaunit.assertNotNil(mcp.transport, "Should still have main transport reference")
-    
-    tearDown()
-end
 
 -- =============================================================================
 -- CONFIGURATION TESTS
@@ -429,15 +289,10 @@ end
 
 -- Export all test functions for LuaUnit registration
 return {
-    TestBalatroMCPInitializationWithFileTransport = TestBalatroMCPInitializationWithFileTransport,
-    TestBalatroMCPInitializationWithHttpTransport = TestBalatroMCPInitializationWithHttpTransport,
-    TestBalatroMCPHttpTransportConfigurationOverride = TestBalatroMCPHttpTransportConfigurationOverride,
-    TestBalatroMCPHttpTransportUnavailableServer = TestBalatroMCPHttpTransportUnavailableServer,
-    TestBalatroMCPHttpTransportInitializationFailure = TestBalatroMCPHttpTransportInitializationFailure,
+    TestBalatroMCPInitializationWithAsyncFileTransport = TestBalatroMCPInitializationWithAsyncFileTransport,
+    TestBalatroMCPAsyncFileTransportConfiguration = TestBalatroMCPAsyncFileTransportConfiguration,
     TestBalatroMCPFileTransportCommunicationTest = TestBalatroMCPFileTransportCommunicationTest,
-    TestBalatroMCPHttpTransportCommunicationTest = TestBalatroMCPHttpTransportCommunicationTest,
     TestBalatroMCPFileTransportBackwardCompatibility = TestBalatroMCPFileTransportBackwardCompatibility,
-    TestBalatroMCPHttpTransportNoFileTransportReference = TestBalatroMCPHttpTransportNoFileTransportReference,
     TestBalatroMCPConfigurationFunction = TestBalatroMCPConfigurationFunction,
     TestBalatroMCPConfigurationDefaults = TestBalatroMCPConfigurationDefaults
 }

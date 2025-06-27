@@ -113,30 +113,54 @@ function MessageManager:write_game_state(state_data)
     self:log("JSON encoding successful, data length: " .. #encoded_data)
     print("[DEBUG_STALE_STATE] JSON encoded, calling transport:write_message")
     
-    -- Delegate to transport
-    local write_success = self.transport:write_message(encoded_data, "game_state")
-    
-    print("[DEBUG_STALE_STATE] Transport write_message result: " .. tostring(write_success))
-    
-    if not write_success then
-        self:log("ERROR: Transport write failed")
-        print("[DEBUG_STALE_STATE] *** TRANSPORT WRITE FAILED ***")
-        return false
+    -- Use async transport write if available (fire-and-forget for game state)
+    if self.transport.async_enabled then
+        print("[DEBUG_STALE_STATE] Using async write for game state")
+        local write_success = self.transport:write_message(encoded_data, "game_state", function(success)
+            if success then
+                print("[DEBUG_STALE_STATE] Async game state write completed successfully")
+                -- Async verification
+                self.transport:verify_message(encoded_data, "game_state", function(verify_success)
+                    if verify_success then
+                        print("[DEBUG_STALE_STATE] Async game state verification completed successfully")
+                    else
+                        print("[DEBUG_STALE_STATE] *** ASYNC GAME STATE VERIFICATION FAILED ***")
+                    end
+                end)
+            else
+                print("[DEBUG_STALE_STATE] *** ASYNC GAME STATE WRITE FAILED ***")
+            end
+        end)
+        
+        print("[DEBUG_STALE_STATE] Async write operation submitted: " .. tostring(write_success))
+        return write_success
+    else
+        -- Fallback to synchronous operation
+        print("[DEBUG_STALE_STATE] Using synchronous write for game state")
+        local write_success = self.transport:write_message(encoded_data, "game_state")
+        
+        print("[DEBUG_STALE_STATE] Transport write_message result: " .. tostring(write_success))
+        
+        if not write_success then
+            self:log("ERROR: Transport write failed")
+            print("[DEBUG_STALE_STATE] *** TRANSPORT WRITE FAILED ***")
+            return false
+        end
+        
+        print("[DEBUG_STALE_STATE] Transport write successful, performing verification")
+        
+        -- Verify through transport
+        local verify_success = self.transport:verify_message(encoded_data, "game_state")
+        if not verify_success then
+            self:log("ERROR: Message verification failed")
+            print("[DEBUG_STALE_STATE] *** MESSAGE VERIFICATION FAILED ***")
+            return false
+        end
+        
+        self:log("Game state written and verified successfully")
+        print("[DEBUG_STALE_STATE] *** WRITE_GAME_STATE COMPLETED SUCCESSFULLY ***")
+        return true
     end
-    
-    print("[DEBUG_STALE_STATE] Transport write successful, performing verification")
-    
-    -- Verify through transport
-    local verify_success = self.transport:verify_message(encoded_data, "game_state")
-    if not verify_success then
-        self:log("ERROR: Message verification failed")
-        print("[DEBUG_STALE_STATE] *** MESSAGE VERIFICATION FAILED ***")
-        return false
-    end
-    
-    self:log("Game state written and verified successfully")
-    print("[DEBUG_STALE_STATE] *** WRITE_GAME_STATE COMPLETED SUCCESSFULLY ***")
-    return true
 end
 
 function MessageManager:write_deck_state(deck_data)
@@ -231,6 +255,8 @@ function MessageManager:read_actions()
         return nil
     end
     
+    -- For action reading, we need synchronous behavior since the caller expects immediate response
+    -- The async transport will use synchronous fallback when no callback is provided
     self:log("ACTION_POLLING - Calling transport:read_message('actions')")
     local message_data = self.transport:read_message("actions")
     if not message_data then
@@ -276,15 +302,28 @@ function MessageManager:write_action_result(result_data)
     
     self:log("JSON encoding successful, data length: " .. #encoded_data)
     
-    -- Delegate to transport
-    local write_success = self.transport:write_message(encoded_data, "action_result")
-    if not write_success then
-        self:log("ERROR: Transport write failed")
-        return false
+    -- Use async transport write if available (fire-and-forget for action results)
+    if self.transport.async_enabled then
+        self:log("Using async write for action result")
+        local write_success = self.transport:write_message(encoded_data, "action_result", function(success)
+            if success then
+                self:log("Async action result write completed successfully")
+            else
+                self:log("ERROR: Async action result write failed")
+            end
+        end)
+        return write_success
+    else
+        -- Fallback to synchronous operation
+        local write_success = self.transport:write_message(encoded_data, "action_result")
+        if not write_success then
+            self:log("ERROR: Transport write failed")
+            return false
+        end
+        
+        self:log("Action result written successfully")
+        return true
     end
-    
-    self:log("Action result written successfully")
-    return true
 end
 
 function MessageManager:cleanup_old_messages(max_age_seconds)
@@ -293,7 +332,20 @@ function MessageManager:cleanup_old_messages(max_age_seconds)
         return false
     end
     
-    return self.transport:cleanup_old_messages(max_age_seconds)
+    -- Use async cleanup if available (fire-and-forget)
+    if self.transport.async_enabled then
+        self:log("Using async cleanup")
+        return self.transport:cleanup_old_messages(max_age_seconds, function(success, count)
+            if success then
+                self:log("Async cleanup completed: " .. (count or 0) .. " files removed")
+            else
+                self:log("ERROR: Async cleanup failed")
+            end
+        end)
+    else
+        -- Fallback to synchronous operation
+        return self.transport:cleanup_old_messages(max_age_seconds)
+    end
 end
 
 return MessageManager

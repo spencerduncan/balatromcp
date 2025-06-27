@@ -10,26 +10,17 @@
 print("BalatroMCP: MAIN FILE LOADING STARTED")
 
 -- Transport Configuration
--- Can be overridden by external configuration or options menu
-local USE_HTTP_TRANSPORT = true -- Set to true to enable HTTP transport instead of file transport
-
--- HTTP Transport Configuration
--- These can be overridden by external configuration
-local HTTP_CONFIG = {
-    base_url = "http://localhost:8080",  -- Default test server URL
-    game_data_endpoint = "/game-data",
-    actions_endpoint = "/actions",
-    timeout = 5
+-- Now using async file transport exclusively for non-blocking I/O
+local ASYNC_FILE_TRANSPORT_CONFIG = {
+    base_path = "shared",  -- Default file transport path
+    enable_async = true    -- Enable async operations when threading available
 }
 
 -- Function to allow external configuration override
-local function configure_transport(use_http, http_config)
-    if use_http ~= nil then
-        USE_HTTP_TRANSPORT = use_http
-    end
-    if http_config and type(http_config) == "table" then
-        for key, value in pairs(http_config) do
-            HTTP_CONFIG[key] = value
+local function configure_transport(file_config)
+    if file_config and type(file_config) == "table" then
+        for key, value in pairs(file_config) do
+            ASYNC_FILE_TRANSPORT_CONFIG[key] = value
         end
     end
 end
@@ -64,14 +55,7 @@ if not file_transport_success then
     print("BalatroMCP: FileTransport load failed: " .. tostring(file_transport_error))
 end
 
-local HttpsTransport = nil
-local https_transport_success, https_transport_error = pcall(function()
-    HttpsTransport = assert(SMODS.load_file("transports/https_transport.lua"))()
-    print("BalatroMCP: HttpsTransport loaded successfully")
-end)
-if not https_transport_success then
-    print("BalatroMCP: HttpsTransport load failed: " .. tostring(https_transport_error))
-end
+-- HttpsTransport removed - using async file transport exclusively
 
 local MessageManager = nil
 local message_manager_success, message_manager_error = pcall(function()
@@ -122,13 +106,12 @@ print("BalatroMCP: MODULE LOADING SUMMARY:")
 print("  DebugLogger: " .. (debug_success and "SUCCESS" or "FAILED"))
 print("  MessageTransport: " .. (transport_success and "SUCCESS" or "FAILED"))
 print("  FileTransport: " .. (file_transport_success and "SUCCESS" or "FAILED"))
-print("  HttpsTransport: " .. (https_transport_success and "SUCCESS" or "FAILED"))
 print("  MessageManager: " .. (message_manager_success and "SUCCESS" or "FAILED"))
 print("  StateExtractor: " .. (state_success and "SUCCESS" or "FAILED"))
 print("  ActionExecutor: " .. (action_success and "SUCCESS" or "FAILED"))
 print("  JokerManager: " .. (joker_success and "SUCCESS" or "FAILED"))
 print("  CrashDiagnostics: " .. (crash_success and "SUCCESS" or "FAILED"))
-print("  Transport Selection: " .. (USE_HTTP_TRANSPORT and "HTTP" or "FILE"))
+print("  Transport Selection: ASYNC_FILE")
 
 local BalatroMCP = {}
 BalatroMCP.__index = BalatroMCP
@@ -151,39 +134,26 @@ function BalatroMCP.new()
     
     local init_success = true
     
-    if USE_HTTP_TRANSPORT then
-        if not HttpsTransport then
-            error("HttpsTransport module not available but USE_HTTP_TRANSPORT is enabled")
-        end
-        
-        -- Use configurable HTTP settings
-        local https_config = {}
-        for key, value in pairs(HTTP_CONFIG) do
-            https_config[key] = value
-        end
-        
-        -- Initialize HTTP transport with error propagation
-        local transport = HttpsTransport.new(https_config)
-        -- Test availability but don't fail hard - log warning instead
-        local available = transport:is_available()
-        if not available then
-            self.debug_logger:warn("HTTP transport server not immediately reachable at " .. https_config.base_url .. " - will retry during operation", "INIT")
-        else
-            self.debug_logger:info("HTTP transport server connection verified at " .. https_config.base_url, "INIT")
-        end
-        
-        self.transport = transport
-        self.transport_type = "HTTP"
-        self.debug_logger:info("HttpsTransport component initialized successfully with base_url: " .. https_config.base_url, "INIT")
+    -- Initialize async file transport exclusively
+    if not FileTransport then
+        error("FileTransport module not available")
+    end
+    
+    -- Use configurable file transport settings
+    local file_config = {}
+    for key, value in pairs(ASYNC_FILE_TRANSPORT_CONFIG) do
+        file_config[key] = value
+    end
+    
+    self.transport = FileTransport.new(file_config.base_path)
+    self.file_transport = self.transport  -- Backward compatibility reference
+    self.transport_type = "ASYNC_FILE"
+    
+    -- Log async capability status
+    if self.transport.async_enabled then
+        self.debug_logger:info("Async FileTransport initialized with threading support", "INIT")
     else
-        if not FileTransport then
-            error("FileTransport module not available but file transport is selected")
-        end
-        
-        self.transport = FileTransport.new()
-        self.file_transport = self.transport  -- Backward compatibility reference
-        self.transport_type = "FILE"
-        self.debug_logger:info("FileTransport component initialized successfully", "INIT")
+        self.debug_logger:info("FileTransport initialized with synchronous fallback (no threading)", "INIT")
     end
     
     self.message_manager = MessageManager.new(self.transport, "BALATRO_MCP")
@@ -254,12 +224,7 @@ function BalatroMCP.new()
     }
     
     if init_success then
-        if self.transport_type == "FILE" then
-            self.debug_logger:test_file_communication()
-        else
-            -- Use transport-agnostic test for HTTP transport
-            self.debug_logger:test_transport_communication(self.transport)
-        end
+        self.debug_logger:test_file_communication()
     end
     
     if init_success then
@@ -383,7 +348,7 @@ function BalatroMCP:stop()
     
     self.polling_active = false
     
-    -- Cleanup transport resources
+    -- Cleanup async file transport resources (threads, channels)
     if self.transport and self.transport.cleanup then
         self.transport:cleanup()
     end
@@ -398,9 +363,9 @@ function BalatroMCP:update(dt)
         return
     end
     
-    -- Update transport for async operations
+    -- Update async file transport to process responses
     if self.transport and self.transport.update then
-        self.transport:update(dt)
+        self.transport:update()
     end
     
     -- NON-INTRUSIVE STATE TRANSITION DETECTION

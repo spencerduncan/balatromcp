@@ -507,6 +507,244 @@ local function TestFileTransportLoggingWithCurrentDirectory()
     tearDown()
 end
 
+-- =============================================================================
+-- ASYNC OPERATION TESTS
+-- =============================================================================
+
+local function TestFileTransportAsyncInitialization()
+    setUp()
+    
+    -- Mock love.thread
+    local mock_thread = {
+        start = function() end,
+        isRunning = function() return true end
+    }
+    
+    love.thread = {
+        newThread = function(code) return mock_thread end,
+        getChannel = function(name) 
+            return {
+                push = function(data) end,
+                pop = function() return nil end,
+                demand = function() return nil end
+            }
+        end
+    }
+    
+    local transport = FileTransport.new("test_shared")
+    
+    luaunit.assertTrue(transport.async_enabled, "Should enable async operations when threading available")
+    luaunit.assertNotNil(transport.worker_thread, "Should create worker thread")
+    luaunit.assertNotNil(transport.request_channel, "Should create request channel")
+    luaunit.assertNotNil(transport.response_channel, "Should create response channel")
+    luaunit.assertEquals(0, transport.request_id_counter, "Should initialize request counter")
+    luaunit.assertEquals("table", type(transport.pending_requests), "Should initialize pending requests table")
+    
+    tearDown()
+end
+
+local function TestFileTransportAsyncFallback()
+    setUp()
+    
+    -- Don't mock love.thread - should fallback to sync
+    love.thread = nil
+    
+    local transport = FileTransport.new("test_shared")
+    
+    luaunit.assertFalse(transport.async_enabled, "Should not enable async when threading unavailable")
+    luaunit.assertNil(transport.worker_thread, "Should not create worker thread")
+    
+    tearDown()
+end
+
+local function TestFileTransportAsyncWriteMessage()
+    setUp()
+    
+    -- Mock async environment
+    local requests = {}
+    local mock_thread = {
+        start = function() end,
+        isRunning = function() return true end
+    }
+    
+    love.thread = {
+        newThread = function(code) return mock_thread end,
+        getChannel = function(name) 
+            return {
+                push = function(data) table.insert(requests, data) end,
+                pop = function() return nil end,
+                demand = function() return nil end
+            }
+        end
+    }
+    
+    local transport = FileTransport.new("test_shared")
+    local callback_called = false
+    local callback_success = false
+    
+    -- Test async write
+    local result = transport:write_message('{"test": "data"}', "game_state", function(success)
+        callback_called = true
+        callback_success = success
+    end)
+    
+    luaunit.assertTrue(result, "Should return true for async operation submission")
+    luaunit.assertEquals(1, #requests, "Should submit request to worker thread")
+    luaunit.assertEquals("write", requests[1].operation, "Should submit write operation")
+    luaunit.assertEquals("test_shared/game_state.json", requests[1].filepath, "Should use correct filepath")
+    luaunit.assertEquals('{"test": "data"}', requests[1].content, "Should include message content")
+    
+    tearDown()
+end
+
+local function TestFileTransportAsyncReadMessage()
+    setUp()
+    
+    -- Mock async environment
+    local requests = {}
+    local mock_thread = {
+        start = function() end,
+        isRunning = function() return true end
+    }
+    
+    love.thread = {
+        newThread = function(code) return mock_thread end,
+        getChannel = function(name) 
+            return {
+                push = function(data) table.insert(requests, data) end,
+                pop = function() return nil end,
+                demand = function() return nil end
+            }
+        end
+    }
+    
+    local transport = FileTransport.new("test_shared")
+    local callback_called = false
+    local callback_success = false
+    local callback_data = nil
+    
+    -- Test async read
+    local result = transport:read_message("game_state", function(success, data)
+        callback_called = true
+        callback_success = success
+        callback_data = data
+    end)
+    
+    luaunit.assertNil(result, "Should return nil for async operation")
+    luaunit.assertEquals(1, #requests, "Should submit getInfo request first")
+    luaunit.assertEquals("getInfo", requests[1].operation, "Should check file existence first")
+    
+    tearDown()
+end
+
+local function TestFileTransportAsyncUpdate()
+    setUp()
+    
+    -- Mock async environment with responses
+    local responses = {
+        {id = 1, operation = "write", success = true, data = true},
+        {id = 2, operation = "read", success = true, data = '{"test": "content"}'}
+    }
+    local response_index = 1
+    
+    local mock_thread = {
+        start = function() end,
+        isRunning = function() return true end
+    }
+    
+    love.thread = {
+        newThread = function(code) return mock_thread end,
+        getChannel = function(name) 
+            return {
+                push = function(data) end,
+                pop = function() 
+                    if response_index <= #responses then
+                        local response = responses[response_index]
+                        response_index = response_index + 1
+                        return response
+                    end
+                    return nil
+                end,
+                demand = function() return nil end
+            }
+        end
+    }
+    
+    local transport = FileTransport.new("test_shared")
+    
+    -- Add some pending requests
+    transport.pending_requests[1] = {
+        callback = function(success, data) 
+            luaunit.assertTrue(success, "First callback should succeed")
+        end,
+        submitted_time = os.clock()
+    }
+    transport.pending_requests[2] = {
+        callback = function(success, data) 
+            luaunit.assertTrue(success, "Second callback should succeed")
+            luaunit.assertEquals('{"test": "content"}', data, "Should receive correct data")
+        end,
+        submitted_time = os.clock()
+    }
+    
+    -- Process responses
+    transport:update()
+    
+    luaunit.assertEquals(0, transport:count_pending_requests(), "Should clear pending requests after processing")
+    
+    tearDown()
+end
+
+local function TestFileTransportAsyncCleanup()
+    setUp()
+    
+    -- Mock async environment
+    local exit_sent = false
+    local mock_thread = {
+        start = function() end,
+        isRunning = function() return not exit_sent end
+    }
+    
+    love.thread = {
+        newThread = function(code) return mock_thread end,
+        getChannel = function(name) 
+            return {
+                push = function(data) 
+                    if data.operation == 'exit' then
+                        exit_sent = true
+                    end
+                end,
+                pop = function() return nil end,
+                demand = function() return nil end
+            }
+        end
+    }
+    
+    love.timer = {
+        sleep = function(duration) end
+    }
+    
+    local transport = FileTransport.new("test_shared")
+    luaunit.assertTrue(transport.async_enabled, "Should be async enabled initially")
+    
+    transport:cleanup()
+    
+    luaunit.assertTrue(exit_sent, "Should send exit signal to worker thread")
+    luaunit.assertFalse(transport.async_enabled, "Should disable async after cleanup")
+    luaunit.assertNil(transport.worker_thread, "Should clear worker thread reference")
+    
+    tearDown()
+end
+
+-- Helper function to count pending requests
+function FileTransport:count_pending_requests()
+    local count = 0
+    for _ in pairs(self.pending_requests) do
+        count = count + 1
+    end
+    return count
+end
+
 -- Export all test functions for LuaUnit registration
 return {
     TestFileTransportInitializationWithDefaultPath = TestFileTransportInitializationWithDefaultPath,
@@ -534,5 +772,11 @@ return {
     TestFileTransportCleanupErrorHandling = TestFileTransportCleanupErrorHandling,
     TestFileTransportDiagnoseWriteFailure = TestFileTransportDiagnoseWriteFailure,
     TestFileTransportLogging = TestFileTransportLogging,
-    TestFileTransportLoggingWithCurrentDirectory = TestFileTransportLoggingWithCurrentDirectory
+    TestFileTransportLoggingWithCurrentDirectory = TestFileTransportLoggingWithCurrentDirectory,
+    TestFileTransportAsyncInitialization = TestFileTransportAsyncInitialization,
+    TestFileTransportAsyncFallback = TestFileTransportAsyncFallback,
+    TestFileTransportAsyncWriteMessage = TestFileTransportAsyncWriteMessage,
+    TestFileTransportAsyncReadMessage = TestFileTransportAsyncReadMessage,
+    TestFileTransportAsyncUpdate = TestFileTransportAsyncUpdate,
+    TestFileTransportAsyncCleanup = TestFileTransportAsyncCleanup
 }
