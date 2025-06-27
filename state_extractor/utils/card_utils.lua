@@ -1,7 +1,7 @@
 -- Card-specific utility functions for state extraction
 -- Provides safe access methods for card properties and attributes
 
-local StateExtractorUtils = require("state_extractor.utils.state_extractor_utils")
+local StateExtractorUtils = assert(SMODS.load_file("state_extractor/utils/state_extractor_utils.lua"))()
 
 local CardUtils = {}
 

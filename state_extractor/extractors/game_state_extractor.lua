@@ -1,8 +1,8 @@
 -- Game state extraction module
 -- Handles ante and money extraction
 
-local IExtractor = require("state_extractor.extractors.i_extractor")
-local StateExtractorUtils = require("state_extractor.utils.state_extractor_utils")
+local IExtractor = assert(SMODS.load_file("state_extractor/extractors/i_extractor.lua"))()
+local StateExtractorUtils = assert(SMODS.load_file("state_extractor/utils/state_extractor_utils.lua"))()
 
 local GameStateExtractor = {}
 GameStateExtractor.__index = GameStateExtractor
