@@ -562,8 +562,14 @@ function BalatroMCP:hook_blind_selection()
                         function_used = func_name
                     })
                     
-                    -- Trigger the existing blind selection handler
-                    balatro_mcp_instance:on_blind_selected()
+                    -- Check cooldown before triggering callback to prevent infinite loops
+                    if balatro_mcp_instance.blind_transition_cooldown <= 0 then
+                        balatro_mcp_instance:on_blind_selected()
+                        print("BalatroMCP: Hook triggered blind selection callback for " .. func_name)
+                    else
+                        print("BalatroMCP: Hook blocked " .. func_name .. " - cooldown active (" .. 
+                              string.format("%.1f", balatro_mcp_instance.blind_transition_cooldown) .. "s remaining)")
+                    end
                     
                     return result
                 end
