@@ -257,6 +257,167 @@ function BalatroMCP.new()
     return self
 end
 
+-- MCP Worker Thread Code
+local MCP_WORKER_CODE = [[
+local love = require('love')
+require('love.filesystem')
+
+-- Worker thread for handling MCP operations
+local state_channel = love.thread.getChannel('mcp_state_updates')
+local action_channel = love.thread.getChannel('mcp_action_requests') 
+local result_channel = love.thread.getChannel('mcp_action_results')
+
+-- Simple state tracking
+local last_processed_sequence = 0
+local polling_interval = 0.125 -- 8 times per second
+
+print("BalatroMCP Worker: Thread started")
+
+while true do
+    -- Check for exit signal
+    local exit_signal = love.thread.getChannel('mcp_exit'):pop()
+    if exit_signal then
+        print("BalatroMCP Worker: Exit signal received")
+        break
+    end
+    
+    -- Process state updates from main thread
+    local state_data = state_channel:pop()
+    if state_data then
+        -- Write state to file (synchronous in worker thread is fine)
+        local state_json = state_data.json
+        if state_json then
+            local success, err = pcall(function()
+                love.filesystem.write("shared/game_state.json", state_json)
+            end)
+            if not success then
+                print("BalatroMCP Worker: State write error: " .. tostring(err))
+            end
+        end
+    end
+    
+    -- Check for pending actions
+    local action_success, action_content = pcall(function()
+        return love.filesystem.read("shared/actions.json")
+    end)
+    
+    if action_success and action_content then
+        -- Parse and send action to main thread for execution
+        local action_data
+        local parse_success, parse_error = pcall(function()
+            action_data = love.data and love.data.decode and love.data.decode("data", "base64", action_content) or action_content
+            if type(action_data) == "string" then
+                -- Try to parse as JSON (simplified parsing)
+                -- In a real implementation, you'd use a proper JSON parser
+                action_data = {raw = action_content}
+            end
+        end)
+        
+        if parse_success and action_data then
+            action_channel:push({
+                data = action_data,
+                timestamp = os.time()
+            })
+        end
+    end
+    
+    -- Sleep to prevent busy waiting (simple busy wait since love.timer not available in thread)
+    local start_time = os.clock()
+    while os.clock() - start_time < polling_interval do
+        -- Simple busy wait
+    end
+end
+
+print("BalatroMCP Worker: Thread ending")
+]]
+
+function BalatroMCP:start_mcp_worker_thread()
+    if not love or not love.thread then
+        print("BalatroMCP: Love2D threading not available, falling back to synchronous mode")
+        self.threaded_mode = false
+        return
+    end
+    
+    print("BalatroMCP: Starting MCP worker thread")
+    
+    -- Create channels for communication
+    self.state_channel = love.thread.getChannel('mcp_state_updates')
+    self.action_channel = love.thread.getChannel('mcp_action_requests')
+    self.result_channel = love.thread.getChannel('mcp_action_results')
+    self.exit_channel = love.thread.getChannel('mcp_exit')
+    
+    -- Create and start worker thread
+    self.mcp_worker = love.thread.newThread(MCP_WORKER_CODE)
+    self.mcp_worker:start()
+    self.threaded_mode = true
+    
+    print("BalatroMCP: MCP worker thread started successfully")
+end
+
+function BalatroMCP:send_state_to_worker()
+    if not self.threaded_mode or not self.state_channel then
+        -- Fallback to original method if threading not available
+        self:check_and_update_state()
+        return
+    end
+    
+    -- Extract current state and send to worker thread
+    local current_state = self.state_extractor:extract_current_state()
+    if current_state then
+        -- Convert state to JSON (simplified)
+        local state_json = self:serialize_state_to_json(current_state)
+        
+        -- Send to worker thread (non-blocking)
+        local send_success = self.state_channel:push({
+            json = state_json,
+            timestamp = love.timer and love.timer.getTime() or os.time(),
+            sequence = self.message_manager:get_next_sequence_id()
+        })
+        
+        if not send_success then
+            print("BalatroMCP: Warning - Failed to send state to worker thread")
+        end
+    end
+    
+    -- Check for action results from worker thread
+    self:process_worker_responses()
+end
+
+function BalatroMCP:process_worker_responses()
+    if not self.threaded_mode or not self.action_channel then
+        return
+    end
+    
+    -- Check for pending actions from worker
+    local action_request = self.action_channel:pop()
+    if action_request then
+        print("BalatroMCP: Received action request from worker thread")
+        -- Process action in main thread (since it needs access to game state)
+        self:process_pending_actions()
+    end
+end
+
+function BalatroMCP:serialize_state_to_json(state)
+    -- Simple JSON serialization for state data
+    -- This is a simplified version - in production you'd use a proper JSON library
+    local json_parts = {}
+    
+    if state.current_phase then
+        table.insert(json_parts, '"current_phase":"' .. tostring(state.current_phase) .. '"')
+    end
+    if state.money then
+        table.insert(json_parts, '"money":' .. tostring(state.money))
+    end
+    if state.ante then
+        table.insert(json_parts, '"ante":' .. tostring(state.ante))
+    end
+    if state.hands_remaining then
+        table.insert(json_parts, '"hands_remaining":' .. tostring(state.hands_remaining))
+    end
+    
+    return "{" .. table.concat(json_parts, ",") .. "}"
+end
+
 function BalatroMCP:defer_state_extraction(extraction_type, context_data)
     -- Use Balatro's Event Manager for deferred state extraction
     local delay = self.extraction_delays[extraction_type] or 0.1
@@ -353,13 +514,31 @@ end
 function BalatroMCP:start()
     print("BalatroMCP: Starting MCP integration")
     
-    self:setup_game_hooks()
-    
     self.polling_active = true
+    
+    -- Initialize threading for MCP operations
+    self:start_mcp_worker_thread()
+    
+    -- Create lightweight event that just passes game state to worker thread
+    local event
+    event = Event {
+        blockable = false,
+        blocking = false,
+        pause_force = true,
+        no_delete = true,
+        trigger = "after",
+        delay = 0.125,
+        timer = "UPTIME",
+        func = function()
+            self:send_state_to_worker()
+            event.start_timer = false
+        end
+    }
+    G.E_MANAGER:add_event(event)
     
     self:send_current_state()
     
-    print("BalatroMCP: MCP integration started")
+    print("BalatroMCP: MCP integration started with threaded state checking")
 end
 
 function BalatroMCP:stop()
@@ -367,17 +546,44 @@ function BalatroMCP:stop()
     
     self.polling_active = false
     
+    -- Stop MCP worker thread
+    if self.threaded_mode and self.exit_channel then
+        print("BalatroMCP: Sending exit signal to worker thread")
+        self.exit_channel:push(true)
+        
+        -- Wait a bit for thread to exit gracefully
+        if self.mcp_worker then
+            -- Give thread time to exit (simple wait)
+            local wait_start = os.clock()
+            while os.clock() - wait_start < 0.1 do
+                -- Simple wait
+            end
+            self.mcp_worker = nil
+        end
+        
+        self.threaded_mode = false
+    end
+    
     -- Cleanup async file transport resources (threads, channels)
     if self.transport and self.transport.cleanup then
         self.transport:cleanup()
     end
     
-    self:cleanup_hooks()
-    
     print("BalatroMCP: MCP integration stopped")
 end
 
-function BalatroMCP:update(dt)
+
+
+
+
+
+
+
+
+
+
+
+function BalatroMCP:check_and_update_state()
     if not self.polling_active then
         return
     end
@@ -387,36 +593,14 @@ function BalatroMCP:update(dt)
         self.transport:update()
     end
     
-    -- NON-INTRUSIVE STATE TRANSITION DETECTION
-    self:detect_blind_selection_transition()
-    self:detect_shop_state_transition()
-    self:detect_round_completion_transition()
-    self:detect_ante_advancement_transition()
-    self:detect_hand_dealing_transition()
-    self:detect_game_over_transition()
-    
-    -- Update blind transition cooldown
-    if self.blind_transition_cooldown > 0 then
-        self.blind_transition_cooldown = self.blind_transition_cooldown - dt
-    end
-    
-    -- Update both timers
-    self.update_timer = self.update_timer + dt
-    self.action_polling_timer = self.action_polling_timer + dt
-    
-    -- Handle action polling on separate timer
-    if (self.action_polling_timer >= self.action_polling_interval) and
-       self.transport and self.transport:is_available() and G.STATE ~= -1 then
-        self.action_polling_timer = 0
-        
+    -- Handle action polling
+    if self.transport and self.transport:is_available() and G.STATE ~= -1 then
         print("BalatroMCP: ACTION_POLLING - Checking for pending actions")
         self:process_pending_actions()
     end
     
-    -- Handle state updates on original timer
-    if (self.update_timer >= self.update_interval) and G.STATE ~= -1 then
-        self.update_timer = 0
-        
+    -- Handle state updates
+    if G.STATE ~= -1 then
         if self.crash_diagnostics then
             self.crash_diagnostics:monitor_joker_operations()
         end
@@ -428,476 +612,6 @@ function BalatroMCP:update(dt)
         
         self:check_and_send_state_update()
     end
-    
-end
-
-function BalatroMCP:setup_game_hooks()
-    print("BalatroMCP: Setting up game hooks")
-    
-    -- Validate hook state before setting up
-    if not self:validate_hook_state() then
-        print("BalatroMCP: ERROR - Hook state validation failed, aborting hook setup")
-        return
-    end
-    
-    -- Check for existing hooks to prevent double-hooking
-    local existing_hook_count = 0
-    for _ in pairs(self.original_functions) do
-        existing_hook_count = existing_hook_count + 1
-    end
-    
-    if existing_hook_count > 0 then
-        print("BalatroMCP: WARNING - " .. existing_hook_count .. " hooks already exist, skipping setup to prevent double-hooking")
-        return
-    end
-    
-    self:hook_game_start()
-    
-    self:hook_hand_evaluation()
-    
-    self:hook_blind_selection()
-    
-    self:hook_shop_interactions()
-    
-    self:hook_joker_interactions()
-    
-    -- Initialize state tracking for non-intrusive detection
-    self:initialize_state_tracking()
-    
-    -- Validate final hook state
-    self:validate_hook_state()
-end
-
-function BalatroMCP:initialize_state_tracking()
-    print("BalatroMCP: Initializing state tracking for non-intrusive detection")
-    
-    -- Blind selection tracking
-    self.last_blind_state = G and G.STATE or nil
-    self.blind_transition_detected = false
-    self.blind_transition_cooldown = 0
-    
-    -- Shop state tracking
-    self.last_shop_state = nil
-    self.shop_state_initialized = false
-    
-    -- Round completion tracking
-    self.last_round_state = nil
-    
-    -- Ante advancement tracking
-    self.last_ante = G and G.GAME and G.GAME.round_resets and G.GAME.round_resets.ante or 0
-    
-    -- Hand dealing tracking
-    self.last_hand_dealing_state = nil
-    self.last_hand_count = 0
-    
-    -- Game over tracking
-    self.last_game_over_state = nil
-    
-    print("BalatroMCP: State tracking initialized")
-end
-
-function BalatroMCP:hook_hand_evaluation()
-    if G.FUNCS then
-        -- Capture self reference for closure
-        local balatro_mcp_instance = self
-        
-        local original_play_cards = G.FUNCS.play_cards_from_highlighted
-        if original_play_cards then
-            -- Store original for cleanup
-            self.original_functions["play_cards_from_highlighted"] = original_play_cards
-            if self.crash_diagnostics then
-                G.FUNCS.play_cards_from_highlighted = self.crash_diagnostics:create_safe_hook(
-                    function(...)
-                        balatro_mcp_instance.crash_diagnostics:track_hook_chain("play_cards_from_highlighted")
-                        balatro_mcp_instance.crash_diagnostics:validate_game_state("play_cards_from_highlighted")
-                        print("BalatroMCP: Hand played - capturing state")
-                        local result = original_play_cards(...)
-                        balatro_mcp_instance:on_hand_played()
-                        return result
-                    end,
-                    "play_cards_from_highlighted"
-                )
-            else
-                G.FUNCS.play_cards_from_highlighted = function(...)
-                    print("BalatroMCP: Hand played - capturing state")
-                    local result = original_play_cards(...)
-                    balatro_mcp_instance:on_hand_played()
-                    return result
-                end
-            end
-        end
-        
-        local original_discard_cards = G.FUNCS.discard_cards_from_highlighted
-        if original_discard_cards then
-            -- Store original for cleanup
-            self.original_functions["discard_cards_from_highlighted"] = original_discard_cards
-            if self.crash_diagnostics then
-                G.FUNCS.discard_cards_from_highlighted = self.crash_diagnostics:create_safe_hook(
-                    function(...)
-                        balatro_mcp_instance.crash_diagnostics:track_hook_chain("discard_cards_from_highlighted")
-                        balatro_mcp_instance.crash_diagnostics:validate_game_state("discard_cards_from_highlighted")
-                        print("BalatroMCP: Cards discarded - capturing state")
-                        local result = original_discard_cards(...)
-                        balatro_mcp_instance:on_cards_discarded()
-                        return result
-                    end,
-                    "discard_cards_from_highlighted"
-                )
-            else
-                G.FUNCS.discard_cards_from_highlighted = function(...)
-                    print("BalatroMCP: Cards discarded - capturing state")
-                    local result = original_discard_cards(...)
-                    balatro_mcp_instance:on_cards_discarded()
-                    return result
-                end
-            end
-        end
-    end
-end
-
-function BalatroMCP:hook_blind_selection()
-    print("BalatroMCP: Setting up blind selection hooks")
-    
-    if G.FUNCS then
-        -- Capture self reference for closure
-        local balatro_mcp_instance = self
-        
-        -- Hook blind selection functions
-        local blind_functions = {
-            "select_blind",
-            "play_blind",
-            "choose_blind"
-        }
-        
-        for _, func_name in ipairs(blind_functions) do
-            local original_func = G.FUNCS[func_name]
-            if original_func then
-                -- Store original for cleanup
-                self.original_functions[func_name] = original_func
-                
-                G.FUNCS[func_name] = function(e, ...)
-                    print("BalatroMCP: Blind selection detected via " .. func_name)
-                    
-                    -- Extract blind info before selection
-                    local blind_info = balatro_mcp_instance:extract_blind_selection_info_from_element(e)
-                    
-                    local result = original_func(e, ...)
-                    
-                    -- Send status update for blind selection
-                    balatro_mcp_instance:send_status_update("blind_selected", {
-                        blind_type = blind_info.type,
-                        blind_name = blind_info.name,
-                        requirement = blind_info.requirement,
-                        reward = blind_info.reward,
-                        function_used = func_name
-                    })
-                    
-                    -- Check cooldown before triggering callback to prevent infinite loops
-                    if balatro_mcp_instance.blind_transition_cooldown <= 0 then
-                        balatro_mcp_instance:on_blind_selected()
-                        print("BalatroMCP: Hook triggered blind selection callback for " .. func_name)
-                    else
-                        print("BalatroMCP: Hook blocked " .. func_name .. " - cooldown active (" .. 
-                              string.format("%.1f", balatro_mcp_instance.blind_transition_cooldown) .. "s remaining)")
-                    end
-                    
-                    return result
-                end
-                print("BalatroMCP: Hooked blind function: " .. func_name)
-            end
-        end
-        
-        -- Hook blind skip function
-        local original_skip = G.FUNCS.skip_blind
-        if original_skip then
-            -- Store original for cleanup
-            self.original_functions["skip_blind"] = original_skip
-            G.FUNCS.skip_blind = function(e, ...)
-                print("BalatroMCP: Blind skip detected")
-                
-                local result = original_skip(e, ...)
-                
-                balatro_mcp_instance:send_status_update("blind_skipped", {})
-                balatro_mcp_instance:send_current_state()
-                
-                return result
-            end
-            print("BalatroMCP: Hooked skip_blind function")
-        end
-        
-        -- Hook boss blind reroll function
-        local original_reroll_boss = G.FUNCS.reroll_boss
-        if original_reroll_boss then
-            -- Store original for cleanup
-            self.original_functions["reroll_boss"] = original_reroll_boss
-            G.FUNCS.reroll_boss = function(...)
-                print("BalatroMCP: Boss blind reroll detected")
-                
-                local result = original_reroll_boss(...)
-                
-                balatro_mcp_instance:send_status_update("boss_blind_rerolled", {})
-                balatro_mcp_instance:send_current_state()
-                
-                return result
-            end
-            print("BalatroMCP: Hooked reroll_boss function")
-        end
-    end
-end
-
-function BalatroMCP:hook_shop_interactions()
-    if G.FUNCS then
-        -- Capture self reference for closure
-        local balatro_mcp_instance = self
-        
-        -- Hook cash_out for shop entry detection
-        local original_cash_out = G.FUNCS.cash_out
-        if original_cash_out then
-            -- Store original for cleanup
-            self.original_functions["cash_out"] = original_cash_out
-            if self.crash_diagnostics then
-                G.FUNCS.cash_out = self.crash_diagnostics:create_safe_hook(
-                    function(...)
-                        balatro_mcp_instance.crash_diagnostics:track_hook_chain("cash_out")
-                        balatro_mcp_instance.crash_diagnostics:validate_game_state("cash_out")
-                        print("BalatroMCP: Cash out triggered - capturing state")
-                        local result = original_cash_out(...)
-                        balatro_mcp_instance:on_shop_entered()
-                        return result
-                    end,
-                    "cash_out"
-                )
-            else
-                G.FUNCS.cash_out = function(...)
-                    print("BalatroMCP: Cash out triggered - capturing state")
-                    local result = original_cash_out(...)
-                    balatro_mcp_instance:on_shop_entered()
-                    return result
-                end
-            end
-        else
-            print("BalatroMCP: WARNING - G.FUNCS.cash_out not available for shop hooks")
-        end
-        
-        -- Hook shop purchase functions for status updates
-        local shop_functions = {
-            "buy_from_shop",
-            "purchase_item",
-            "shop_purchase",
-            "buy_joker",
-            "buy_card"
-        }
-        
-        for _, func_name in ipairs(shop_functions) do
-            local original_func = G.FUNCS[func_name]
-            if original_func then
-                -- Store original for cleanup
-                self.original_functions[func_name] = original_func
-                
-                G.FUNCS[func_name] = function(e, ...)
-                    print("BalatroMCP: Shop purchase detected via " .. func_name)
-                    
-                    -- Extract item info before purchase
-                    local item_info = balatro_mcp_instance:extract_shop_item_info(e)
-                    
-                    local result = original_func(e, ...)
-                    
-                    -- Send status update for purchase
-                    balatro_mcp_instance:send_status_update("shop_purchase", {
-                        item_name = item_info.name,
-                        item_type = item_info.type,
-                        cost = item_info.cost,
-                        function_used = func_name
-                    })
-                    
-                    -- Send updated game state
-                    balatro_mcp_instance:send_current_state()
-                    
-                    return result
-                end
-                print("BalatroMCP: Hooked shop function: " .. func_name)
-            end
-        end
-        
-        -- Hook reroll shop function
-        local original_reroll = G.FUNCS.reroll_shop
-        if original_reroll then
-            -- Store original for cleanup
-            self.original_functions["reroll_shop"] = original_reroll
-            G.FUNCS.reroll_shop = function(...)
-                print("BalatroMCP: Shop reroll detected")
-                
-                local result = original_reroll(...)
-                
-                balatro_mcp_instance:send_status_update("shop_reroll", {})
-                balatro_mcp_instance:send_current_state()
-                
-                return result
-            end
-            print("BalatroMCP: Hooked reroll_shop function")
-        end
-        
-    end
-end
-
-function BalatroMCP:hook_game_start()
-    print("BalatroMCP: Setting up game start hooks")
-    
-    if G.FUNCS then
-        -- Capture self reference for closure
-        local balatro_mcp_instance = self
-        
-        local game_start_functions = {
-            "start_run",      -- Most likely candidate
-            "new_run",
-            "begin_run",
-            "start_game",
-            "new_game",
-            "init_run",
-            "setup_run"
-        }
-        
-        local hooks_applied = 0
-        
-        for _, func_name in ipairs(game_start_functions) do
-            local original_func = G.FUNCS[func_name]
-            if original_func then
-                -- Store original for cleanup
-                self.original_functions[func_name] = original_func
-                
-                G.FUNCS[func_name] = function(...)
-                    print("BalatroMCP: Game start detected via " .. func_name .. " - capturing state")
-                    local result = original_func(...)
-                    balatro_mcp_instance:on_game_started()
-                    return result
-                end
-                
-                hooks_applied = hooks_applied + 1
-            end
-        end
-        
-        if hooks_applied == 0 then
-            print("BalatroMCP: DEBUG_HOOKS - No standard game start functions found, using fallback detection")
-            -- Fallback: Hook into any function that might start a game
-            -- This will be discovered through the diagnostic logging above
-        else
-            print("BalatroMCP: DEBUG_HOOKS - Applied " .. hooks_applied .. " game start hooks")
-        end
-    else
-        print("BalatroMCP: ERROR - G.FUNCS not available for game start hooks")
-    end
-end
-
-function BalatroMCP:hook_joker_interactions()
-    print("BalatroMCP: Joker interaction hooks set up")
-end
-
-function BalatroMCP:cleanup_hooks()
-    print("BalatroMCP: Cleaning up game hooks")
-    
-    if not self.original_functions then
-        print("BalatroMCP: No original functions to restore")
-        return
-    end
-    
-    local restored_count = 0
-    local error_count = 0
-    
-    -- Restore all hooked functions to their original implementations
-    for func_name, original_func in pairs(self.original_functions) do
-        local restore_success, restore_error = pcall(function()
-            if G and G.FUNCS and original_func then
-                G.FUNCS[func_name] = original_func
-                restored_count = restored_count + 1
-                print("BalatroMCP: Restored function: " .. func_name)
-            else
-                error("Missing G.FUNCS or original function for " .. func_name)
-            end
-        end)
-        
-        if not restore_success then
-            error_count = error_count + 1
-            print("BalatroMCP: ERROR restoring " .. func_name .. ": " .. tostring(restore_error))
-        end
-    end
-    
-    -- Clear the original functions table
-    self.original_functions = {}
-    
-    print("BalatroMCP: Hook cleanup completed - " .. restored_count .. " functions restored, " .. error_count .. " errors")
-    
-    -- Verify cleanup by checking if functions are properly restored
-    self:verify_hook_cleanup()
-end
-
-function BalatroMCP:verify_hook_cleanup()
-    print("BalatroMCP: Verifying hook cleanup...")
-    
-    if not G or not G.FUNCS then
-        print("BalatroMCP: WARNING - G.FUNCS not available for verification")
-        return
-    end
-    
-    -- List of functions that should have been hooked and restored
-    local expected_functions = {
-        "play_cards_from_highlighted",
-        "discard_cards_from_highlighted", 
-        "select_blind",
-        "play_blind",
-        "choose_blind",
-        "skip_blind",
-        "reroll_boss",
-        "cash_out",
-        "buy_from_shop",
-        "purchase_item",
-        "shop_purchase",
-        "buy_joker",
-        "buy_card",
-        "reroll_shop",
-        "start_run",
-        "new_run",
-        "begin_run",
-        "start_game",
-        "new_game",
-        "init_run",
-        "setup_run"
-    }
-    
-    local verified_count = 0
-    local missing_count = 0
-    
-    for _, func_name in ipairs(expected_functions) do
-        if G.FUNCS[func_name] then
-            verified_count = verified_count + 1
-        else
-            missing_count = missing_count + 1
-            print("BalatroMCP: NOTE - Function not found (may not exist in this version): " .. func_name)
-        end
-    end
-    
-    print("BalatroMCP: Verification complete - " .. verified_count .. " functions verified, " .. missing_count .. " not found")
-end
-
-function BalatroMCP:validate_hook_state()
-    -- Validate current hook state to prevent double-hooking
-    if not self.original_functions then
-        print("BalatroMCP: Hook state validation failed - original_functions table missing")
-        return false
-    end
-    
-    local hook_count = 0
-    for _ in pairs(self.original_functions) do
-        hook_count = hook_count + 1
-    end
-    
-    print("BalatroMCP: Current hook state - " .. hook_count .. " functions hooked")
-    
-    if hook_count > 20 then
-        print("BalatroMCP: WARNING - Unusually high number of hooked functions detected")
-        return false
-    end
-    
-    return true
 end
 
 function BalatroMCP:process_pending_actions()
@@ -1173,188 +887,11 @@ function BalatroMCP:on_game_over()
 end
 
 
-function BalatroMCP:detect_blind_selection_transition()
-    if not G or not G.STATE or not G.STATES then
-        return
-    end
-    
-    local current_state = G.STATE
-    
-    if not self.last_blind_state then
-        self.last_blind_state = current_state
-        return
-    end
-    
-    if self.blind_transition_cooldown > 0 then
-        return
-    end
-    
-    local was_blind_select = (self.last_blind_state == G.STATES.BLIND_SELECT)
-    local is_hand_select = (current_state == G.STATES.SELECTING_HAND or current_state == G.STATES.DRAW_TO_HAND)
-    
-    if was_blind_select and is_hand_select then
-        print("BalatroMCP: NON_INTRUSIVE_DETECTION - Blind selection completed: " .. 
-              tostring(self.last_blind_state) .. " -> " .. tostring(current_state))
-        self:on_blind_selected()
-    end
-    
-    self.last_blind_state = current_state
-end
 
-function BalatroMCP:detect_shop_state_transition()
-    if not G or not G.STATE or not G.STATES then
-        return
-    end
-    
-    local current_state = G.STATE
-    
-    if not self.last_shop_state then
-        self.last_shop_state = current_state
-        self.shop_state_initialized = false
-        return
-    end
-    
-    local was_shop = (self.last_shop_state == G.STATES.SHOP)
-    local is_shop = (current_state == G.STATES.SHOP)
-    local was_not_shop = not was_shop
-    
-    -- Shop entry detection
-    if was_not_shop and is_shop and not self.shop_state_initialized then
-        print("BalatroMCP: NON_INTRUSIVE_DETECTION - Shop state entered: " ..
-              tostring(self.last_shop_state) .. " -> " .. tostring(current_state))
-        
-        self.shop_state_initialized = true
-        self:on_shop_entered()
-    end
-    
-    -- Shop exit detection
-    if was_shop and not is_shop and self.shop_state_initialized then
-        print("BalatroMCP: NON_INTRUSIVE_DETECTION - Shop state exited: " ..
-              tostring(self.last_shop_state) .. " -> " .. tostring(current_state))
-        
-        self.shop_state_initialized = false
-        self:on_shop_exited()
-    end
-    
-    if current_state ~= G.STATES.SHOP then
-        self.shop_state_initialized = false
-    end
-    
-    self.last_shop_state = current_state
-end
 
-function BalatroMCP:detect_round_completion_transition()
-    if not G or not G.STATE or not G.STATES then
-        return
-    end
-    
-    local current_state = G.STATE
-    
-    if not self.last_round_state then
-        self.last_round_state = current_state
-        self.last_ante = G.GAME and G.GAME.round_resets and G.GAME.round_resets.ante or 0
-        return
-    end
-    
-    -- Detect round completion by looking for transitions to shop or next round states
-    local was_playing = (self.last_round_state == G.STATES.SELECTING_HAND or
-                        self.last_round_state == G.STATES.HAND_PLAYED or
-                        self.last_round_state == G.STATES.DRAW_TO_HAND)
-    local is_round_end = (current_state == G.STATES.SHOP or
-                         current_state == G.STATES.ROUND_EVAL or
-                         current_state == G.STATES.NEW_ROUND)
-    
-    if was_playing and is_round_end then
-        print("BalatroMCP: NON_INTRUSIVE_DETECTION - Round completed: " ..
-              tostring(self.last_round_state) .. " -> " .. tostring(current_state))
-        self:on_round_completed()
-    end
-    
-    self.last_round_state = current_state
-end
 
-function BalatroMCP:detect_ante_advancement_transition()
-    if not G or not G.GAME or not G.GAME.round_resets then
-        return
-    end
-    
-    local current_ante = G.GAME.round_resets.ante or 0
-    
-    if not self.last_ante then
-        self.last_ante = current_ante
-        return
-    end
-    
-    if current_ante > self.last_ante then
-        print("BalatroMCP: NON_INTRUSIVE_DETECTION - Ante advanced: " ..
-              tostring(self.last_ante) .. " -> " .. tostring(current_ante))
-        self:on_ante_advanced()
-    end
-    
-    self.last_ante = current_ante
-end
 
-function BalatroMCP:detect_hand_dealing_transition()
-    if not G or not G.STATE or not G.STATES then
-        return
-    end
-    
-    local current_state = G.STATE
-    
-    if not self.last_hand_dealing_state then
-        self.last_hand_dealing_state = current_state
-        self.last_hand_count = 0
-        return
-    end
-    
-    -- Extract current hand count
-    local current_hand_count = 0
-    if G.hand and G.hand.cards then
-        current_hand_count = #G.hand.cards
-    end
-    
-    -- Detect hand dealing completion
-    local was_drawing = (self.last_hand_dealing_state == G.STATES.DRAW_TO_HAND or
-                        self.last_hand_dealing_state == G.STATES.NEW_ROUND)
-    local is_hand_ready = (current_state == G.STATES.SELECTING_HAND)
-    local hand_size_increased = (current_hand_count > self.last_hand_count)
-    
-    if was_drawing and is_hand_ready and hand_size_increased then
-        print("BalatroMCP: NON_INTRUSIVE_DETECTION - Hand dealing completed: " ..
-              tostring(self.last_hand_dealing_state) .. " -> " .. tostring(current_state) ..
-              " (hand: " .. tostring(self.last_hand_count) .. " -> " .. tostring(current_hand_count) .. ")")
-        self:on_hand_dealt()
-    end
-    
-    self.last_hand_dealing_state = current_state
-    self.last_hand_count = current_hand_count
-end
 
-function BalatroMCP:detect_game_over_transition()
-    if not G or not G.STATE or not G.STATES then
-        return
-    end
-    
-    local current_state = G.STATE
-    
-    if not self.last_game_over_state then
-        self.last_game_over_state = current_state
-        return
-    end
-    
-    -- Detect game over states
-    local was_playing = (self.last_game_over_state ~= G.STATES.GAME_OVER and
-                        self.last_game_over_state ~= G.STATES.SMODS_BOOSTER_OPENED)
-    local is_game_over = (current_state == G.STATES.GAME_OVER)
-    
-    if was_playing and is_game_over then
-        print("BalatroMCP: NON_INTRUSIVE_DETECTION - Game over detected: " ..
-              tostring(self.last_game_over_state) .. " -> " .. tostring(current_state))
-        self:on_game_over()
-    end
-    
-    self.last_game_over_state = current_state
-end
 
 function BalatroMCP:extract_shop_item_info(element)
     -- Extract information about shop item from UI element
