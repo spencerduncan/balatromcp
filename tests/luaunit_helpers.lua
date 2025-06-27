@@ -236,20 +236,36 @@ function luaunit_helpers.setup_mock_love_graphics()
     return love.graphics
 end
 
--- Mock SMODS environment setup (preserves exact functionality from test_file_io.lua)
+-- Mock SMODS environment setup (enhanced for StateExtractor compatibility)
 function luaunit_helpers.setup_mock_smods()
     if not _G.SMODS then
-        -- Create mock SMODS object that uses the actual JSON library
+        -- Create mock SMODS object that provides compatibility layer
         _G.SMODS = {
             load_file = function(filename)
-                -- Mock implementation that mimics SMODS.load_file behavior
+                -- Convert SMODS.load_file() path to require() path
+                local require_path = filename:gsub("/", "."):gsub("%.lua$", "")
+                
+                -- Special handling for known files
                 if filename == "libs/json.lua" then
                     -- Return a function that when called returns the actual JSON library
                     return function()
                         return require("libs.json")
                     end
+                elseif filename:match("^state_extractor/") then
+                    -- Handle StateExtractor modules
+                    return function()
+                        return require(require_path)
+                    end
                 else
-                    error("Mock SMODS: File not found: " .. filename)
+                    -- Try to require the file and return it wrapped in a function
+                    local success, module = pcall(require, require_path)
+                    if success then
+                        return function()
+                            return module
+                        end
+                    else
+                        error("Mock SMODS: File not found or could not require: " .. filename .. " (tried: " .. require_path .. ")")
+                    end
                 end
             end
         }

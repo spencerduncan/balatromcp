@@ -4,6 +4,9 @@
 
 local luaunit_helpers = require('tests.luaunit_helpers')
 local luaunit = require('libs.luaunit')
+
+-- Setup SMODS mock before requiring StateExtractor
+luaunit_helpers.setup_mock_smods()
 local StateExtractor = require('state_extractor.state_extractor')
 
 -- Test StateExtractor orchestration
@@ -12,11 +15,17 @@ TestStateExtractorOrchestration = {}
 function TestStateExtractorOrchestration:setUp()
     -- Store original G
     self.original_G = G
+    
+    -- Ensure SMODS mock is available for each test (don't clean up between tests)
+    luaunit_helpers.setup_mock_smods()
 end
 
 function TestStateExtractorOrchestration:tearDown()
     -- Restore original G
     G = self.original_G
+    
+    -- Don't clean up SMODS mock to avoid breaking subsequent tests
+    -- The module is already loaded and cached by require()
 end
 
 -- Test orchestrator creation and initialization
@@ -300,8 +309,16 @@ function TestStateExtractorOrchestration:test_orchestration_comprehensive_state(
             cards = {
                 {
                     ability = {name = "deck_card"},
-                    base = {rank = "K", suit = "Hearts", id = "KH"}
+                    base = {value = "K", suit = "Hearts", id = "KH"},
+                    unique_val = "deck_card_1"
                 }
+            }
+        },
+        playing_cards = {
+            {
+                ability = {name = "deck_card"},
+                base = {value = "K", suit = "Hearts", id = "KH"},
+                unique_val = "deck_card_1"
             }
         },
         shop_jokers = {
