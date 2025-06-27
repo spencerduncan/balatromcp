@@ -344,4 +344,115 @@ function TestStateExtractorOrchestration:test_orchestration_comprehensive_state(
     luaunit.assertTrue(#result.available_actions > 0)
 end
 
+-- Test lookup table functionality
+function TestStateExtractorOrchestration:test_extractor_lookup_table_initialization()
+    local extractor = StateExtractor.new()
+    
+    luaunit.assertNotNil(extractor.extractor_lookup)
+    luaunit.assertEquals("table", type(extractor.extractor_lookup))
+    luaunit.assertTrue(#extractor.extractors > 0)
+    
+    -- Verify lookup table contains all registered extractors
+    for _, registered_extractor in ipairs(extractor.extractors) do
+        local name = registered_extractor:get_name()
+        luaunit.assertNotNil(name)
+        luaunit.assertEquals(registered_extractor, extractor.extractor_lookup[name])
+    end
+end
+
+-- Test delegation method performance optimization
+function TestStateExtractorOrchestration:test_get_session_id_uses_lookup()
+    local extractor = StateExtractor.new()
+    
+    -- Verify session extractor is in lookup table
+    luaunit.assertNotNil(extractor.extractor_lookup["session_extractor"])
+    
+    -- Test delegation works
+    local session_id = extractor:get_session_id()
+    luaunit.assertNotNil(session_id)
+    luaunit.assertEquals("string", type(session_id))
+end
+
+-- Test deck cards delegation method
+function TestStateExtractorOrchestration:test_extract_deck_cards_delegation()
+    G = {
+        playing_cards = {
+            {unique_val = "test_card_1", base = {value = "A", suit = "Spades"}}
+        }
+    }
+    
+    local extractor = StateExtractor.new()
+    
+    -- Verify deck card extractor is in lookup table
+    luaunit.assertNotNil(extractor.extractor_lookup["deck_card_extractor"])
+    
+    -- Test delegation works
+    local deck_cards = extractor:extract_deck_cards()
+    luaunit.assertNotNil(deck_cards)
+    luaunit.assertEquals("table", type(deck_cards))
+end
+
+-- Test remaining deck cards delegation method
+function TestStateExtractorOrchestration:test_extract_remaining_deck_cards_delegation()
+    G = {
+        deck = {
+            cards = {
+                {unique_val = "remaining_card_1", base = {value = "K", suit = "Hearts"}}
+            }
+        }
+    }
+    
+    local extractor = StateExtractor.new()
+    
+    -- Verify deck card extractor is in lookup table
+    luaunit.assertNotNil(extractor.extractor_lookup["deck_card_extractor"])
+    
+    -- Test delegation works
+    local remaining_cards = extractor:extract_remaining_deck_cards()
+    luaunit.assertNotNil(remaining_cards)
+    luaunit.assertEquals("table", type(remaining_cards))
+end
+
+-- Test fallback behavior when extractor not found
+function TestStateExtractorOrchestration:test_delegation_fallback_behavior()
+    local extractor = StateExtractor.new()
+    
+    -- Remove deck card extractor from lookup for testing
+    local original_extractor = extractor.extractor_lookup["deck_card_extractor"]
+    extractor.extractor_lookup["deck_card_extractor"] = nil
+    
+    -- Test fallback behavior returns empty table
+    local deck_cards = extractor:extract_deck_cards()
+    luaunit.assertEquals("table", type(deck_cards))
+    luaunit.assertEquals(0, #deck_cards)
+    
+    local remaining_cards = extractor:extract_remaining_deck_cards()
+    luaunit.assertEquals("table", type(remaining_cards))
+    luaunit.assertEquals(0, #remaining_cards)
+    
+    -- Restore for other tests
+    extractor.extractor_lookup["deck_card_extractor"] = original_extractor
+end
+
+-- Test lookup table synchronization with extractors array
+function TestStateExtractorOrchestration:test_lookup_table_synchronization()
+    local extractor = StateExtractor.new()
+    
+    -- Count extractors in both structures
+    local extractors_count = #extractor.extractors
+    local lookup_count = 0
+    for _ in pairs(extractor.extractor_lookup) do
+        lookup_count = lookup_count + 1
+    end
+    
+    luaunit.assertEquals(extractors_count, lookup_count)
+    
+    -- Verify each extractor in array has corresponding lookup entry
+    for _, registered_extractor in ipairs(extractor.extractors) do
+        local name = registered_extractor:get_name()
+        luaunit.assertNotNil(extractor.extractor_lookup[name])
+        luaunit.assertEquals(registered_extractor, extractor.extractor_lookup[name])
+    end
+end
+
 return TestStateExtractorOrchestration
