@@ -55,12 +55,40 @@ local function setup_test_environment()
     -- Safely preserve original os functions before mocking
     local original_os = _G.os
     _G.os = setmetatable({
-        date = function(format) return "12:34:56" end,
+        date = function(format) 
+            -- Return appropriate format based on input
+            if format and string.find(format, "%%Y.-%%m.-%%d") then
+                -- ISO format request - return proper ISO timestamp
+                return "2024-01-01T12:34:56Z"
+            else
+                -- Default format - return simple time
+                return "12:34:56" 
+            end
+        end,
         time = function() return 1234567890 end,
         clock = original_os and original_os.clock or function() return 1234567890 end
     }, {
         __index = original_os -- Fallback to original os functions
     })
+end
+
+-- Global variable to store original os for proper cleanup
+local original_os_backup = _G.os
+
+-- Cleanup function to restore original environment
+local function cleanup_test_environment()
+    -- Restore original os functions
+    if original_os_backup then
+        _G.os = original_os_backup
+    end
+    
+    -- Clean up global G object
+    _G.G = nil
+    
+    -- Clean up love mock
+    if _G.love and _G.love.timer then
+        _G.love.timer = nil
+    end
 end
 
 -- Helper functions to create test objects
@@ -558,9 +586,16 @@ function TestMonitorJokerOperationsDetectsAndLogsCorruptedJokers()
 end
 
 -- Run tests if executed directly
+-- Ensure cleanup when module is loaded/unloaded
 if arg and arg[0] and string.find(arg[0], "test_crash_diagnostics_luaunit") then
-    os.exit(luaunit.LuaUnit.run())
+    local result = luaunit.LuaUnit.run()
+    cleanup_test_environment() -- Clean up after all tests
+    os.exit(result)
 end
+
+-- IMPORTANT: Clean up globals when this module is loaded in test suite
+-- This ensures os.date is restored for subsequent tests
+cleanup_test_environment()
 
 return {
     TestValidateObjectConfigDetectsNilObject = TestValidateObjectConfigDetectsNilObject,
