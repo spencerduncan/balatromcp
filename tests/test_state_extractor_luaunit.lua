@@ -4,7 +4,9 @@
 
 local luaunit_helpers = require('tests.luaunit_helpers')
 local luaunit = require('libs.luaunit')
-local StateExtractor = require('state_extractor.state_extractor')
+
+-- StateExtractor will be loaded after SMODS setup
+local StateExtractor
 
 -- Test StateExtractor orchestration
 TestStateExtractorOrchestration = {}
@@ -12,11 +14,26 @@ TestStateExtractorOrchestration = {}
 function TestStateExtractorOrchestration:setUp()
     -- Store original G
     self.original_G = G
+    self.original_SMODS = _G.SMODS
+    
+    -- Set up SMODS mock before loading StateExtractor
+    luaunit_helpers.setup_mock_smods()
+    
+    -- Clear all StateExtractor modules from cache to ensure fresh loading with SMODS
+    for module_name, _ in pairs(package.loaded) do
+        if string.match(module_name, "^state_extractor%.") then
+            package.loaded[module_name] = nil
+        end
+    end
+    
+    -- Now load StateExtractor with proper SMODS mock in place
+    StateExtractor = require('state_extractor.state_extractor')
 end
 
 function TestStateExtractorOrchestration:tearDown()
-    -- Restore original G
+    -- Restore original G and SMODS
     G = self.original_G
+    _G.SMODS = self.original_SMODS
 end
 
 -- Test orchestrator creation and initialization

@@ -13,6 +13,10 @@ local test_state = {}
 local function setUp()
     -- Save original globals
     test_state.original_g = G
+    test_state.original_smods = _G.SMODS
+    
+    -- Set up SMODS mock for StateExtractor compatibility
+    luaunit_helpers.setup_mock_smods()
     
     -- Set up clean environment
     G = nil
@@ -21,6 +25,7 @@ end
 local function tearDown()
     -- Restore original globals
     G = test_state.original_g
+    _G.SMODS = test_state.original_smods
 end
 
 -- =============================================================================
@@ -30,7 +35,7 @@ end
 function testActionExecutorMovePlayingCardMissingFromIndex()
     setUp()
     local ActionExecutor = require("action_executor")
-    local StateExtractor = require("state_extractor")
+    local StateExtractor = require("state_extractor.state_extractor")
     local JokerManager = require("joker_manager")
     
     local state_extractor = StateExtractor.new()
@@ -51,7 +56,7 @@ end
 function testActionExecutorMovePlayingCardInvalidFromIndex()
     setUp()
     local ActionExecutor = require("action_executor")
-    local StateExtractor = require("state_extractor")
+    local StateExtractor = require("state_extractor.state_extractor")
     local JokerManager = require("joker_manager")
     
     local state_extractor = StateExtractor.new()
@@ -72,7 +77,7 @@ end
 function testActionExecutorMovePlayingCardMissingToIndex()
     setUp()
     local ActionExecutor = require("action_executor")
-    local StateExtractor = require("state_extractor")
+    local StateExtractor = require("state_extractor.state_extractor")
     local JokerManager = require("joker_manager")
     
     local state_extractor = StateExtractor.new()
@@ -93,7 +98,7 @@ end
 function testActionExecutorMovePlayingCardInvalidToIndex()
     setUp()
     local ActionExecutor = require("action_executor")
-    local StateExtractor = require("state_extractor")
+    local StateExtractor = require("state_extractor.state_extractor")
     local JokerManager = require("joker_manager")
     
     local state_extractor = StateExtractor.new()
@@ -114,7 +119,7 @@ end
 function testActionExecutorMovePlayingCardNYIError()
     setUp()
     local ActionExecutor = require("action_executor")
-    local StateExtractor = require("state_extractor")
+    local StateExtractor = require("state_extractor.state_extractor")
     local JokerManager = require("joker_manager")
     
     local state_extractor = StateExtractor.new()
@@ -140,7 +145,7 @@ function testActionExecutorSkipBlindMissingGlobalState()
     setUp()
     G = nil -- No global G object
     local ActionExecutor = require("action_executor")
-    local StateExtractor = require("state_extractor")
+    local StateExtractor = require("state_extractor.state_extractor")
     local JokerManager = require("joker_manager")
     
     local state_extractor = StateExtractor.new()
@@ -159,7 +164,7 @@ function testActionExecutorSkipBlindMissingGState()
     setUp()
     G = {} -- G exists but missing STATE
     local ActionExecutor = require("action_executor")
-    local StateExtractor = require("state_extractor")
+    local StateExtractor = require("state_extractor.state_extractor")
     local JokerManager = require("joker_manager")
     
     local state_extractor = StateExtractor.new()
@@ -181,7 +186,7 @@ function testActionExecutorSkipBlindMissingGStates()
         -- Missing STATES
     }
     local ActionExecutor = require("action_executor")
-    local StateExtractor = require("state_extractor")
+    local StateExtractor = require("state_extractor.state_extractor")
     local JokerManager = require("joker_manager")
     
     local state_extractor = StateExtractor.new()
@@ -204,7 +209,7 @@ function testActionExecutorSkipBlindWrongGameState()
         states = {BLIND_SELECT = 2, SELECTING_HAND = 1}
     })
     local ActionExecutor = require("action_executor")
-    local StateExtractor = require("state_extractor")
+    local StateExtractor = require("state_extractor.state_extractor")
     local JokerManager = require("joker_manager")
     
     local state_extractor = StateExtractor.new()
@@ -228,7 +233,7 @@ function testActionExecutorSkipBlindCorrectStateButNYI()
         -- Missing FUNCS - this will trigger the "function not available" error
     })
     local ActionExecutor = require("action_executor")
-    local StateExtractor = require("state_extractor")
+    local StateExtractor = require("state_extractor.state_extractor")
     local JokerManager = require("joker_manager")
     
     local state_extractor = StateExtractor.new()
@@ -252,7 +257,7 @@ function testActionExecutorSkipBlindMissingFuncs()
         -- Missing FUNCS
     })
     local ActionExecutor = require("action_executor")
-    local StateExtractor = require("state_extractor")
+    local StateExtractor = require("state_extractor.state_extractor")
     local JokerManager = require("joker_manager")
     
     local state_extractor = StateExtractor.new()
@@ -276,7 +281,7 @@ function testActionExecutorSkipBlindMissingSkipFunction()
         funcs = {} -- Empty FUNCS, missing skip_blind
     })
     local ActionExecutor = require("action_executor")
-    local StateExtractor = require("state_extractor")
+    local StateExtractor = require("state_extractor.state_extractor")
     local JokerManager = require("joker_manager")
     
     local state_extractor = StateExtractor.new()
@@ -317,7 +322,7 @@ function testActionExecutorSkipBlindFunctionError()
         }
     })
     local ActionExecutor = require("action_executor")
-    local StateExtractor = require("state_extractor")
+    local StateExtractor = require("state_extractor.state_extractor")
     local JokerManager = require("joker_manager")
     
     local state_extractor = StateExtractor.new()
@@ -360,7 +365,7 @@ function testActionExecutorSkipBlindSuccessful()
         }
     })
     local ActionExecutor = require("action_executor")
-    local StateExtractor = require("state_extractor")
+    local StateExtractor = require("state_extractor.state_extractor")
     local JokerManager = require("joker_manager")
     
     local state_extractor = StateExtractor.new()
@@ -383,7 +388,7 @@ end
 function testActionExecutorExecuteActionMovePlayingCard()
     setUp()
     local ActionExecutor = require("action_executor")
-    local StateExtractor = require("state_extractor")
+    local StateExtractor = require("state_extractor.state_extractor")
     local JokerManager = require("joker_manager")
     
     local state_extractor = StateExtractor.new()
@@ -412,7 +417,7 @@ function testActionExecutorExecuteActionSkipBlind()
         -- Missing FUNCS - this will trigger the "function not available" error
     })
     local ActionExecutor = require("action_executor")
-    local StateExtractor = require("state_extractor")
+    local StateExtractor = require("state_extractor.state_extractor")
     local JokerManager = require("joker_manager")
     
     local state_extractor = StateExtractor.new()
