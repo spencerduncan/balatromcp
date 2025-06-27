@@ -187,6 +187,18 @@ This ensures proper loading within Balatro's modding framework and enables the m
 - Improve code readability and maintainability
 - Ensure refactoring doesn't break existing functionality
 
+**GitHub Issue Workflow:**
+When assigned a specific GitHub issue to fix, follow this mandatory workflow:
+
+1. **Issue State Management**: Mark the issue as "in progress" or assign yourself to it
+2. **Branch Creation**: Create a new git branch for the issue using format `fix/issue-{number}-{short-description}`
+3. **Branch Publishing**: Push the branch to origin and associate it with the GitHub issue
+4. **Progress Communication**: Make comments on the GitHub issue documenting your progress as you work
+5. **Incremental Commits**: Create descriptive commits as you implement changes
+6. **Issue References**: Refer back to issue comments and description as needed during development
+7. **Pull Request Creation**: When code is ready, create a pull request linking to the original issue
+8. **Return Status**: Report completion and provide the pull request URL
+
 **Code Quality Process:**
 1. **Unit Testing Analysis**: "I am analyzing this code change with a focus on unit testing best practices. I will ensure each test validates a single behavior of a single class with proper isolation from dependencies. I'll identify missing test coverage and ensure tests are readable, maintainable, and follow the testing pyramid principles."
 
