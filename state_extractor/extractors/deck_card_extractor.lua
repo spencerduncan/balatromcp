@@ -52,12 +52,12 @@ function DeckCardExtractor:validate_card_structure(card, card_name)
 end
 
 function DeckCardExtractor:extract_deck_cards()
-    -- Extract deck cards from G.deck.cards with CIRCULAR REFERENCE SAFE access
+    -- Extract deck cards from G.playing_cards with CIRCULAR REFERENCE SAFE access
     local deck_cards = {}
     
-    -- Try G.deck.cards first (standard location)
-    if StateExtractorUtils.safe_check_path(G, {"deck", "cards"}) then
-        for i, card in ipairs(G.deck.cards) do
+    -- Try G.playing_cards first (primary source for full deck data)
+    if StateExtractorUtils.safe_check_path(G, {"playing_cards"}) then
+        for i, card in ipairs(G.playing_cards) do
             if card then
                 -- SAFE EXTRACTION: Only extract primitive values, avoid object references
                 local safe_card = {
@@ -74,12 +74,12 @@ function DeckCardExtractor:extract_deck_cards()
         return deck_cards
     end
     
-    -- Fallback to G.playing_cards if deck.cards not available
-    if not StateExtractorUtils.safe_check_path(G, {"playing_cards"}) then
+    -- Fallback to G.deck.cards if playing_cards not available (remaining deck cards only)
+    if not StateExtractorUtils.safe_check_path(G, {"deck", "cards"}) then
         return deck_cards
     end
     
-    for i, card in ipairs(G.playing_cards) do
+    for i, card in ipairs(G.deck.cards) do
         if card then
             -- SAFE EXTRACTION: Only extract primitive values, avoid object references
             local safe_card = {
