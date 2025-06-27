@@ -271,6 +271,16 @@ return {current_phase = "hand_selection"}
 - New version: Facade pattern with specialized extractors
 - Fix: Ensure new facade exposes same public interface as old monolithic version
 
+### Hook Lifecycle Management Best Practices
+**Reference**: See HOOK_LIFECYCLE_REVIEW_LESSONS.md for comprehensive patterns
+
+**Critical Infrastructure Pattern**: When implementing hook/resource management:
+1. **Store Original References**: Always preserve original function pointers before replacement
+2. **Implement Verification**: Include post-cleanup verification to confirm restoration
+3. **Error Recovery**: Use pcall and continue processing even if individual restorations fail
+4. **State Validation**: Prevent double-hooking with pre-setup validation checks
+5. **Comprehensive Logging**: Include diagnostic output for troubleshooting production issues
+
 ### File Path Assumptions in Tests
 **Issue**: DeckCardExtractor expected `G.playing_cards` but test data provided `G.deck.cards`.
 

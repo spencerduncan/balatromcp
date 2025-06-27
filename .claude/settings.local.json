@@ -23,7 +23,7 @@
       "Bash(rg:*)",
       "Bash(lua:*)",
       "Bash(git pull:*)",
-      "Bash(git merge:*)"
+      "Bash(gh label:*)"
     ],
     "deny": []
   },
