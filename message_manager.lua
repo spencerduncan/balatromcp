@@ -75,78 +75,32 @@ end
 
 -- High-level message operations
 function MessageManager:write_game_state(state_data)
-    self:log("Attempting to write game state")
-    
     if not state_data then
-        self:log("ERROR: No state data provided")
-        return false
-    end
-    
-    -- MAIN THREAD DIAGNOSTIC: Verify we're encoding in main thread
-    local is_main_thread = love and love.graphics and love.graphics.isActive
-    if not is_main_thread then
-        self:log("ERROR: JSON encoding happening in worker thread - this will fail")
         return false
     end
     
     if not self.transport:is_available() then
-        self:log("ERROR: Transport is not available")
         return false
     end
     
-    -- Create message structure in main thread (where we have access to all data)
+    -- Create message structure and encode to JSON
     local message = self:create_message(state_data, "game_state")
-    self:log("Created message structure with sequence_id: " .. message.sequence_id)
-    
-    -- JSON encoding MUST happen in main thread
     local encode_success, encoded_data = pcall(self.json.encode, message)
     if not encode_success then
-        self:log("ERROR: JSON encoding failed: " .. tostring(encoded_data))
         return false
     end
     
-    local json_size = #encoded_data
-    self:log("JSON encoding successful, data length: " .. json_size)
-    
-    -- Pass pre-encoded JSON to async transport (no re-encoding in worker thread)
+    -- Pass pre-encoded JSON to async transport
     if self.transport.async_enabled then
-        self:log("Using async write for pre-encoded JSON (size: " .. json_size .. ")")
-        local write_success = self.transport:write_message(encoded_data, "game_state", function(success)
-            if success then
-                self:log("Async game state write completed successfully")
-                -- Async verification with pre-encoded data
-                self.transport:verify_message(encoded_data, "game_state", function(verify_success)
-                    if verify_success then
-                        self:log("Async game state verification completed successfully")
-                    else
-                        self:log("ERROR: Async game state verification failed")
-                    end
-                end)
-            else
-                self:log("ERROR: Async game state write failed")
-            end
-        end)
-        
-        return write_success
+        return self.transport:write_message(encoded_data, "game_state")
     else
-        -- Synchronous fallback with pre-encoded data
-        self:log("Using synchronous write for pre-encoded JSON (size: " .. json_size .. ")")
+        -- Synchronous fallback
         local write_success = self.transport:write_message(encoded_data, "game_state")
-        
         if not write_success then
-            self:log("ERROR: Transport write failed")
             return false
         end
         
-        -- Verify with pre-encoded data
-        local verify_success = self.transport:verify_message(encoded_data, "game_state")
-        if not verify_success then
-            self:log("ERROR: Message verification failed")
-            return false
-        end
-        
-        self:log("Game state written and verified successfully")
-        return true
+        return self.transport:verify_message(encoded_data, "game_state")
     end
 end
 

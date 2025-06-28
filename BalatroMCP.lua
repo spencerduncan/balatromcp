@@ -398,21 +398,16 @@ function BalatroMCP:process_worker_responses()
 end
 
 function BalatroMCP:serialize_state_to_json(state)
-    -- Use proper JSON library to serialize ALL state data, not just 4 fields
+    -- Use proper JSON library to serialize ALL state data
     if not self.message_manager or not self.message_manager.json then
-        print("BalatroMCP: ERROR - JSON library not available for state serialization")
         return "{}"
     end
     
     local encode_success, json_string = pcall(self.message_manager.json.encode, state)
     if not encode_success then
-        print("BalatroMCP: ERROR - Failed to serialize complete state to JSON: " .. tostring(json_string))
         -- Fallback to minimal state if full serialization fails
-        return '{"money":' .. (state.money or 0) .. ',"ante":' .. (state.ante or 1) .. ',"error":"full_serialization_failed"}'
+        return '{"money":' .. (state.money or 0) .. ',"ante":' .. (state.ante or 1) .. ',"error":"serialization_failed"}'
     end
-    
-    local json_size = string.len(json_string)
-    print("BalatroMCP: Complete state serialized to JSON successfully, size: " .. json_size .. " bytes")
     
     return json_string
 end
