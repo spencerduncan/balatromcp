@@ -623,6 +623,7 @@ function BalatroMCP:process_pending_actions()
             self.processing_action = false
             self.pending_state_extraction = false
             self.processing_action_start_time = nil
+            return  -- Skip this iteration, retry next time
         else
             print("BalatroMCP: ACTION_POLLING - Skipping, already processing action")
             return
@@ -783,7 +784,10 @@ function BalatroMCP:send_state_update(state)
             
             -- Remaining deck (cards still in deck that can be drawn)
             remaining_deck_cards = self.state_extractor:extract_remaining_deck_cards()
-        }
+        },
+        
+        -- Voucher and ante information (included in main state for external analysis)
+        vouchers_ante = state.vouchers_ante
     }
     
     local state_message = {
@@ -829,6 +833,17 @@ function BalatroMCP:send_state_update(state)
     end
     
     print("BalatroMCP: [DEBUG_STALE_STATE] Message send result: " .. tostring(send_result))
+    
+    -- Send vouchers and ante information as separate JSON export (using data already extracted)
+    if state.vouchers_ante then
+        local voucher_send_result = self.message_manager:write_vouchers_ante(state.vouchers_ante)
+        if not voucher_send_result then
+            print("BalatroMCP: WARNING - Failed to write vouchers ante data")
+        else
+            print("BalatroMCP: [DEBUG_STALE_STATE] Vouchers ante send result: " .. tostring(voucher_send_result))
+        end
+    end
+    
     print("BalatroMCP: [DEBUG_STALE_STATE] === STATE TRANSMISSION COMPLETED ===")
     
     local hand_count = #(state.hand_cards or {})
@@ -840,6 +855,7 @@ function BalatroMCP:send_state_update(state)
     print("  - Full deck cards: " .. full_deck_count)
     print("  - Remaining deck cards: " .. remaining_deck_count)
     print("  - Phase: " .. (state.current_phase or "unknown"))
+    print("  - Vouchers ante export: vouchers_ante.json")
 end
 
 function BalatroMCP:calculate_state_hash(state)

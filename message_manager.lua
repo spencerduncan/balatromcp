@@ -388,6 +388,49 @@ function MessageManager:write_action_result(result_data)
     end
 end
 
+function MessageManager:write_vouchers_ante(vouchers_ante_data)
+    self:log("Attempting to write vouchers ante data")
+    
+    if not vouchers_ante_data then
+        self:log("ERROR: No vouchers ante data provided")
+        return false
+    end
+    
+    if not self.transport:is_available() then
+        self:log("ERROR: Transport is not available")
+        return false
+    end
+    
+    local message = self:create_message(vouchers_ante_data, "vouchers_ante")
+    self:log("Created vouchers ante message structure with sequence_id: " .. message.sequence_id)
+    
+    -- Encode message to JSON
+    local encode_success, encoded_data = pcall(self.json.encode, message)
+    if not encode_success then
+        self:log("ERROR: JSON encoding failed: " .. tostring(encoded_data))
+        return false
+    end
+    
+    self:log("JSON encoding successful, data length: " .. #encoded_data)
+    
+    -- Delegate to transport
+    local write_success = self.transport:write_message(encoded_data, "vouchers_ante")
+    if not write_success then
+        self:log("ERROR: Transport write failed")
+        return false
+    end
+    
+    -- Verify through transport
+    local verify_success = self.transport:verify_message(encoded_data, "vouchers_ante")
+    if not verify_success then
+        self:log("ERROR: Message verification failed")
+        return false
+    end
+    
+    self:log("Vouchers ante data written and verified successfully")
+    return true
+end
+
 function MessageManager:cleanup_old_messages(max_age_seconds)
     if not self.transport:is_available() then
         self:log("ERROR: Transport is not available for cleanup")

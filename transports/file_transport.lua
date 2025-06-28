@@ -178,6 +178,7 @@ function FileTransport:get_filepath(message_type)
         remaining_deck = "remaining_deck.json",
         full_deck = "full_deck.json",
         hand_levels = "hand_levels.json",
+        vouchers_ante = "vouchers_ante.json",
         actions = "actions.json",
         action_result = "action_results.json",
         ["debug.log"] = "file_transport_debug.log"
