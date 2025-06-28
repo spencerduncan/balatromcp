@@ -84,7 +84,7 @@ function StateExtractor:extract_current_state()
         end
     end
     
-    -- Handle extraction errors
+    -- Include extraction errors in output for debugging if any occurred
     if #extraction_errors > 0 then
         state.extraction_errors = extraction_errors
     end
@@ -194,4 +194,74 @@ function StateExtractor:validate_states()
         return
     end
 end
+
+-- Enhanced G object validation for extraction diagnostics
+function StateExtractor:validate_g_object_for_extraction()
+    local validation_result = {
+        valid = true,
+        reason = "",
+        missing_properties = {}
+    }
+    
+    if not G then
+        validation_result.valid = false
+        validation_result.reason = "Global G object is nil"
+        return validation_result
+    end
+    
+    local critical_properties = {
+        "STATE", "STATES", "GAME", "hand", "jokers", "consumeables", "shop_jokers"
+    }
+    
+    for _, prop in ipairs(critical_properties) do
+        if G[prop] == nil then
+            table.insert(validation_result.missing_properties, prop)
+            validation_result.valid = false
+        end
+    end
+    
+    if not validation_result.valid then
+        validation_result.reason = "Missing critical properties: " .. table.concat(validation_result.missing_properties, ", ")
+    end
+    
+    return validation_result
+end
+
+-- Get required G object paths for each extractor type
+function StateExtractor:get_extractor_required_paths(extractor_name)
+    local extractor_paths = {
+        session_extractor = {},
+        phase_extractor = {{"STATE"}, {"STATES"}},
+        game_state_extractor = {{"GAME", "round_resets", "ante"}, {"GAME", "dollars"}},
+        round_state_extractor = {{"GAME", "current_round", "hands_left"}, {"GAME", "current_round", "discards_left"}},
+        hand_card_extractor = {{"hand", "cards"}},
+        joker_extractor = {{"jokers", "cards"}},
+        consumable_extractor = {{"consumeables", "cards"}},
+        deck_card_extractor = {{"deck", "cards"}, {"playing_cards"}},
+        blind_extractor = {{"GAME", "blind"}},
+        shop_extractor = {{"shop_jokers", "cards"}},
+        action_extractor = {},
+        joker_reorder_extractor = {{"jokers", "cards"}}
+    }
+    
+    return extractor_paths[extractor_name] or {}
+end
+
+-- Check if a specific G object path exists
+function StateExtractor:check_g_object_path(path)
+    if not G then
+        return false
+    end
+    
+    local current = G
+    for _, segment in ipairs(path) do
+        if type(current) ~= "table" or current[segment] == nil then
+            return false
+        end
+        current = current[segment]
+    end
+    
+    return true
+end
+
 return StateExtractor

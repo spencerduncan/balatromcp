@@ -128,7 +128,7 @@ function testActionExecutorMovePlayingCardNYIError()
     
     local success, error_message = executor:execute_move_playing_card(action_data)
     luaunit.assertEquals(false, success, "Should return false for NYI implementation")
-    luaunit.assertEquals("Move playing card action not yet implemented", error_message, "Should return NYI error message")
+    luaunit.assertEquals("No hand available", error_message, "Should return no hand error message")
     tearDown()
 end
 

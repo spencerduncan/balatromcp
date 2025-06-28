@@ -305,64 +305,30 @@ end
 
 function FileTransport:write_message(message_data, message_type, callback)
     if not self:is_available() then
-        self:log("ERROR: Filesystem not available")
         if callback then callback(false) end
         return false
     end
     
-    if not message_data then
-        self:log("ERROR: No message data provided")
-        if callback then callback(false) end
-        return false
-    end
-    
-    if not message_type then
-        self:log("ERROR: No message type provided")
+    if not message_data or not message_type then
         if callback then callback(false) end
         return false
     end
     
     local filepath = self:get_filepath(message_type)
-    self:log("Writing to file: " .. filepath)
     
     -- If async is enabled and callback provided, use async
     if self.async_enabled and callback then
         local request_id = self:submit_async_request('write', {
             filepath = filepath,
             content = message_data
-        }, function(success, result, error)
-            if not success then
-                self:log("ERROR: Async file write failed: " .. tostring(error))
-                self:diagnose_write_failure()
-                callback(false)
-            else
-                self:log("Message written successfully to: " .. filepath)
-                self.write_success_count = self.write_success_count + 1
-                self:log("DIAGNOSTIC: Total successful writes: " .. self.write_success_count)
-                callback(true)
-            end
-        end)
+        }, callback)
         
         return true -- Request submitted
     else
         -- Synchronous fallback
         local write_success = love.filesystem.write(filepath, message_data)
-        
-        if not write_success then
-            self:log("ERROR: File write failed")
-            self:diagnose_write_failure()
-            if callback then callback(false) end
-            return false
-        end
-        
-        self:log("Message written successfully to: " .. filepath)
-        
-        -- Track successful writes
-        self.write_success_count = self.write_success_count + 1
-        self:log("DIAGNOSTIC: Total successful writes: " .. self.write_success_count)
-        
-        if callback then callback(true) end
-        return true
+        if callback then callback(write_success) end
+        return write_success
     end
 end
 

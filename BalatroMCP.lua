@@ -398,24 +398,18 @@ function BalatroMCP:process_worker_responses()
 end
 
 function BalatroMCP:serialize_state_to_json(state)
-    -- Simple JSON serialization for state data
-    -- This is a simplified version - in production you'd use a proper JSON library
-    local json_parts = {}
-    
-    if state.current_phase then
-        table.insert(json_parts, '"current_phase":"' .. tostring(state.current_phase) .. '"')
-    end
-    if state.money then
-        table.insert(json_parts, '"money":' .. tostring(state.money))
-    end
-    if state.ante then
-        table.insert(json_parts, '"ante":' .. tostring(state.ante))
-    end
-    if state.hands_remaining then
-        table.insert(json_parts, '"hands_remaining":' .. tostring(state.hands_remaining))
+    -- Use proper JSON library to serialize ALL state data
+    if not self.message_manager or not self.message_manager.json then
+        return "{}"
     end
     
-    return "{" .. table.concat(json_parts, ",") .. "}"
+    local encode_success, json_string = pcall(self.message_manager.json.encode, state)
+    if not encode_success then
+        -- Fallback to minimal state if full serialization fails
+        return '{"money":' .. (state.money or 0) .. ',"ante":' .. (state.ante or 1) .. ',"error":"serialization_failed"}'
+    end
+    
+    return json_string
 end
 
 function BalatroMCP:defer_state_extraction(extraction_type, context_data)
