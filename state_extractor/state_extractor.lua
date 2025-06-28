@@ -49,7 +49,24 @@ end
 
 function StateExtractor:register_extractor(extractor)
     -- Import IExtractor for validation
-    local IExtractor = assert(SMODS.load_file("state_extractor/extractors/i_extractor.lua"))()
+    -- Use direct require for better test compatibility
+    local IExtractor
+    if SMODS and SMODS.load_file then
+        -- Production environment - use SMODS
+        local load_result = SMODS.load_file("state_extractor/extractors/i_extractor.lua")
+        if load_result then
+            IExtractor = load_result()
+        end
+    end
+    
+    -- Fallback to direct require for test environments
+    if not IExtractor then
+        IExtractor = require("state_extractor.extractors.i_extractor")
+    end
+    
+    if not IExtractor then
+        error("Failed to load IExtractor interface")
+    end
     
     -- Validate extractor implements required interface
     if IExtractor.validate_implementation(extractor) then
