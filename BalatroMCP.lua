@@ -799,6 +799,18 @@ function BalatroMCP:send_state_update(state)
     
     local send_result = self.message_manager:write_game_state(state_message)
     
+    -- Also write hand levels data if available
+    if state.hand_levels then
+        local hand_levels_data = {
+            session_id = state.session_id,
+            hand_levels = state.hand_levels
+        }
+        local hand_levels_result = self.message_manager:write_hand_levels(hand_levels_data)
+        print("BalatroMCP: [DEBUG_STALE_STATE] Hand levels write result: " .. tostring(hand_levels_result))
+    else
+        print("BalatroMCP: [DEBUG_STALE_STATE] No hand levels data available in state")
+    end
+    
     print("BalatroMCP: [DEBUG_STALE_STATE] Message send result: " .. tostring(send_result))
     print("BalatroMCP: [DEBUG_STALE_STATE] === STATE TRANSMISSION COMPLETED ===")
     
