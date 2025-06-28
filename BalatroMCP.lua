@@ -618,6 +618,7 @@ function BalatroMCP:process_pending_actions()
             self.processing_action = false
             self.pending_state_extraction = false
             self.processing_action_start_time = nil
+            return  -- Skip this iteration, retry next time
         else
             print("BalatroMCP: ACTION_POLLING - Skipping, already processing action")
             return
