@@ -792,6 +792,23 @@ function BalatroMCP:send_state_update(state)
     
     local send_result = self.message_manager:write_game_state(state_message)
     
+    -- Write full deck data to separate file as requested in issue #89
+    local deck_cards = comprehensive_state.card_data and comprehensive_state.card_data.full_deck_cards
+    if not deck_cards or #deck_cards == 0 then
+        print("BalatroMCP: WARNING - No deck cards found in state, skipping full deck export")
+    else
+        local full_deck_message = {
+            session_id = state.session_id or "unknown",
+            timestamp = os.time(),
+            card_count = #deck_cards,
+            cards = deck_cards
+        }
+        local full_deck_success = self.message_manager:write_full_deck(full_deck_message)
+        if not full_deck_success then
+            print("BalatroMCP: WARNING - Failed to write full deck data")
+        end
+    end
+    
     -- Also write hand levels data if available
     if state.hand_levels then
         local hand_levels_data = {

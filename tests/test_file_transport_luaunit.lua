@@ -142,6 +142,16 @@ local function TestFileTransportGetFilepathWithUnknownMessageType()
     tearDown()
 end
 
+local function TestFileTransportGetFilepathForFullDeck()
+    setUp()
+    
+    local transport = FileTransport.new("shared")
+    
+    luaunit.assertEquals("shared/full_deck.json", transport:get_filepath("full_deck"), "Should map full_deck message type to full_deck.json")
+    
+    tearDown()
+end
+
 -- =============================================================================
 -- WRITE MESSAGE TESTS
 -- =============================================================================
@@ -769,6 +779,7 @@ return {
     TestFileTransportGetFilepathWithSubdirectory = TestFileTransportGetFilepathWithSubdirectory,
     TestFileTransportGetFilepathWithCurrentDirectory = TestFileTransportGetFilepathWithCurrentDirectory,
     TestFileTransportGetFilepathWithUnknownMessageType = TestFileTransportGetFilepathWithUnknownMessageType,
+    TestFileTransportGetFilepathForFullDeck = TestFileTransportGetFilepathForFullDeck,
     TestFileTransportWriteMessage = TestFileTransportWriteMessage,
     TestFileTransportWriteMessageWithCurrentDirectory = TestFileTransportWriteMessageWithCurrentDirectory,
     TestFileTransportWriteMessageErrorHandling = TestFileTransportWriteMessageErrorHandling,
