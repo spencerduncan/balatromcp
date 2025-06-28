@@ -611,9 +611,13 @@ end
 function BalatroMCP:process_pending_actions()
     if self.processing_action then
         -- Safety timeout: reset stuck processing flag after 10 seconds
+        -- This prevents indefinite blocking when action processing gets stuck due to game engine issues
         if not self.processing_action_start_time then
-            print("BalatroMCP: WARNING - processing_action=true but start_time=nil, this should not happen")
-            self.processing_action_start_time = os.time()
+            print("BalatroMCP: WARNING - Inconsistent state detected, resetting processing flags")
+            self.processing_action = false
+            self.pending_state_extraction = false
+            self.processing_action_start_time = nil
+            return  -- Skip this iteration, retry next time
         elseif os.time() - self.processing_action_start_time > 10 then
             print("BalatroMCP: WARNING - Processing action timeout, resetting stuck flag")
             self.processing_action = false
