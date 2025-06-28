@@ -779,9 +779,6 @@ function BalatroMCP:send_state_update(state)
             -- Current hand (cards player is holding and can play/discard right now)
             hand_cards = state.hand_cards or {},
             
-            -- Full deck (all 52 cards that were in the deck at start, including enhancements/editions)
-            full_deck_cards = self.state_extractor:extract_deck_cards(),
-            
             -- Remaining deck (cards still in deck that can be drawn)
             remaining_deck_cards = self.state_extractor:extract_remaining_deck_cards()
         },
@@ -803,8 +800,25 @@ function BalatroMCP:send_state_update(state)
     
     local send_result = self.message_manager:write_game_state(state_message)
     
+    -- Write deck state to separate file as requested in issue #88
+    local extracted_deck_cards = self.state_extractor:extract_deck_cards()
+    if extracted_deck_cards and #extracted_deck_cards > 0 then
+        local deck_state_message = {
+            session_id = state.session_id or "unknown",
+            timestamp = os.time(),
+            card_count = #extracted_deck_cards,
+            deck_cards = extracted_deck_cards
+        }
+        local deck_state_success = self.message_manager:write_deck_state(deck_state_message)
+        if not deck_state_success then
+            print("BalatroMCP: WARNING - Failed to write deck state to separate file")
+        end
+    else
+        print("BalatroMCP: WARNING - No deck cards found, skipping deck state export")
+    end
+    
     -- Write full deck data to separate file as requested in issue #89
-    local deck_cards = comprehensive_state.card_data and comprehensive_state.card_data.full_deck_cards
+    local deck_cards = extracted_deck_cards  -- Use the same data extracted for deck_state.json
     if not deck_cards or #deck_cards == 0 then
         print("BalatroMCP: WARNING - No deck cards found in state, skipping full deck export")
     else
@@ -847,7 +861,7 @@ function BalatroMCP:send_state_update(state)
     print("BalatroMCP: [DEBUG_STALE_STATE] === STATE TRANSMISSION COMPLETED ===")
     
     local hand_count = #(state.hand_cards or {})
-    local full_deck_count = #(comprehensive_state.card_data.full_deck_cards or {})
+    local full_deck_count = #(extracted_deck_cards or {})
     local remaining_deck_count = #(comprehensive_state.card_data.remaining_deck_cards or {})
     
     print("BalatroMCP: Comprehensive state update sent")
@@ -856,6 +870,7 @@ function BalatroMCP:send_state_update(state)
     print("  - Remaining deck cards: " .. remaining_deck_count)
     print("  - Phase: " .. (state.current_phase or "unknown"))
     print("  - Vouchers ante export: vouchers_ante.json")
+    print("  - Deck state export: deck_state.json")
 end
 
 function BalatroMCP:calculate_state_hash(state)
