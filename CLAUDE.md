@@ -222,6 +222,14 @@ When assigned a specific GitHub issue to fix, follow this mandatory workflow:
 - **Transport**: AsyncFileTransport with Love2D threading
 - **Key Areas Needing Work**: See TODO_REMAINING_TEST_ISSUES.md
 
+## Code Review Lessons Learned
+
+For specific insights from code reviews and implementation patterns, see:
+- [ActionExecutor Review Lessons](./ACTION_EXECUTOR_REVIEW_LESSONS.md) - Patterns for action implementation and validation
+- [MessageManager Review Lessons](./MESSAGE_MANAGER_REVIEW_LESSONS.md) - Patterns for message export and integration layer reviews
+- [Code Review Response Lessons](./CODE_REVIEW_RESPONSE_LESSONS.md) - Patterns for addressing critical review feedback effectively
+- [Test Suite Recovery Lessons](./TEST_SUITE_RECOVERY_LESSONS.md) - Patterns for debugging and fixing test suite degradation
+
 ## Important Lessons Learned
 
 ### Test Suite Maintenance
@@ -286,7 +294,34 @@ return {current_phase = "hand_selection"}
 -- TODO: Reverse this priority for production accuracy
 ```
 
-## Review Lessons Documentation
+## Action Format Protocol
 
-For detailed code review insights and patterns discovered during development, see:
-- [StateExtractor Review Lessons](state_extractor/STATE_EXTRACTOR_REVIEW_LESSONS.md) - Delegation pattern insights from PR #37
+### Message Envelope Structure
+All actions sent to BalatroMCP must use the complete message envelope format:
+
+```json
+{
+  "timestamp": "2025-06-28T12:34:56Z",
+  "sequence_id": 1,
+  "message_type": "action",
+  "data": {
+    "action_type": "select_blind",
+    "sequence_id": 1,
+    "blind_type": "small"
+  }
+}
+```
+
+### Action-Specific Parameters
+
+- **select_blind**: `blind_type` ("small", "big", "boss")
+- **play_hand/discard_cards**: `card_indices` array of integers
+- **buy_item**: `shop_index` integer, optional `buy_and_use` string
+- **sell_joker**: `joker_index` integer
+- **sell_consumable**: `consumable_index` integer
+- **use_consumable**: `consumable_index` integer
+- **move_playing_card**: `from_index` and `to_index` integers
+- **reorder_jokers**: `from_index` and `to_index` integers
+- **select_pack_offer**: `pack_index` integer
+
+**Reference**: See create-action.ps1 for complete parameter specifications

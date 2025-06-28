@@ -17,6 +17,9 @@ local BlindExtractor = assert(SMODS.load_file("state_extractor/extractors/blind_
 local ShopExtractor = assert(SMODS.load_file("state_extractor/extractors/shop_extractor.lua"))()
 local ActionExtractor = assert(SMODS.load_file("state_extractor/extractors/action_extractor.lua"))()
 local JokerReorderExtractor = assert(SMODS.load_file("state_extractor/extractors/joker_reorder_extractor.lua"))()
+local VoucherAnteExtractor = assert(SMODS.load_file("state_extractor/extractors/voucher_ante_extractor.lua"))()
+local PackExtractor = assert(SMODS.load_file("state_extractor/extractors/pack_extractor.lua"))()
+local HandLevelsExtractor = assert(SMODS.load_file("state_extractor/extractors/hand_levels_extractor.lua"))()
 
 local StateExtractor = {}
 StateExtractor.__index = StateExtractor
@@ -40,6 +43,9 @@ function StateExtractor.new()
     self:register_extractor(ShopExtractor.new())
     self:register_extractor(ActionExtractor.new())
     self:register_extractor(JokerReorderExtractor.new())
+    self:register_extractor(VoucherAnteExtractor.new())
+    self:register_extractor(PackExtractor.new())
+    self:register_extractor(HandLevelsExtractor.new())
     
     -- Immediately test G object availability and structure
     self:validate_g_object()
@@ -49,7 +55,24 @@ end
 
 function StateExtractor:register_extractor(extractor)
     -- Import IExtractor for validation
-    local IExtractor = assert(SMODS.load_file("state_extractor/extractors/i_extractor.lua"))()
+    -- Use direct require for better test compatibility
+    local IExtractor
+    if SMODS and SMODS.load_file then
+        -- Production environment - use SMODS
+        local load_result = SMODS.load_file("state_extractor/extractors/i_extractor.lua")
+        if load_result then
+            IExtractor = load_result()
+        end
+    end
+    
+    -- Fallback to direct require for test environments
+    if not IExtractor then
+        IExtractor = require("state_extractor.extractors.i_extractor")
+    end
+    
+    if not IExtractor then
+        error("Failed to load IExtractor interface")
+    end
     
     -- Validate extractor implements required interface
     if IExtractor.validate_implementation(extractor) then
@@ -84,7 +107,7 @@ function StateExtractor:extract_current_state()
         end
     end
     
-    -- Handle extraction errors
+    -- Include extraction errors in output for debugging if any occurred
     if #extraction_errors > 0 then
         state.extraction_errors = extraction_errors
     end
@@ -194,4 +217,77 @@ function StateExtractor:validate_states()
         return
     end
 end
+
+-- Enhanced G object validation for extraction diagnostics
+function StateExtractor:validate_g_object_for_extraction()
+    local validation_result = {
+        valid = true,
+        reason = "",
+        missing_properties = {}
+    }
+    
+    if not G then
+        validation_result.valid = false
+        validation_result.reason = "Global G object is nil"
+        return validation_result
+    end
+    
+    local critical_properties = {
+        "STATE", "STATES", "GAME", "hand", "jokers", "consumeables", "shop_jokers"
+    }
+    
+    for _, prop in ipairs(critical_properties) do
+        if G[prop] == nil then
+            table.insert(validation_result.missing_properties, prop)
+            validation_result.valid = false
+        end
+    end
+    
+    if not validation_result.valid then
+        validation_result.reason = "Missing critical properties: " .. table.concat(validation_result.missing_properties, ", ")
+    end
+    
+    return validation_result
+end
+
+-- Get required G object paths for each extractor type
+function StateExtractor:get_extractor_required_paths(extractor_name)
+    local extractor_paths = {
+        session_extractor = {},
+        phase_extractor = {{"STATE"}, {"STATES"}},
+        game_state_extractor = {{"GAME", "round_resets", "ante"}, {"GAME", "dollars"}},
+        round_state_extractor = {{"GAME", "current_round", "hands_left"}, {"GAME", "current_round", "discards_left"}},
+        hand_card_extractor = {{"hand", "cards"}},
+        joker_extractor = {{"jokers", "cards"}},
+        consumable_extractor = {{"consumeables", "cards"}},
+        deck_card_extractor = {{"deck", "cards"}, {"playing_cards"}},
+        blind_extractor = {{"GAME", "blind"}},
+        shop_extractor = {{"shop_jokers", "cards"}},
+        action_extractor = {},
+        joker_reorder_extractor = {{"jokers", "cards"}},
+        pack_extractor = {{"pack_cards", "cards"}},
+        voucher_ante_extractor = {{"GAME", "vouchers"}, {"shop_vouchers", "cards"}},
+        hand_levels_extractor = {{"GAME", "hands"}, {"GAME", "hand_levels"}, {"GAME", "poker_hands"}}
+    }
+    
+    return extractor_paths[extractor_name] or {}
+end
+
+-- Check if a specific G object path exists
+function StateExtractor:check_g_object_path(path)
+    if not G then
+        return false
+    end
+    
+    local current = G
+    for _, segment in ipairs(path) do
+        if type(current) ~= "table" or current[segment] == nil then
+            return false
+        end
+        current = current[segment]
+    end
+    
+    return true
+end
+
 return StateExtractor

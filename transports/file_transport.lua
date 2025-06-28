@@ -176,6 +176,9 @@ function FileTransport:get_filepath(message_type)
         game_state = "game_state.json",
         deck_state = "deck_state.json",
         remaining_deck = "remaining_deck.json",
+        full_deck = "full_deck.json",
+        hand_levels = "hand_levels.json",
+        vouchers_ante = "vouchers_ante.json",
         actions = "actions.json",
         action_result = "action_results.json",
         ["debug.log"] = "file_transport_debug.log"
@@ -256,8 +259,15 @@ function FileTransport:process_async_responses()
         end
         
         local pending = self.pending_requests[response.id]
-        if pending and pending.callback then
-            pending.callback(response.success, response.data, response.error)
+        if pending then
+            -- Track successful write operations
+            if response.success and response.operation == 'write' then
+                self.write_success_count = self.write_success_count + 1
+            end
+            
+            if pending.callback then
+                pending.callback(response.success, response.data, response.error)
+            end
         end
         
         self.pending_requests[response.id] = nil
@@ -305,64 +315,33 @@ end
 
 function FileTransport:write_message(message_data, message_type, callback)
     if not self:is_available() then
-        self:log("ERROR: Filesystem not available")
         if callback then callback(false) end
         return false
     end
     
-    if not message_data then
-        self:log("ERROR: No message data provided")
-        if callback then callback(false) end
-        return false
-    end
-    
-    if not message_type then
-        self:log("ERROR: No message type provided")
+    if not message_data or not message_type then
         if callback then callback(false) end
         return false
     end
     
     local filepath = self:get_filepath(message_type)
-    self:log("Writing to file: " .. filepath)
     
     -- If async is enabled and callback provided, use async
     if self.async_enabled and callback then
         local request_id = self:submit_async_request('write', {
             filepath = filepath,
             content = message_data
-        }, function(success, result, error)
-            if not success then
-                self:log("ERROR: Async file write failed: " .. tostring(error))
-                self:diagnose_write_failure()
-                callback(false)
-            else
-                self:log("Message written successfully to: " .. filepath)
-                self.write_success_count = self.write_success_count + 1
-                self:log("DIAGNOSTIC: Total successful writes: " .. self.write_success_count)
-                callback(true)
-            end
-        end)
+        }, callback)
         
         return true -- Request submitted
     else
         -- Synchronous fallback
         local write_success = love.filesystem.write(filepath, message_data)
-        
-        if not write_success then
-            self:log("ERROR: File write failed")
-            self:diagnose_write_failure()
-            if callback then callback(false) end
-            return false
+        if write_success then
+            self.write_success_count = self.write_success_count + 1
         end
-        
-        self:log("Message written successfully to: " .. filepath)
-        
-        -- Track successful writes
-        self.write_success_count = self.write_success_count + 1
-        self:log("DIAGNOSTIC: Total successful writes: " .. self.write_success_count)
-        
-        if callback then callback(true) end
-        return true
+        if callback then callback(write_success) end
+        return write_success
     end
 end
 
@@ -603,7 +582,7 @@ function FileTransport:cleanup_old_messages(max_age_seconds, callback)
     
     max_age_seconds = max_age_seconds or 300 -- 5 minutes default
     
-    local files = {"game_state.json", "deck_state.json", "remaining_deck.json", "actions.json", "action_results.json"}
+    local files = {"game_state.json", "deck_state.json", "remaining_deck.json", "full_deck.json", "hand_levels.json", "actions.json", "action_results.json"}
     local current_time = os.time()
     local cleanup_count = 0
     local files_to_check = #files

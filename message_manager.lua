@@ -75,91 +75,32 @@ end
 
 -- High-level message operations
 function MessageManager:write_game_state(state_data)
-    -- ADD COMPREHENSIVE DIAGNOSTIC LOGGING FOR STALE STATE DEBUG
-    print("[DEBUG_STALE_STATE] MessageManager:write_game_state called")
-    self:log("Attempting to write game state")
-    
     if not state_data then
-        self:log("ERROR: No state data provided")
-        print("[DEBUG_STALE_STATE] *** WRITE_GAME_STATE FAILED - NO STATE DATA ***")
         return false
     end
     
-    print("[DEBUG_STALE_STATE] State data received, checking transport availability")
-    print("[DEBUG_STALE_STATE] Transport object: " .. tostring(self.transport))
-    
-    local transport_available = self.transport:is_available()
-    print("[DEBUG_STALE_STATE] Transport available: " .. tostring(transport_available))
-    
-    if not transport_available then
-        self:log("ERROR: Transport is not available")
-        print("[DEBUG_STALE_STATE] *** WRITE_GAME_STATE FAILED - TRANSPORT NOT AVAILABLE ***")
+    if not self.transport:is_available() then
         return false
     end
     
-    print("[DEBUG_STALE_STATE] Creating message structure")
+    -- Create message structure and encode to JSON
     local message = self:create_message(state_data, "game_state")
-    self:log("Created message structure with sequence_id: " .. message.sequence_id)
-    
-    -- Encode message to JSON
-    print("[DEBUG_STALE_STATE] Encoding message to JSON")
     local encode_success, encoded_data = pcall(self.json.encode, message)
     if not encode_success then
-        self:log("ERROR: JSON encoding failed: " .. tostring(encoded_data))
-        print("[DEBUG_STALE_STATE] *** JSON ENCODING FAILED ***")
         return false
     end
     
-    self:log("JSON encoding successful, data length: " .. #encoded_data)
-    print("[DEBUG_STALE_STATE] JSON encoded, calling transport:write_message")
-    
-    -- Use async transport write if available (fire-and-forget for game state)
+    -- Pass pre-encoded JSON to async transport
     if self.transport.async_enabled then
-        print("[DEBUG_STALE_STATE] Using async write for game state")
-        local write_success = self.transport:write_message(encoded_data, "game_state", function(success)
-            if success then
-                print("[DEBUG_STALE_STATE] Async game state write completed successfully")
-                -- Async verification
-                self.transport:verify_message(encoded_data, "game_state", function(verify_success)
-                    if verify_success then
-                        print("[DEBUG_STALE_STATE] Async game state verification completed successfully")
-                    else
-                        print("[DEBUG_STALE_STATE] *** ASYNC GAME STATE VERIFICATION FAILED ***")
-                    end
-                end)
-            else
-                print("[DEBUG_STALE_STATE] *** ASYNC GAME STATE WRITE FAILED ***")
-            end
-        end)
-        
-        print("[DEBUG_STALE_STATE] Async write operation submitted: " .. tostring(write_success))
-        return write_success
+        return self.transport:write_message(encoded_data, "game_state")
     else
-        -- Fallback to synchronous operation
-        print("[DEBUG_STALE_STATE] Using synchronous write for game state")
+        -- Synchronous fallback
         local write_success = self.transport:write_message(encoded_data, "game_state")
-        
-        print("[DEBUG_STALE_STATE] Transport write_message result: " .. tostring(write_success))
-        
         if not write_success then
-            self:log("ERROR: Transport write failed")
-            print("[DEBUG_STALE_STATE] *** TRANSPORT WRITE FAILED ***")
             return false
         end
         
-        print("[DEBUG_STALE_STATE] Transport write successful, performing verification")
-        
-        -- Verify through transport
-        local verify_success = self.transport:verify_message(encoded_data, "game_state")
-        if not verify_success then
-            self:log("ERROR: Message verification failed")
-            print("[DEBUG_STALE_STATE] *** MESSAGE VERIFICATION FAILED ***")
-            return false
-        end
-        
-        self:log("Game state written and verified successfully")
-        print("[DEBUG_STALE_STATE] *** WRITE_GAME_STATE COMPLETED SUCCESSFULLY ***")
-        return true
+        return self.transport:verify_message(encoded_data, "game_state")
     end
 end
 
@@ -248,6 +189,127 @@ function MessageManager:write_remaining_deck(remaining_deck_data)
     return true
 end
 
+function MessageManager:write_full_deck(full_deck_data)
+    self:log("Attempting to write full deck state")
+    
+    if not full_deck_data then
+        self:log("ERROR: No full deck data provided")
+        return false
+    end
+    
+    if not self.transport:is_available() then
+        self:log("ERROR: Transport is not available")
+        return false
+    end
+    
+    local message = self:create_message(full_deck_data, "full_deck")
+    self:log("Created full deck message structure with sequence_id: " .. message.sequence_id)
+    
+    -- Encode message to JSON
+    local encode_success, encoded_data = pcall(self.json.encode, message)
+    if not encode_success then
+        self:log("ERROR: JSON encoding failed: " .. tostring(encoded_data))
+        return false
+    end
+    
+    self:log("JSON encoding successful, data length: " .. #encoded_data)
+    
+    -- Delegate to transport
+    local write_success = self.transport:write_message(encoded_data, "full_deck")
+    if not write_success then
+        self:log("ERROR: Transport write failed")
+        return false
+    end
+    
+    -- Verify through transport
+    local verify_success = self.transport:verify_message(encoded_data, "full_deck")
+    if not verify_success then
+        self:log("ERROR: Message verification failed")
+        return false
+    end
+    
+    self:log("Full deck state written and verified successfully")
+    return true
+end
+
+function MessageManager:write_hand_levels(hand_levels_data)
+    self:log("Attempting to write hand levels state")
+    
+    if not hand_levels_data then
+        self:log("ERROR: No hand levels data provided")
+        return false
+    end
+    
+    if not self.transport:is_available() then
+        self:log("ERROR: Transport is not available")
+        return false
+    end
+    
+    -- Create message structure that matches the JSON specification
+    local hand_levels_message = {
+        session_id = hand_levels_data.session_id or "session_unknown",
+        timestamp = os.time(),
+        total_hands_played = self:calculate_total_hands_played(hand_levels_data.hand_levels),
+        hands = hand_levels_data.hand_levels or {}
+    }
+    
+    self:log("Created hand levels message structure")
+    
+    -- Encode message to JSON
+    local encode_success, encoded_data = pcall(self.json.encode, hand_levels_message)
+    if not encode_success then
+        self:log("ERROR: JSON encoding failed: " .. tostring(encoded_data))
+        return false
+    end
+    
+    self:log("JSON encoding successful, data length: " .. #encoded_data)
+    
+    -- Use async transport write if available
+    if self.transport.async_enabled then
+        self:log("Using async write for hand levels")
+        local write_success = self.transport:write_message(encoded_data, "hand_levels", function(success)
+            if success then
+                self:log("Async hand levels write completed successfully")
+            else
+                self:log("ERROR: Async hand levels write failed")
+            end
+        end)
+        return write_success
+    else
+        -- Fallback to synchronous operation
+        local write_success = self.transport:write_message(encoded_data, "hand_levels")
+        if not write_success then
+            self:log("ERROR: Transport write failed")
+            return false
+        end
+        
+        -- Verify through transport
+        local verify_success = self.transport:verify_message(encoded_data, "hand_levels")
+        if not verify_success then
+            self:log("ERROR: Message verification failed")
+            return false
+        end
+        
+        self:log("Hand levels state written and verified successfully")
+        return true
+    end
+end
+
+function MessageManager:calculate_total_hands_played(hands_data)
+    if not hands_data or type(hands_data) ~= "table" then
+        return 0
+    end
+    
+    local total = 0
+    for hand_name, hand_info in pairs(hands_data) do
+        if hand_info and hand_info.times_played then
+            total = total + hand_info.times_played
+        end
+    end
+    
+    return total
+end
+
 function MessageManager:read_actions()
     self:log("ACTION_POLLING - Checking transport availability")
     if not self.transport:is_available() then
@@ -324,6 +386,49 @@ function MessageManager:write_action_result(result_data)
         self:log("Action result written successfully")
         return true
     end
+end
+
+function MessageManager:write_vouchers_ante(vouchers_ante_data)
+    self:log("Attempting to write vouchers ante data")
+    
+    if not vouchers_ante_data then
+        self:log("ERROR: No vouchers ante data provided")
+        return false
+    end
+    
+    if not self.transport:is_available() then
+        self:log("ERROR: Transport is not available")
+        return false
+    end
+    
+    local message = self:create_message(vouchers_ante_data, "vouchers_ante")
+    self:log("Created vouchers ante message structure with sequence_id: " .. message.sequence_id)
+    
+    -- Encode message to JSON
+    local encode_success, encoded_data = pcall(self.json.encode, message)
+    if not encode_success then
+        self:log("ERROR: JSON encoding failed: " .. tostring(encoded_data))
+        return false
+    end
+    
+    self:log("JSON encoding successful, data length: " .. #encoded_data)
+    
+    -- Delegate to transport
+    local write_success = self.transport:write_message(encoded_data, "vouchers_ante")
+    if not write_success then
+        self:log("ERROR: Transport write failed")
+        return false
+    end
+    
+    -- Verify through transport
+    local verify_success = self.transport:verify_message(encoded_data, "vouchers_ante")
+    if not verify_success then
+        self:log("ERROR: Message verification failed")
+        return false
+    end
+    
+    self:log("Vouchers ante data written and verified successfully")
+    return true
 end
 
 function MessageManager:cleanup_old_messages(max_age_seconds)
