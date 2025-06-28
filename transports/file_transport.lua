@@ -180,6 +180,7 @@ function FileTransport:get_filepath(message_type)
         hand_levels = "hand_levels.json",
         actions = "actions.json",
         action_result = "action_results.json",
+        vouchers_ante = "vouchers_ante.json",
         ["debug.log"] = "file_transport_debug.log"
     }
     
