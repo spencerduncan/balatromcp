@@ -774,6 +774,15 @@ function BalatroMCP:send_state_update(state)
     
     local send_result = self.message_manager:write_game_state(state_message)
     
+    -- Write full deck data to separate file as requested in issue #89
+    local full_deck_message = {
+        session_id = state.session_id or "unknown",
+        timestamp = os.time(),
+        card_count = #(comprehensive_state.card_data.full_deck_cards or {}),
+        cards = comprehensive_state.card_data.full_deck_cards or {}
+    }
+    self.message_manager:write_full_deck(full_deck_message)
+    
     print("BalatroMCP: [DEBUG_STALE_STATE] Message send result: " .. tostring(send_result))
     print("BalatroMCP: [DEBUG_STALE_STATE] === STATE TRANSMISSION COMPLETED ===")
     
