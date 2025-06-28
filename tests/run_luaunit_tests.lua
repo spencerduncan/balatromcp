@@ -19,6 +19,7 @@ local luaunit_test_modules = {
     {name = "test_shop_state_detection_luaunit", description = "ShopStateDetection shop state transition detection and timing mechanisms"},
     {name = "test_state_extractor_luaunit", description = "StateExtractor comprehensive state extraction functionality and validation logic"},
     {name = "test_action_executor_luaunit", description = "ActionExecutor NYI methods parameter validation and error handling"},
+    {name = "test_use_pack_tarot_luaunit", description = "ActionExecutor use_pack_tarot functionality with target selection"},
     
     -- Diagnostic modules (85 tests total)
     {name = "test_api_method_fixes_luaunit", description = "API method fixes and validation"},
