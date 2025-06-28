@@ -25,7 +25,9 @@
       "Bash(rg:*)",
       "Bash(git rev-parse:*)",
       "Bash(git fetch:*)",
-      "Bash(git merge:*)"
+      "Bash(git merge:*)",
+      "Bash(lua tests/test_file_transport_luaunit.lua:*)",
+      "Bash(git branch:*)"
     ],
     "deny": []
   },

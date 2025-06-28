@@ -222,6 +222,13 @@ When assigned a specific GitHub issue to fix, follow this mandatory workflow:
 - **Transport**: AsyncFileTransport with Love2D threading
 - **Key Areas Needing Work**: See TODO_REMAINING_TEST_ISSUES.md
 
+## Code Review Lessons Learned
+
+For specific insights from code reviews and implementation patterns, see:
+- [ActionExecutor Review Lessons](./ACTION_EXECUTOR_REVIEW_LESSONS.md) - Patterns for action implementation and validation
+- [MessageManager Review Lessons](./MESSAGE_MANAGER_REVIEW_LESSONS.md) - Patterns for message export and integration layer reviews
+- [Code Review Response Lessons](./CODE_REVIEW_RESPONSE_LESSONS.md) - Patterns for addressing critical review feedback effectively
+
 ## Important Lessons Learned
 
 ### Test Suite Maintenance
