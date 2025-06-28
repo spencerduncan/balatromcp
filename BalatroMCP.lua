@@ -612,6 +612,7 @@ function BalatroMCP:process_pending_actions()
     if self.processing_action then
         -- Safety timeout: reset stuck processing flag after 10 seconds
         if not self.processing_action_start_time then
+            print("BalatroMCP: WARNING - processing_action=true but start_time=nil, this should not happen")
             self.processing_action_start_time = os.time()
         elseif os.time() - self.processing_action_start_time > 10 then
             print("BalatroMCP: WARNING - Processing action timeout, resetting stuck flag")
@@ -646,7 +647,7 @@ function BalatroMCP:process_pending_actions()
     end
     
     self.processing_action = true
-    self.processing_action_start_time = nil  -- Clear timeout when starting new action
+    self.processing_action_start_time = os.time()  -- Set timeout start time when beginning processing
     self.last_action_sequence = sequence
     
     print("BalatroMCP: Processing action [seq=" .. sequence .. "]: " .. (action_data.action_type or "unknown"))
@@ -685,6 +686,7 @@ function BalatroMCP:process_pending_actions()
     -- This ensures cleanup happens regardless of threading mode
     print("BalatroMCP: Resetting processing flag (threading-safe cleanup)")
     self.processing_action = false
+    self.processing_action_start_time = nil
     self.pending_state_extraction = false
 end
 
@@ -707,6 +709,7 @@ function BalatroMCP:handle_delayed_state_extraction()
     
     self.pending_state_extraction = false
     self.processing_action = false
+    self.processing_action_start_time = nil
 end
 
 function BalatroMCP:check_and_send_state_update()
