@@ -610,8 +610,18 @@ end
 
 function BalatroMCP:process_pending_actions()
     if self.processing_action then
-        print("BalatroMCP: ACTION_POLLING - Skipping, already processing action")
-        return
+        -- Safety timeout: reset stuck processing flag after 10 seconds
+        if not self.processing_action_start_time then
+            self.processing_action_start_time = os.time()
+        elseif os.time() - self.processing_action_start_time > 10 then
+            print("BalatroMCP: WARNING - Processing action timeout, resetting stuck flag")
+            self.processing_action = false
+            self.pending_state_extraction = false
+            self.processing_action_start_time = nil
+        else
+            print("BalatroMCP: ACTION_POLLING - Skipping, already processing action")
+            return
+        end
     end
     
     print("BalatroMCP: ACTION_POLLING - Calling message_manager:read_actions()")
@@ -636,6 +646,7 @@ function BalatroMCP:process_pending_actions()
     end
     
     self.processing_action = true
+    self.processing_action_start_time = nil  -- Clear timeout when starting new action
     self.last_action_sequence = sequence
     
     print("BalatroMCP: Processing action [seq=" .. sequence .. "]: " .. (action_data.action_type or "unknown"))
@@ -652,22 +663,29 @@ function BalatroMCP:process_pending_actions()
     local money_after = state_after and state_after.money or "unknown"
     print("BalatroMCP: DEBUG - State IMMEDIATELY after action: phase=" .. phase_after .. ", money=" .. tostring(money_after))
     
-    print("BalatroMCP: Deferring state extraction to next update cycle")
-    self.pending_state_extraction = true
-    self.pending_action_result = {
+    -- Send action result immediately and reset processing flag
+    local action_result = {
         sequence = sequence,
         action_type = action_data.action_type,
         success = result.success,
         error_message = result.error_message,
-        timestamp = os.time()
-        }
+        timestamp = os.time(),
+        new_state = state_after
+    }
     
+    self.message_manager:write_action_result(action_result)
     
     if result.success then
         print("BalatroMCP: Action completed successfully")
     else
         print("BalatroMCP: Action failed: " .. (result.error_message or "Unknown error"))
     end
+    
+    -- CRITICAL FIX: Reset processing flag immediately in main thread
+    -- This ensures cleanup happens regardless of threading mode
+    print("BalatroMCP: Resetting processing flag (threading-safe cleanup)")
+    self.processing_action = false
+    self.pending_state_extraction = false
 end
 
 function BalatroMCP:handle_delayed_state_extraction()
@@ -789,6 +807,18 @@ function BalatroMCP:send_state_update(state)
         if not full_deck_success then
             print("BalatroMCP: WARNING - Failed to write full deck data")
         end
+    end
+    
+    -- Also write hand levels data if available
+    if state.hand_levels then
+        local hand_levels_data = {
+            session_id = state.session_id,
+            hand_levels = state.hand_levels
+        }
+        local hand_levels_result = self.message_manager:write_hand_levels(hand_levels_data)
+        print("BalatroMCP: [DEBUG_STALE_STATE] Hand levels write result: " .. tostring(hand_levels_result))
+    else
+        print("BalatroMCP: [DEBUG_STALE_STATE] No hand levels data available in state")
     end
     
     print("BalatroMCP: [DEBUG_STALE_STATE] Message send result: " .. tostring(send_result))

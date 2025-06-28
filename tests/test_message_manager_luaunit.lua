@@ -460,6 +460,115 @@ local function TestMessageManagerCleanupWithTransportUnavailable()
     tearDown()
 end
 
+local function TestMessageManagerWriteHandLevels()
+    setUp()
+    
+    local transport = MockTransport.new()
+    local manager = MessageManager.new(transport, "TEST_MANAGER")
+    
+    local hand_levels_data = {
+        session_id = "test_session_123",
+        hand_levels = {
+            ["High Card"] = {level = 1, times_played = 5, chips = 5, mult = 1},
+            ["Pair"] = {level = 2, times_played = 8, chips = 20, mult = 3},
+            ["Two Pair"] = {level = 1, times_played = 3, chips = 20, mult = 2},
+            ["Flush"] = {level = 3, times_played = 6, chips = 105, mult = 7}
+        }
+    }
+    
+    local success = manager:write_hand_levels(hand_levels_data)
+    
+    luaunit.assertTrue(success, "Should successfully write hand levels")
+    luaunit.assertNotNil(transport.written_messages["hand_levels"], "Should write message to transport")
+    
+    -- Verify message structure matches JSON specification
+    local written_data = transport.written_messages["hand_levels"]
+    local decoded_message = manager.json.decode(written_data)
+    
+    luaunit.assertEquals("test_session_123", decoded_message.session_id, "Should preserve session ID")
+    luaunit.assertNotNil(decoded_message.timestamp, "Should include timestamp")
+    luaunit.assertEquals(22, decoded_message.total_hands_played, "Should calculate total hands played (5+8+3+6)")
+    luaunit.assertNotNil(decoded_message.hands, "Should include hands data")
+    
+    -- Verify specific hand data preservation
+    luaunit.assertEquals(2, decoded_message.hands["Pair"].level, "Should preserve Pair level")
+    luaunit.assertEquals(8, decoded_message.hands["Pair"].times_played, "Should preserve Pair times_played")
+    luaunit.assertEquals(20, decoded_message.hands["Pair"].chips, "Should preserve Pair chips")
+    luaunit.assertEquals(3, decoded_message.hands["Pair"].mult, "Should preserve Pair mult")
+    
+    luaunit.assertEquals(3, decoded_message.hands["Flush"].level, "Should preserve Flush level")
+    luaunit.assertEquals(6, decoded_message.hands["Flush"].times_played, "Should preserve Flush times_played")
+    
+    tearDown()
+end
+
+local function TestMessageManagerWriteHandLevelsWithNilData()
+    setUp()
+    
+    local transport = MockTransport.new()
+    local manager = MessageManager.new(transport, "TEST_MANAGER")
+    
+    local success = manager:write_hand_levels(nil)
+    
+    luaunit.assertFalse(success, "Should fail when hand levels data is nil")
+    luaunit.assertNil(transport.written_messages["hand_levels"], "Should not write message when data is nil")
+    
+    tearDown()
+end
+
+local function TestMessageManagerWriteHandLevelsWithTransportUnavailable()
+    setUp()
+    
+    local transport = MockTransport.new()
+    transport.available = false
+    local manager = MessageManager.new(transport, "TEST_MANAGER")
+    
+    local hand_levels_data = {
+        session_id = "test_session",
+        hand_levels = {["Pair"] = {level = 1, times_played = 0, chips = 10, mult = 2}}
+    }
+    
+    local success = manager:write_hand_levels(hand_levels_data)
+    
+    luaunit.assertFalse(success, "Should fail when transport unavailable")
+    
+    tearDown()
+end
+
+local function TestMessageManagerCalculateTotalHandsPlayed()
+    setUp()
+    
+    local transport = MockTransport.new()
+    local manager = MessageManager.new(transport, "TEST_MANAGER")
+    
+    -- Test with complete hand data
+    local hands_data = {
+        ["High Card"] = {times_played = 5},
+        ["Pair"] = {times_played = 8},
+        ["Flush"] = {times_played = 3}
+    }
+    local total = manager:calculate_total_hands_played(hands_data)
+    luaunit.assertEquals(16, total, "Should sum all times_played values")
+    
+    -- Test with nil data
+    total = manager:calculate_total_hands_played(nil)
+    luaunit.assertEquals(0, total, "Should return 0 for nil data")
+    
+    -- Test with empty data
+    total = manager:calculate_total_hands_played({})
+    luaunit.assertEquals(0, total, "Should return 0 for empty data")
+    
+    -- Test with missing times_played fields
+    local incomplete_hands = {
+        ["Pair"] = {level = 2},  -- Missing times_played
+        ["Flush"] = {times_played = 5}
+    }
+    total = manager:calculate_total_hands_played(incomplete_hands)
+    luaunit.assertEquals(5, total, "Should handle missing times_played fields")
+    
+    tearDown()
+end
+
 -- Export all test functions for LuaUnit registration
 return {
     TestMessageManagerInitializationWithValidTransport = TestMessageManagerInitializationWithValidTransport,
@@ -480,5 +589,9 @@ return {
     TestMessageManagerTransportWriteFailure = TestMessageManagerTransportWriteFailure,
     TestMessageManagerTransportVerificationFailure = TestMessageManagerTransportVerificationFailure,
     TestMessageManagerCleanupOldMessages = TestMessageManagerCleanupOldMessages,
-    TestMessageManagerCleanupWithTransportUnavailable = TestMessageManagerCleanupWithTransportUnavailable
+    TestMessageManagerCleanupWithTransportUnavailable = TestMessageManagerCleanupWithTransportUnavailable,
+    TestMessageManagerWriteHandLevels = TestMessageManagerWriteHandLevels,
+    TestMessageManagerWriteHandLevelsWithNilData = TestMessageManagerWriteHandLevelsWithNilData,
+    TestMessageManagerWriteHandLevelsWithTransportUnavailable = TestMessageManagerWriteHandLevelsWithTransportUnavailable,
+    TestMessageManagerCalculateTotalHandsPlayed = TestMessageManagerCalculateTotalHandsPlayed
 }
