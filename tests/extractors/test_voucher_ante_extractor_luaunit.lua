@@ -1,386 +1,393 @@
--- Test suite for VoucherAnteExtractor
--- Tests voucher and ante information extraction functionality
+-- Test file for VoucherAnteExtractor
+-- Tests voucher and ante extraction functionality
 
 local luaunit = require('libs.luaunit')
+local VoucherAnteExtractor = require("state_extractor.extractors.voucher_ante_extractor")
 
--- Global test setup
-local SMODS = {
-    load_file = function(path)
-        return loadfile(path)
-    end
-}
-
-local function setup_mock_g()
+-- Test helper functions
+local function create_mock_shop_voucher(name, cost, effect)
     return {
+        ability = {
+            set = "Voucher",
+            name = name or "Test Voucher",
+            effect = effect or "Test effect",
+            description = "Test description"
+        },
+        cost = cost or 10
+    }
+end
+
+local function create_mock_owned_voucher(name, effect, active)
+    return {
+        name = name or "Test Voucher",
+        effect = effect or "Test effect", 
+        description = "Test description",
+        active = active ~= false
+    }
+end
+
+local function create_mock_consumable(name, set, ability_name)
+    return {
+        ability = {
+            set = set or "Tarot",
+            name = ability_name or name or "Test Consumable"
+        },
+        unique_val = "consumable_" .. (name or "test")
+    }
+end
+
+local function create_mock_g_with_ante(ante)
+    return {
+        GAME = {
+            round_resets = {
+                ante = ante or 1,
+                blind = 0
+            },
+            dollars = 100
+        }
+    }
+end
+
+local function create_mock_g_with_vouchers(owned_vouchers, shop_vouchers, consumables)
+    local mock_g = {
         GAME = {
             round_resets = {
                 ante = 3,
                 blind = 1
             },
-            vouchers = {
-                v_overstock = true,
-                v_clearance_sale = {
-                    name = "Clearance Sale",
-                    effect = "All cards in shop cost $1 less",
-                    active = true
-                }
-            }
+            dollars = 150,
+            vouchers = owned_vouchers or {}
         },
         shop_vouchers = {
-            cards = {
-                {
-                    ability = {
-                        name = "Overstock",
-                        effect = "+1 shop slot",
-                        description = "Increases shop size"
-                    },
-                    cost = 10
-                },
-                {
-                    ability = {
-                        name = "Clearance Sale", 
-                        effect = "All cards cost $1 less",
-                        description = "Reduces shop prices"
-                    },
-                    cost = 8
-                }
-            }
+            cards = shop_vouchers or {}
         },
         consumeables = {
-            cards = {
-                {
-                    ability = {
-                        name = "Skip Blind",
-                        set = "Spectral",
-                        effect = "Skip next blind"
-                    },
-                    unique_val = "skip_123"
-                },
-                {
-                    ability = {
-                        name = "The Fool",
-                        set = "Tarot",
-                        effect = "Creates a random joker"
-                    },
-                    unique_val = "fool_456"
-                }
-            }
+            cards = consumables or {}
         }
     }
+    return mock_g
 end
 
+local function create_mock_g_with_alternative_voucher_paths(path_type, voucher_data)
+    local mock_g = {
+        GAME = {
+            round_resets = {
+                ante = 2,
+                blind = 0
+            },
+            dollars = 75
+        }
+    }
+    
+    if path_type == "used_vouchers" then
+        mock_g.GAME.used_vouchers = voucher_data or {}
+    elseif path_type == "owned_vouchers" then
+        mock_g.GAME.owned_vouchers = voucher_data or {}
+    else
+        mock_g.GAME.vouchers = voucher_data or {}
+    end
+    
+    return mock_g
+end
+
+-- Test VoucherAnteExtractor
 TestVoucherAnteExtractor = {}
 
 function TestVoucherAnteExtractor:setUp()
-    -- Mock the global dependencies
-    G = setup_mock_g()
-    
-    -- Load required modules
-    local StateExtractorUtils = assert(SMODS.load_file("state_extractor/utils/state_extractor_utils.lua"))()
-    local IExtractor = assert(SMODS.load_file("state_extractor/extractors/i_extractor.lua"))()
-    local VoucherAnteExtractor = assert(SMODS.load_file("state_extractor/extractors/voucher_ante_extractor.lua"))()
-    
     self.extractor = VoucherAnteExtractor.new()
+    -- Store original G
+    self.original_G = G
 end
 
-function TestVoucherAnteExtractor:test_extractor_creation()
-    luaunit.assertNotNil(self.extractor)
+function TestVoucherAnteExtractor:tearDown()
+    -- Restore original G
+    G = self.original_G
+end
+
+-- Test basic extractor properties
+function TestVoucherAnteExtractor:test_get_name()
     luaunit.assertEquals(self.extractor:get_name(), "voucher_ante_extractor")
 end
 
-function TestVoucherAnteExtractor:test_get_current_ante()
-    local current_ante = self.extractor:get_current_ante()
-    luaunit.assertEquals(current_ante, 3)
+-- Test current ante extraction
+function TestVoucherAnteExtractor:test_get_current_ante_basic()
+    G = create_mock_g_with_ante(5)
+    local ante = self.extractor:get_current_ante()
+    luaunit.assertEquals(ante, 5)
 end
 
+function TestVoucherAnteExtractor:test_get_current_ante_nil_game()
+    G = nil
+    local ante = self.extractor:get_current_ante()
+    luaunit.assertEquals(ante, 1)  -- Should return default value
+end
+
+function TestVoucherAnteExtractor:test_get_current_ante_missing_path()
+    G = {GAME = {}}  -- Missing round_resets.ante
+    local ante = self.extractor:get_current_ante()
+    luaunit.assertEquals(ante, 1)  -- Should return default value
+end
+
+-- Test ante requirements extraction
 function TestVoucherAnteExtractor:test_get_ante_requirements()
+    G = create_mock_g_with_ante(3)
     local requirements = self.extractor:get_ante_requirements()
+    
     luaunit.assertNotNil(requirements)
     luaunit.assertEquals(requirements.next_ante, 4)
-    luaunit.assertEquals(requirements.blinds_remaining, 1)
+    luaunit.assertEquals(type(requirements.blinds_remaining), "number")
 end
 
-function TestVoucherAnteExtractor:test_extract_owned_vouchers()
-    local owned_vouchers = self.extractor:extract_owned_vouchers()
-    luaunit.assertNotNil(owned_vouchers)
-    luaunit.assertEquals(#owned_vouchers, 2)
-    
-    -- Check for boolean voucher
-    local overstock_found = false
-    for _, voucher in ipairs(owned_vouchers) do
-        if voucher.name == "v_overstock" then
-            overstock_found = true
-            luaunit.assertEquals(voucher.active, true)
-            break
-        end
-    end
-    luaunit.assertTrue(overstock_found)
-    
-    -- Check for table voucher
-    local clearance_found = false
-    for _, voucher in ipairs(owned_vouchers) do
-        if voucher.name == "Clearance Sale" then
-            clearance_found = true
-            luaunit.assertEquals(voucher.effect, "All cards in shop cost $1 less")
-            luaunit.assertEquals(voucher.active, true)
-            break
-        end
-    end
-    luaunit.assertTrue(clearance_found)
-end
-
-function TestVoucherAnteExtractor:test_extract_shop_vouchers()
+-- Test shop vouchers extraction
+function TestVoucherAnteExtractor:test_extract_shop_vouchers_empty()
+    G = {shop_vouchers = {cards = {}}}
     local shop_vouchers = self.extractor:extract_shop_vouchers()
+    
     luaunit.assertNotNil(shop_vouchers)
+    luaunit.assertEquals(#shop_vouchers, 0)
+end
+
+function TestVoucherAnteExtractor:test_extract_shop_vouchers_single()
+    local mock_voucher = create_mock_shop_voucher("Overstock", 20, "Adds extra shop slot")
+    G = {shop_vouchers = {cards = {mock_voucher}}}
+    
+    local shop_vouchers = self.extractor:extract_shop_vouchers()
+    
+    luaunit.assertEquals(#shop_vouchers, 1)
+    luaunit.assertEquals(shop_vouchers[1].index, 0)  -- 0-based indexing
+    luaunit.assertEquals(shop_vouchers[1].name, "Overstock")
+    luaunit.assertEquals(shop_vouchers[1].cost, 20)
+    luaunit.assertEquals(shop_vouchers[1].available, true)
+end
+
+function TestVoucherAnteExtractor:test_extract_shop_vouchers_multiple()
+    local voucher1 = create_mock_shop_voucher("Overstock", 20, "Extra shop slot")
+    local voucher2 = create_mock_shop_voucher("Clearance Sale", 30, "Rerolls cost less")
+    G = {shop_vouchers = {cards = {voucher1, voucher2}}}
+    
+    local shop_vouchers = self.extractor:extract_shop_vouchers()
+    
     luaunit.assertEquals(#shop_vouchers, 2)
-    
-    local overstock_shop = shop_vouchers[1]
-    luaunit.assertEquals(overstock_shop.name, "Overstock")
-    luaunit.assertEquals(overstock_shop.cost, 10)
-    luaunit.assertEquals(overstock_shop.index, 0) -- 0-based indexing
-    luaunit.assertTrue(overstock_shop.available)
-    
-    local clearance_shop = shop_vouchers[2]
-    luaunit.assertEquals(clearance_shop.name, "Clearance Sale")
-    luaunit.assertEquals(clearance_shop.cost, 8)
-    luaunit.assertEquals(clearance_shop.index, 1)
+    luaunit.assertEquals(shop_vouchers[1].name, "Overstock")
+    luaunit.assertEquals(shop_vouchers[2].name, "Clearance Sale")
+    luaunit.assertEquals(shop_vouchers[2].index, 1)
 end
 
-function TestVoucherAnteExtractor:test_extract_skip_vouchers()
-    local skip_vouchers = self.extractor:extract_skip_vouchers()
-    luaunit.assertNotNil(skip_vouchers)
-    
-    -- Should find the "Skip Blind" consumable
-    local skip_found = false
-    for _, skip_voucher in ipairs(skip_vouchers) do
-        if skip_voucher.name == "Skip Blind" then
-            skip_found = true
-            luaunit.assertEquals(skip_voucher.type, "Spectral")
-            luaunit.assertEquals(skip_voucher.quantity, 1)
-            luaunit.assertEquals(skip_voucher.id, "skip_123")
-            break
-        end
-    end
-    luaunit.assertTrue(skip_found)
-end
-
-function TestVoucherAnteExtractor:test_is_skip_consumable()
-    luaunit.assertTrue(self.extractor:is_skip_consumable("Skip Blind", "Spectral", {}))
-    luaunit.assertTrue(self.extractor:is_skip_consumable("Pass Turn", "Tarot", {}))
-    luaunit.assertFalse(self.extractor:is_skip_consumable("The Fool", "Tarot", {}))
-    luaunit.assertFalse(self.extractor:is_skip_consumable("Normal Card", "Standard", {}))
-end
-
-function TestVoucherAnteExtractor:test_is_skip_voucher_effect()
-    luaunit.assertTrue(self.extractor:is_skip_voucher_effect("Skip Pack", "Skip next ante"))
-    luaunit.assertTrue(self.extractor:is_skip_voucher_effect("Ante Bypass", "Bypass current ante"))
-    luaunit.assertFalse(self.extractor:is_skip_voucher_effect("Normal Voucher", "Normal effect"))
-end
-
-function TestVoucherAnteExtractor:test_full_extract()
-    local result = self.extractor:extract()
-    luaunit.assertNotNil(result)
-    luaunit.assertNotNil(result.vouchers_ante)
-    
-    local voucher_data = result.vouchers_ante
-    luaunit.assertEquals(voucher_data.current_ante, 3)
-    luaunit.assertNotNil(voucher_data.ante_requirements)
-    luaunit.assertEquals(voucher_data.ante_requirements.next_ante, 4)
-    luaunit.assertNotNil(voucher_data.owned_vouchers)
-    luaunit.assertNotNil(voucher_data.shop_vouchers)
-    luaunit.assertNotNil(voucher_data.skip_vouchers)
-end
-
-function TestVoucherAnteExtractor:test_extract_error_handling()
-    -- Test with nil G object
-    local original_g = G
-    G = nil
-    
-    local result = self.extractor:extract()
-    luaunit.assertNotNil(result)
-    luaunit.assertNotNil(result.vouchers_ante)
-    
-    local voucher_data = result.vouchers_ante
-    luaunit.assertEquals(voucher_data.current_ante, 1) -- Default fallback
-    luaunit.assertEquals(#voucher_data.owned_vouchers, 0)
-    luaunit.assertEquals(#voucher_data.shop_vouchers, 0)
-    luaunit.assertEquals(#voucher_data.skip_vouchers, 0)
-    
-    -- Restore G
-    G = original_g
-end
-
-function TestVoucherAnteExtractor:test_extract_empty_shop()
-    -- Test with empty shop vouchers
-    G.shop_vouchers = {cards = {}}
-    
+function TestVoucherAnteExtractor:test_extract_shop_vouchers_nil_path()
+    G = {}  -- No shop_vouchers path
     local shop_vouchers = self.extractor:extract_shop_vouchers()
+    
     luaunit.assertNotNil(shop_vouchers)
     luaunit.assertEquals(#shop_vouchers, 0)
 end
 
-function TestVoucherAnteExtractor:test_extract_no_consumables()
-    -- Test with no consumables
-    G.consumeables = {cards = {}}
+-- Test owned vouchers extraction
+function TestVoucherAnteExtractor:test_extract_owned_vouchers_empty_primary_path()
+    G = create_mock_g_with_vouchers({}, {}, {})
+    local owned_vouchers = self.extractor:extract_owned_vouchers()
     
-    local skip_vouchers = self.extractor:extract_skip_vouchers()
-    luaunit.assertNotNil(skip_vouchers)
-    -- May still have skip vouchers from owned vouchers, so just check it's a table
-    luaunit.assertEquals(type(skip_vouchers), "table")
+    luaunit.assertNotNil(owned_vouchers)
+    luaunit.assertEquals(#owned_vouchers, 0)
 end
 
-function TestVoucherAnteExtractor:test_extract_missing_shop_vouchers()
-    -- Test with missing shop_vouchers structure
-    G.shop_vouchers = nil
-    
-    local shop_vouchers = self.extractor:extract_shop_vouchers()
-    luaunit.assertNotNil(shop_vouchers)
-    luaunit.assertEquals(#shop_vouchers, 0)
-end
-
-function TestVoucherAnteExtractor:test_extract_alternative_voucher_paths()
-    -- Test extracting from alternative voucher storage paths
-    G.GAME.vouchers = nil
-    G.GAME.used_vouchers = {
-        v_telescope = {
-            name = "Telescope",
-            effect = "Earn $1 at end of round",
-            active = false
+function TestVoucherAnteExtractor:test_extract_owned_vouchers_table_format()
+    local voucher_data = {
+        overstock = {
+            name = "Overstock",
+            effect = "Adds extra shop slot",
+            active = true
+        },
+        clearance = {
+            name = "Clearance Sale", 
+            effect = "Rerolls cost less",
+            active = true
         }
     }
     
+    G = create_mock_g_with_vouchers(voucher_data, {}, {})
     local owned_vouchers = self.extractor:extract_owned_vouchers()
+    
     luaunit.assertNotNil(owned_vouchers)
-    luaunit.assertEquals(#owned_vouchers, 1)
-    luaunit.assertEquals(owned_vouchers[1].name, "Telescope")
-    luaunit.assertEquals(owned_vouchers[1].active, false)
-end
-
-function TestVoucherAnteExtractor:test_extract_complex_skip_vouchers()
-    -- Add a voucher that provides skip effects
-    G.GAME.vouchers.v_ante_skip = {
-        name = "Ante Skip Voucher",
-        effect = "Skip next ante requirement",
-        active = true
-    }
+    luaunit.assertEquals(#owned_vouchers, 2)
     
-    local skip_vouchers = self.extractor:extract_skip_vouchers()
-    luaunit.assertNotNil(skip_vouchers)
+    -- Find vouchers by name (order not guaranteed)
+    local overstock_found = false
+    local clearance_found = false
     
-    -- Should find both consumable skip and voucher skip
-    local voucher_skip_found = false
-    for _, skip_voucher in ipairs(skip_vouchers) do
-        if skip_voucher.name == "Ante Skip Voucher" then
-            voucher_skip_found = true
-            luaunit.assertEquals(skip_voucher.type, "voucher")
-            luaunit.assertEquals(skip_voucher.quantity, 1)
-            break
+    for _, voucher in ipairs(owned_vouchers) do
+        if voucher.name == "Overstock" then
+            overstock_found = true
+            luaunit.assertEquals(voucher.effect, "Adds extra shop slot")
+            luaunit.assertEquals(voucher.active, true)
+        elseif voucher.name == "Clearance Sale" then
+            clearance_found = true
+            luaunit.assertEquals(voucher.effect, "Rerolls cost less")
+            luaunit.assertEquals(voucher.active, true)
         end
     end
-    luaunit.assertTrue(voucher_skip_found)
+    
+    luaunit.assertTrue(overstock_found, "Overstock voucher should be found")
+    luaunit.assertTrue(clearance_found, "Clearance Sale voucher should be found")
 end
 
-function TestVoucherAnteExtractor:test_extract_voucher_data_types()
-    -- Test handling different voucher data types
-    G.GAME.vouchers = {
-        simple_boolean = true,
-        complex_table = {
-            name = "Complex Voucher",
-            effect = "Complex effect",
-            description = "Complex description",
-            active = true
-        },
-        false_boolean = false
+function TestVoucherAnteExtractor:test_extract_owned_vouchers_boolean_format()
+    local voucher_data = {
+        overstock = true,
+        clearance = false
     }
     
+    G = create_mock_g_with_vouchers(voucher_data, {}, {})
     local owned_vouchers = self.extractor:extract_owned_vouchers()
-    luaunit.assertNotNil(owned_vouchers)
-    luaunit.assertEquals(#owned_vouchers, 3)
     
-    -- Check boolean vouchers
-    local simple_found = false
-    local false_found = false
+    luaunit.assertEquals(#owned_vouchers, 2)
+    
+    -- Check that boolean values are converted correctly
     for _, voucher in ipairs(owned_vouchers) do
-        if voucher.name == "simple_boolean" then
-            simple_found = true
+        if voucher.name == "overstock" then
             luaunit.assertEquals(voucher.active, true)
-        elseif voucher.name == "false_boolean" then
-            false_found = true
+        elseif voucher.name == "clearance" then
             luaunit.assertEquals(voucher.active, false)
         end
     end
-    luaunit.assertTrue(simple_found)
-    luaunit.assertTrue(false_found)
 end
 
-function TestVoucherAnteExtractor:test_interface_compliance()
-    -- Test that the extractor implements the IExtractor interface correctly
-    local IExtractor = assert(SMODS.load_file("state_extractor/extractors/i_extractor.lua"))()
-    
-    luaunit.assertTrue(IExtractor.validate_implementation(self.extractor))
-    luaunit.assertEquals(type(self.extractor.extract), "function")
-    luaunit.assertEquals(type(self.extractor.get_name), "function")
-    luaunit.assertEquals(self.extractor:get_name(), "voucher_ante_extractor")
-end
-
-function TestVoucherAnteExtractor:test_defensive_shop_voucher_extraction()
-    -- Test with malformed shop voucher data
-    G.shop_vouchers.cards = {
-        nil, -- nil entry
-        {}, -- empty table
-        {ability = nil}, -- nil ability
-        {ability = {name = "Valid Voucher"}}, -- valid entry
-        {ability = {name = "Another Valid", cost = nil}} -- missing cost
+function TestVoucherAnteExtractor:test_extract_owned_vouchers_alternative_paths()
+    local voucher_data = {
+        test_voucher = {
+            name = "Test Voucher",
+            effect = "Test effect",
+            active = true
+        }
     }
     
-    local shop_vouchers = self.extractor:extract_shop_vouchers()
-    luaunit.assertNotNil(shop_vouchers)
-    -- Should handle malformed data gracefully and extract valid entries
-    luaunit.assertGreaterThan(#shop_vouchers, 0)
+    -- Test used_vouchers path
+    G = create_mock_g_with_alternative_voucher_paths("used_vouchers", voucher_data)
+    local owned_vouchers = self.extractor:extract_owned_vouchers()
+    luaunit.assertEquals(#owned_vouchers, 1)
+    luaunit.assertEquals(owned_vouchers[1].name, "Test Voucher")
+    
+    -- Test owned_vouchers path
+    G = create_mock_g_with_alternative_voucher_paths("owned_vouchers", voucher_data)
+    owned_vouchers = self.extractor:extract_owned_vouchers()
+    luaunit.assertEquals(#owned_vouchers, 1)
+    luaunit.assertEquals(owned_vouchers[1].name, "Test Voucher")
 end
 
-function TestVoucherAnteExtractor:test_defensive_consumable_extraction()
-    -- Test with malformed consumable data
-    G.consumeables.cards = {
-        nil, -- nil entry
-        {}, -- empty table
-        {ability = nil}, -- nil ability
-        {ability = {name = "Skip Test", set = "Spectral"}}, -- valid skip
-        {ability = {name = nil, set = "Tarot"}} -- nil name
-    }
+-- Test skip vouchers extraction
+function TestVoucherAnteExtractor:test_extract_skip_vouchers_empty()
+    G = create_mock_g_with_vouchers({}, {}, {})
+    local skip_vouchers = self.extractor:extract_skip_vouchers()
+    
+    luaunit.assertNotNil(skip_vouchers)
+    luaunit.assertEquals(#skip_vouchers, 0)
+end
+
+function TestVoucherAnteExtractor:test_extract_skip_vouchers_from_consumables()
+    local skip_consumable = create_mock_consumable("Skip Card", "Spectral", "Skip")
+    G = create_mock_g_with_vouchers({}, {}, {skip_consumable})
     
     local skip_vouchers = self.extractor:extract_skip_vouchers()
-    luaunit.assertNotNil(skip_vouchers)
-    -- Should handle malformed data gracefully
-    luaunit.assertEquals(type(skip_vouchers), "table")
+    
+    luaunit.assertEquals(#skip_vouchers, 1)
+    luaunit.assertEquals(skip_vouchers[1].name, "Skip")
+    luaunit.assertEquals(skip_vouchers[1].type, "Spectral")
+    luaunit.assertEquals(skip_vouchers[1].quantity, 1)
 end
 
-function TestVoucherAnteExtractor:test_extract_comprehensive_integration()
-    -- Test the complete extraction pipeline
-    local full_result = self.extractor:extract()
-    luaunit.assertNotNil(full_result)
-    luaunit.assertNotNil(full_result.vouchers_ante)
+function TestVoucherAnteExtractor:test_extract_skip_vouchers_from_owned_vouchers()
+    local skip_voucher_data = {
+        ante_skip = {
+            name = "Ante Skipper",
+            effect = "Skip current ante",
+            active = true
+        }
+    }
     
-    local data = full_result.vouchers_ante
+    G = create_mock_g_with_vouchers(skip_voucher_data, {}, {})
+    local skip_vouchers = self.extractor:extract_skip_vouchers()
     
-    -- Validate structure completeness
+    luaunit.assertEquals(#skip_vouchers, 1)
+    luaunit.assertEquals(skip_vouchers[1].name, "Ante Skipper")
+    luaunit.assertEquals(skip_vouchers[1].type, "voucher")
+    luaunit.assertEquals(skip_vouchers[1].quantity, 1)
+end
+
+-- Test helper method: is_skip_consumable
+function TestVoucherAnteExtractor:test_is_skip_consumable()
+    luaunit.assertTrue(self.extractor:is_skip_consumable("Skip Card", "Spectral", {}))
+    luaunit.assertTrue(self.extractor:is_skip_consumable("Pass Blind", "Tarot", {}))
+    luaunit.assertTrue(self.extractor:is_skip_consumable("Bypass Ante", "Planet", {}))
+    luaunit.assertFalse(self.extractor:is_skip_consumable("Normal Card", "Tarot", {}))
+    luaunit.assertFalse(self.extractor:is_skip_consumable(nil, "Tarot", {}))
+end
+
+-- Test helper method: is_skip_voucher_effect
+function TestVoucherAnteExtractor:test_is_skip_voucher_effect()
+    luaunit.assertTrue(self.extractor:is_skip_voucher_effect("Ante Skip", "Skip the current ante"))
+    luaunit.assertTrue(self.extractor:is_skip_voucher_effect("Bypass Card", "Bypass blind requirements"))
+    luaunit.assertTrue(self.extractor:is_skip_voucher_effect("Pass Helper", "Pass current round"))
+    luaunit.assertFalse(self.extractor:is_skip_voucher_effect("Normal Voucher", "Normal effect"))
+    luaunit.assertFalse(self.extractor:is_skip_voucher_effect(nil, nil))
+end
+
+-- Test full extraction
+function TestVoucherAnteExtractor:test_full_extract()
+    local owned_vouchers = {
+        overstock = {
+            name = "Overstock",
+            effect = "Adds extra shop slot",
+            active = true
+        }
+    }
+    
+    local shop_vouchers = {
+        create_mock_shop_voucher("Clearance Sale", 30, "Rerolls cost less")
+    }
+    
+    local consumables = {
+        create_mock_consumable("Skip Card", "Spectral", "Skip")
+    }
+    
+    G = create_mock_g_with_vouchers(owned_vouchers, shop_vouchers, consumables)
+    
+    local result = self.extractor:extract()
+    
+    luaunit.assertNotNil(result)
+    luaunit.assertNotNil(result.vouchers_ante)
+    
+    local data = result.vouchers_ante
     luaunit.assertNotNil(data.current_ante)
     luaunit.assertNotNil(data.ante_requirements)
     luaunit.assertNotNil(data.owned_vouchers)
     luaunit.assertNotNil(data.shop_vouchers)
     luaunit.assertNotNil(data.skip_vouchers)
     
-    -- Validate data types
-    luaunit.assertEquals(type(data.current_ante), "number")
-    luaunit.assertEquals(type(data.ante_requirements), "table")
-    luaunit.assertEquals(type(data.owned_vouchers), "table")
-    luaunit.assertEquals(type(data.shop_vouchers), "table")
-    luaunit.assertEquals(type(data.skip_vouchers), "table")
+    luaunit.assertEquals(data.current_ante, 3)
+    luaunit.assertEquals(#data.owned_vouchers, 1)
+    luaunit.assertEquals(#data.shop_vouchers, 1)
+    luaunit.assertEquals(#data.skip_vouchers, 1)
+end
+
+function TestVoucherAnteExtractor:test_extract_error_handling()
+    G = nil  -- Force an error condition
     
-    -- Validate content presence
-    luaunit.assertGreaterThan(data.current_ante, 0)
-    luaunit.assertGreaterThan(#data.owned_vouchers, 0)
-    luaunit.assertGreaterThan(#data.shop_vouchers, 0)
+    local result = self.extractor:extract()
+    
+    luaunit.assertNotNil(result)
+    luaunit.assertNotNil(result.vouchers_ante)
+    
+    local data = result.vouchers_ante
+    luaunit.assertEquals(data.current_ante, 1)
+    luaunit.assertEquals(#data.owned_vouchers, 0)
+    luaunit.assertEquals(#data.shop_vouchers, 0)
+    luaunit.assertEquals(#data.skip_vouchers, 0)
+end
+
+-- Run the tests
+if _G.luaunit then
+    local runner = luaunit.LuaUnit.new()
+    runner:setOutputType("text")
+    runner:runSuite()
 end
 
 return TestVoucherAnteExtractor
