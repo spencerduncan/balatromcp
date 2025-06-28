@@ -34,6 +34,7 @@ local luaunit_test_modules = {
     {name = "test_https_transport_luaunit", description = "HttpsTransport HTTPS-based I/O operations and network communication"},
     {name = "test_balatromcp_transport_initialization_luaunit", description = "BalatroMCP transport initialization and configuration"},
     {name = "test_async_https_transport_luaunit", description = "Async HTTPS transport threading and non-blocking operations"},
+    {name = "test_action_processing_timing_luaunit", description = "Action processing timing and concurrency flag management"},
 }
 
 -- Set up a minimal environment for testing

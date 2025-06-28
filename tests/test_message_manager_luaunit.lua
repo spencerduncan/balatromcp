@@ -292,6 +292,38 @@ local function TestMessageManagerReadActions()
     tearDown()
 end
 
+local function TestMessageManagerWriteFullDeck()
+    setUp()
+    
+    local transport = MockTransport.new()
+    local manager = MessageManager.new(transport, "TEST_MANAGER")
+    
+    local full_deck_data = {
+        session_id = "session_1234567890_abcd",
+        timestamp = 1234567890,
+        card_count = 52,
+        cards = {
+            {id = 0.99878375925668, rank = "A", suit = "Spades", enhancement = "none", edition = "none", seal = "none"},
+            {id = 0.42391847392847, rank = "2", suit = "Hearts", enhancement = "mult", edition = "foil", seal = "red"}
+        }
+    }
+    local success = manager:write_full_deck(full_deck_data)
+    
+    luaunit.assertTrue(success, "Should successfully write full deck data")
+    luaunit.assertNotNil(transport.written_messages["full_deck"], "Should write message to transport")
+    
+    -- Verify message structure
+    local written_data = transport.written_messages["full_deck"]
+    local decoded_message = manager.json.decode(written_data)
+    luaunit.assertEquals("full_deck", decoded_message.message_type, "Should have correct message type")
+    luaunit.assertEquals(full_deck_data, decoded_message.data, "Should preserve full deck data")
+    luaunit.assertEquals(2, #decoded_message.data.cards, "Should preserve all cards in deck")
+    luaunit.assertEquals("session_1234567890_abcd", decoded_message.data.session_id, "Should preserve session ID")
+    luaunit.assertEquals(52, decoded_message.data.card_count, "Should preserve card count")
+    
+    tearDown()
+end
+
 -- =============================================================================
 -- ERROR HANDLING TESTS
 -- =============================================================================
@@ -549,6 +581,7 @@ return {
     TestMessageManagerWriteGameState = TestMessageManagerWriteGameState,
     TestMessageManagerWriteDeckState = TestMessageManagerWriteDeckState,
     TestMessageManagerWriteActionResult = TestMessageManagerWriteActionResult,
+    TestMessageManagerWriteFullDeck = TestMessageManagerWriteFullDeck,
     TestMessageManagerReadActions = TestMessageManagerReadActions,
     TestMessageManagerErrorHandlingNilData = TestMessageManagerErrorHandlingNilData,
     TestMessageManagerErrorHandlingTransportUnavailable = TestMessageManagerErrorHandlingTransportUnavailable,

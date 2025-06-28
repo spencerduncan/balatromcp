@@ -29,7 +29,9 @@
       "Bash(git merge:*)",
       "Bash(lua tests/test_file_transport_luaunit.lua:*)",
       "Bash(git branch:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(lua tests/test_action_processing_timing_luaunit.lua:*)",
+      "Bash(lua tests/test_action_processing_timing_luaunit.lua:*)"
     ],
     "deny": []
   },

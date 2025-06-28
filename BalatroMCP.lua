@@ -705,14 +705,30 @@ function BalatroMCP:handle_delayed_state_extraction()
     if self.pending_action_result then
         self.pending_action_result.new_state = current_state
         
-        self.message_manager:write_action_result(self.pending_action_result)
-        print("BalatroMCP: Delayed action result sent with updated state")
-        
-        self.pending_action_result = nil
+        local write_success = self.message_manager:write_action_result(self.pending_action_result)
+        if write_success then
+            print("BalatroMCP: Delayed action result sent with updated state")
+            self.pending_action_result = nil
+            
+            -- Only reset processing flag after successful action result write
+            self.processing_action = false
+            print("BalatroMCP: Action processing completed successfully, flag reset")
+        else
+            print("BalatroMCP: WARNING - Failed to write action result, keeping processing flag set")
+            -- Keep processing_action = true if write failed to prevent new actions
+            -- The timeout mechanism from PR #93 will eventually reset it
+        end
+    else
+        -- No pending action result - this could be normal recovery or indicate a logic error
+        if self.processing_action then
+            print("BalatroMCP: WARNING - processing_action flag was set but no pending action result found")
+            print("BalatroMCP: This could indicate a timing issue or stuck state, resetting flag for recovery")
+        end
+        self.processing_action = false
+        print("BalatroMCP: No pending action result, processing flag reset")
     end
     
     self.pending_state_extraction = false
-    self.processing_action = false
     self.processing_action_start_time = nil
 end
 

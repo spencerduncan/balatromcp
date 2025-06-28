@@ -267,6 +267,49 @@ function MessageManager:calculate_total_hands_played(hands_data)
     return total
 end
 
+function MessageManager:write_full_deck(full_deck_data)
+    self:log("Attempting to write full deck state")
+    
+    if not full_deck_data then
+        self:log("ERROR: No full deck data provided")
+        return false
+    end
+    
+    if not self.transport:is_available() then
+        self:log("ERROR: Transport is not available")
+        return false
+    end
+    
+    local message = self:create_message(full_deck_data, "full_deck")
+    self:log("Created full deck message structure with sequence_id: " .. message.sequence_id)
+    
+    -- Encode message to JSON
+    local encode_success, encoded_data = pcall(self.json.encode, message)
+    if not encode_success then
+        self:log("ERROR: JSON encoding failed: " .. tostring(encoded_data))
+        return false
+    end
+    
+    self:log("JSON encoding successful, data length: " .. #encoded_data)
+    
+    -- Delegate to transport
+    local write_success = self.transport:write_message(encoded_data, "full_deck")
+    if not write_success then
+        self:log("ERROR: Transport write failed")
+        return false
+    end
+    
+    -- Verify through transport
+    local verify_success = self.transport:verify_message(encoded_data, "full_deck")
+    if not verify_success then
+        self:log("ERROR: Message verification failed")
+        return false
+    end
+    
+    self:log("Full deck state written and verified successfully")
+    return true
+end
+
 function MessageManager:read_actions()
     self:log("ACTION_POLLING - Checking transport availability")
     if not self.transport:is_available() then
