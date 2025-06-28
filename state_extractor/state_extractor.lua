@@ -17,6 +17,7 @@ local BlindExtractor = assert(SMODS.load_file("state_extractor/extractors/blind_
 local ShopExtractor = assert(SMODS.load_file("state_extractor/extractors/shop_extractor.lua"))()
 local ActionExtractor = assert(SMODS.load_file("state_extractor/extractors/action_extractor.lua"))()
 local JokerReorderExtractor = assert(SMODS.load_file("state_extractor/extractors/joker_reorder_extractor.lua"))()
+local VoucherAnteExtractor = assert(SMODS.load_file("state_extractor/extractors/voucher_ante_extractor.lua"))()
 
 local StateExtractor = {}
 StateExtractor.__index = StateExtractor
@@ -40,6 +41,7 @@ function StateExtractor.new()
     self:register_extractor(ShopExtractor.new())
     self:register_extractor(ActionExtractor.new())
     self:register_extractor(JokerReorderExtractor.new())
+    self:register_extractor(VoucherAnteExtractor.new())
     
     -- Immediately test G object availability and structure
     self:validate_g_object()

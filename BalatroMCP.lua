@@ -775,6 +775,17 @@ function BalatroMCP:send_state_update(state)
     local send_result = self.message_manager:write_game_state(state_message)
     
     print("BalatroMCP: [DEBUG_STALE_STATE] Message send result: " .. tostring(send_result))
+    
+    -- Send vouchers and ante information as separate JSON export
+    local voucher_extractor = self.state_extractor.extractor_lookup["voucher_ante_extractor"]
+    if voucher_extractor then
+        local vouchers_ante_data = voucher_extractor:extract()
+        if vouchers_ante_data then
+            local voucher_send_result = self.message_manager:write_vouchers_ante(vouchers_ante_data)
+            print("BalatroMCP: [DEBUG_STALE_STATE] Vouchers ante send result: " .. tostring(voucher_send_result))
+        end
+    end
+    
     print("BalatroMCP: [DEBUG_STALE_STATE] === STATE TRANSMISSION COMPLETED ===")
     
     local hand_count = #(state.hand_cards or {})
@@ -786,6 +797,7 @@ function BalatroMCP:send_state_update(state)
     print("  - Full deck cards: " .. full_deck_count)
     print("  - Remaining deck cards: " .. remaining_deck_count)
     print("  - Phase: " .. (state.current_phase or "unknown"))
+    print("  - Vouchers ante export: vouchers_ante.json")
 end
 
 function BalatroMCP:calculate_state_hash(state)
