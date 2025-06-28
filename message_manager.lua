@@ -189,6 +189,84 @@ function MessageManager:write_remaining_deck(remaining_deck_data)
     return true
 end
 
+function MessageManager:write_hand_levels(hand_levels_data)
+    self:log("Attempting to write hand levels state")
+    
+    if not hand_levels_data then
+        self:log("ERROR: No hand levels data provided")
+        return false
+    end
+    
+    if not self.transport:is_available() then
+        self:log("ERROR: Transport is not available")
+        return false
+    end
+    
+    -- Create message structure that matches the JSON specification
+    local hand_levels_message = {
+        session_id = hand_levels_data.session_id or "session_unknown",
+        timestamp = os.time(),
+        total_hands_played = self:calculate_total_hands_played(hand_levels_data.hand_levels),
+        hands = hand_levels_data.hand_levels or {}
+    }
+    
+    self:log("Created hand levels message structure")
+    
+    -- Encode message to JSON
+    local encode_success, encoded_data = pcall(self.json.encode, hand_levels_message)
+    if not encode_success then
+        self:log("ERROR: JSON encoding failed: " .. tostring(encoded_data))
+        return false
+    end
+    
+    self:log("JSON encoding successful, data length: " .. #encoded_data)
+    
+    -- Use async transport write if available
+    if self.transport.async_enabled then
+        self:log("Using async write for hand levels")
+        local write_success = self.transport:write_message(encoded_data, "hand_levels", function(success)
+            if success then
+                self:log("Async hand levels write completed successfully")
+            else
+                self:log("ERROR: Async hand levels write failed")
+            end
+        end)
+        return write_success
+    else
+        -- Fallback to synchronous operation
+        local write_success = self.transport:write_message(encoded_data, "hand_levels")
+        if not write_success then
+            self:log("ERROR: Transport write failed")
+            return false
+        end
+        
+        -- Verify through transport
+        local verify_success = self.transport:verify_message(encoded_data, "hand_levels")
+        if not verify_success then
+            self:log("ERROR: Message verification failed")
+            return false
+        end
+        
+        self:log("Hand levels state written and verified successfully")
+        return true
+    end
+end
+
+function MessageManager:calculate_total_hands_played(hands_data)
+    if not hands_data or type(hands_data) ~= "table" then
+        return 0
+    end
+    
+    local total = 0
+    for hand_name, hand_info in pairs(hands_data) do
+        if hand_info and hand_info.times_played then
+            total = total + hand_info.times_played
+        end
+    end
+    
+    return total
+end
+
 function MessageManager:read_actions()
     self:log("ACTION_POLLING - Checking transport availability")
     if not self.transport:is_available() then
