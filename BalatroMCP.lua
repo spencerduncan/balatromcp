@@ -695,7 +695,11 @@ function BalatroMCP:handle_delayed_state_extraction()
             -- The timeout mechanism from PR #93 will eventually reset it
         end
     else
-        -- No pending action result, safe to reset flag
+        -- No pending action result - this could be normal recovery or indicate a logic error
+        if self.processing_action then
+            print("BalatroMCP: WARNING - processing_action flag was set but no pending action result found")
+            print("BalatroMCP: This could indicate a timing issue or stuck state, resetting flag for recovery")
+        end
         self.processing_action = false
         print("BalatroMCP: No pending action result, processing flag reset")
     end
@@ -785,23 +789,6 @@ function BalatroMCP:send_state_update(state)
     print("BalatroMCP: [DEBUG_STALE_STATE] Message manager: " .. tostring(self.message_manager))
     
     local send_result = self.message_manager:write_game_state(state_message)
-    
-    -- Write full deck data to separate file as requested in issue #89
-    local deck_cards = comprehensive_state.card_data and comprehensive_state.card_data.full_deck_cards
-    if not deck_cards or #deck_cards == 0 then
-        print("BalatroMCP: WARNING - No deck cards found in state, skipping full deck export")
-    else
-        local full_deck_message = {
-            session_id = state.session_id or "unknown",
-            timestamp = os.time(),
-            card_count = #deck_cards,
-            cards = deck_cards
-        }
-        local full_deck_success = self.message_manager:write_full_deck(full_deck_message)
-        if not full_deck_success then
-            print("BalatroMCP: WARNING - Failed to write full deck data")
-        end
-    end
     
     print("BalatroMCP: [DEBUG_STALE_STATE] Message send result: " .. tostring(send_result))
     print("BalatroMCP: [DEBUG_STALE_STATE] === STATE TRANSMISSION COMPLETED ===")
