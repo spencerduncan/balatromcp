@@ -17,6 +17,8 @@ local BlindExtractor = assert(SMODS.load_file("state_extractor/extractors/blind_
 local ShopExtractor = assert(SMODS.load_file("state_extractor/extractors/shop_extractor.lua"))()
 local ActionExtractor = assert(SMODS.load_file("state_extractor/extractors/action_extractor.lua"))()
 local JokerReorderExtractor = assert(SMODS.load_file("state_extractor/extractors/joker_reorder_extractor.lua"))()
+local PackExtractor = assert(SMODS.load_file("state_extractor/extractors/pack_extractor.lua"))()
+local HandLevelsExtractor = assert(SMODS.load_file("state_extractor/extractors/hand_levels_extractor.lua"))()
 
 local StateExtractor = {}
 StateExtractor.__index = StateExtractor
@@ -40,6 +42,8 @@ function StateExtractor.new()
     self:register_extractor(ShopExtractor.new())
     self:register_extractor(ActionExtractor.new())
     self:register_extractor(JokerReorderExtractor.new())
+    self:register_extractor(PackExtractor.new())
+    self:register_extractor(HandLevelsExtractor.new())
     
     -- Immediately test G object availability and structure
     self:validate_g_object()
@@ -258,7 +262,9 @@ function StateExtractor:get_extractor_required_paths(extractor_name)
         blind_extractor = {{"GAME", "blind"}},
         shop_extractor = {{"shop_jokers", "cards"}},
         action_extractor = {},
-        joker_reorder_extractor = {{"jokers", "cards"}}
+        joker_reorder_extractor = {{"jokers", "cards"}},
+        pack_extractor = {{"pack_cards", "cards"}},
+        hand_levels_extractor = {{"GAME", "hands"}, {"GAME", "hand_levels"}, {"GAME", "poker_hands"}}
     }
     
     return extractor_paths[extractor_name] or {}

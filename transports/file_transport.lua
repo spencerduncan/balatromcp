@@ -177,6 +177,7 @@ function FileTransport:get_filepath(message_type)
         deck_state = "deck_state.json",
         remaining_deck = "remaining_deck.json",
         full_deck = "full_deck.json",
+        hand_levels = "hand_levels.json",
         actions = "actions.json",
         action_result = "action_results.json",
         ["debug.log"] = "file_transport_debug.log"
@@ -580,7 +581,7 @@ function FileTransport:cleanup_old_messages(max_age_seconds, callback)
     
     max_age_seconds = max_age_seconds or 300 -- 5 minutes default
     
-    local files = {"game_state.json", "deck_state.json", "remaining_deck.json", "full_deck.json", "actions.json", "action_results.json"}
+    local files = {"game_state.json", "deck_state.json", "remaining_deck.json", "full_deck.json", "hand_levels.json", "actions.json", "action_results.json"}
     local current_time = os.time()
     local cleanup_count = 0
     local files_to_check = #files

@@ -69,6 +69,8 @@ function ActionExecutor:execute_action(action_data)
         success, error_message = self:execute_select_blind(action_data)
     elseif action_type == "select_pack_offer" then
         success, error_message = self:execute_select_pack_offer(action_data)
+    elseif action_type == "use_pack_tarot" then
+        success, error_message = self:execute_use_pack_tarot(action_data)
     elseif action_type == "reroll_boss" then
         success, error_message = self:execute_reroll_boss(action_data)
     elseif action_type == "reroll_shop" then
@@ -794,6 +796,80 @@ function ActionExecutor:execute_go_next(action_data)
         return true, nil
     else
         return false, "Go next failed: " .. tostring(error_result)
+    end
+end
+
+function ActionExecutor:execute_use_pack_tarot(action_data)
+    local pack_index = action_data.pack_index
+    local target_card_indices = action_data.target_card_indices or {}
+    
+    if not pack_index or pack_index < 0 then
+        return false, "Invalid pack index"
+    end
+    
+    print("BalatroMCP: Using pack tarot at index: " .. pack_index .. " with " .. #target_card_indices .. " targets")
+    
+    local success, error_message = self:validate_game_state()
+    if not success then
+        return false, error_message
+    end
+    
+    if not G.FUNCS or not G.FUNCS.use_card then
+        return false, "Use card function not available"
+    end
+    
+    -- Pack offers are typically stored in G.pack_cards when available
+    if not G.pack_cards or not G.pack_cards.cards then
+        return false, "No pack offers available"
+    end
+    
+    if pack_index >= #G.pack_cards.cards then
+        return false, "Pack offer not found at index: " .. pack_index .. " (max: " .. (#G.pack_cards.cards - 1) .. ")"
+    end
+    
+    local pack_card = G.pack_cards.cards[pack_index + 1] -- Lua 1-based indexing
+    if not pack_card then
+        return false, "Pack offer not found at index: " .. pack_index
+    end
+    
+    -- Validate that this is a tarot card
+    if not pack_card.ability or pack_card.ability.set ~= "Tarot" then
+        return false, "Pack item at index " .. pack_index .. " is not a tarot card (found: " .. tostring(pack_card.ability and pack_card.ability.set or "unknown") .. ")"
+    end
+    
+    -- Validate target card indices if provided
+    if #target_card_indices > 0 then
+        if not G.hand or not G.hand.cards then
+            return false, "No hand cards available for targeting"
+        end
+        
+        local hand_size = #G.hand.cards
+        for _, target_index in ipairs(target_card_indices) do
+            if target_index < 0 or target_index >= hand_size then
+                return false, "Invalid target card index: " .. target_index .. " (hand size: " .. hand_size .. ")"
+            end
+        end
+        
+        -- Select target cards for tarot use
+        for _, target_index in ipairs(target_card_indices) do
+            local target_card = G.hand.cards[target_index + 1] -- Lua 1-based indexing
+            if target_card then
+                G.hand:add_to_highlighted(target_card)
+                print("BalatroMCP: Added target card at index " .. target_index .. " to highlighted")
+            end
+        end
+    end
+    
+    print("BalatroMCP: Calling G.FUNCS.use_card for tarot with " .. #target_card_indices .. " highlighted cards")
+    local call_success, error_result = pcall(function()
+        G.FUNCS.use_card({config = {ref_table = pack_card}})
+    end)
+    
+    if call_success then
+        print("BalatroMCP: Pack tarot use successful!")
+        return true, nil
+    else
+        return false, "Pack tarot use failed: " .. tostring(error_result)
     end
 end
 
