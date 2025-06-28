@@ -76,3 +76,7 @@ local_config.lua
 workshop_items/
 steam_workshop/
 
+# Claude Code local settings
+.claude/settings.local.json
+.claude/memory/
+
