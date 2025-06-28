@@ -178,9 +178,9 @@ function FileTransport:get_filepath(message_type)
         remaining_deck = "remaining_deck.json",
         full_deck = "full_deck.json",
         hand_levels = "hand_levels.json",
+        vouchers_ante = "vouchers_ante.json",
         actions = "actions.json",
         action_result = "action_results.json",
-        vouchers_ante = "vouchers_ante.json",
         ["debug.log"] = "file_transport_debug.log"
     }
     
@@ -259,8 +259,15 @@ function FileTransport:process_async_responses()
         end
         
         local pending = self.pending_requests[response.id]
-        if pending and pending.callback then
-            pending.callback(response.success, response.data, response.error)
+        if pending then
+            -- Track successful write operations
+            if response.success and response.operation == 'write' then
+                self.write_success_count = self.write_success_count + 1
+            end
+            
+            if pending.callback then
+                pending.callback(response.success, response.data, response.error)
+            end
         end
         
         self.pending_requests[response.id] = nil
@@ -330,6 +337,9 @@ function FileTransport:write_message(message_data, message_type, callback)
     else
         -- Synchronous fallback
         local write_success = love.filesystem.write(filepath, message_data)
+        if write_success then
+            self.write_success_count = self.write_success_count + 1
+        end
         if callback then callback(write_success) end
         return write_success
     end

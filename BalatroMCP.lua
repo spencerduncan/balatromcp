@@ -611,8 +611,13 @@ end
 function BalatroMCP:process_pending_actions()
     if self.processing_action then
         -- Safety timeout: reset stuck processing flag after 10 seconds
+        -- This prevents indefinite blocking when action processing gets stuck due to game engine issues
         if not self.processing_action_start_time then
-            self.processing_action_start_time = os.time()
+            print("BalatroMCP: WARNING - Inconsistent state detected, resetting processing flags")
+            self.processing_action = false
+            self.pending_state_extraction = false
+            self.processing_action_start_time = nil
+            return  -- Skip this iteration, retry next time
         elseif os.time() - self.processing_action_start_time > 10 then
             print("BalatroMCP: WARNING - Processing action timeout, resetting stuck flag")
             self.processing_action = false
@@ -647,7 +652,7 @@ function BalatroMCP:process_pending_actions()
     end
     
     self.processing_action = true
-    self.processing_action_start_time = nil  -- Clear timeout when starting new action
+    self.processing_action_start_time = os.time()  -- Set timeout start time when beginning processing
     self.last_action_sequence = sequence
     
     print("BalatroMCP: Processing action [seq=" .. sequence .. "]: " .. (action_data.action_type or "unknown"))
@@ -686,6 +691,7 @@ function BalatroMCP:process_pending_actions()
     -- This ensures cleanup happens regardless of threading mode
     print("BalatroMCP: Resetting processing flag (threading-safe cleanup)")
     self.processing_action = false
+    self.processing_action_start_time = nil
     self.pending_state_extraction = false
 end
 
@@ -708,6 +714,7 @@ function BalatroMCP:handle_delayed_state_extraction()
     
     self.pending_state_extraction = false
     self.processing_action = false
+    self.processing_action_start_time = nil
 end
 
 function BalatroMCP:check_and_send_state_update()
@@ -777,7 +784,10 @@ function BalatroMCP:send_state_update(state)
             
             -- Remaining deck (cards still in deck that can be drawn)
             remaining_deck_cards = self.state_extractor:extract_remaining_deck_cards()
-        }
+        },
+        
+        -- Voucher and ante information (included in main state for external analysis)
+        vouchers_ante = state.vouchers_ante
     }
     
     local state_message = {
@@ -824,12 +834,12 @@ function BalatroMCP:send_state_update(state)
     
     print("BalatroMCP: [DEBUG_STALE_STATE] Message send result: " .. tostring(send_result))
     
-    -- Send vouchers and ante information as separate JSON export
-    local voucher_extractor = self.state_extractor.extractor_lookup["voucher_ante_extractor"]
-    if voucher_extractor then
-        local vouchers_ante_data = voucher_extractor:extract()
-        if vouchers_ante_data then
-            local voucher_send_result = self.message_manager:write_vouchers_ante(vouchers_ante_data)
+    -- Send vouchers and ante information as separate JSON export (using data already extracted)
+    if state.vouchers_ante then
+        local voucher_send_result = self.message_manager:write_vouchers_ante(state.vouchers_ante)
+        if not voucher_send_result then
+            print("BalatroMCP: WARNING - Failed to write vouchers ante data")
+        else
             print("BalatroMCP: [DEBUG_STALE_STATE] Vouchers ante send result: " .. tostring(voucher_send_result))
         end
     end
