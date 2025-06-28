@@ -75,90 +75,77 @@ end
 
 -- High-level message operations
 function MessageManager:write_game_state(state_data)
-    -- ADD COMPREHENSIVE DIAGNOSTIC LOGGING FOR STALE STATE DEBUG
-    print("[DEBUG_STALE_STATE] MessageManager:write_game_state called")
     self:log("Attempting to write game state")
     
     if not state_data then
         self:log("ERROR: No state data provided")
-        print("[DEBUG_STALE_STATE] *** WRITE_GAME_STATE FAILED - NO STATE DATA ***")
         return false
     end
     
-    print("[DEBUG_STALE_STATE] State data received, checking transport availability")
-    print("[DEBUG_STALE_STATE] Transport object: " .. tostring(self.transport))
+    -- MAIN THREAD DIAGNOSTIC: Verify we're encoding in main thread
+    local is_main_thread = love and love.graphics and love.graphics.isActive
+    if not is_main_thread then
+        self:log("ERROR: JSON encoding happening in worker thread - this will fail")
+        return false
+    end
     
-    local transport_available = self.transport:is_available()
-    print("[DEBUG_STALE_STATE] Transport available: " .. tostring(transport_available))
-    
-    if not transport_available then
+    if not self.transport:is_available() then
         self:log("ERROR: Transport is not available")
-        print("[DEBUG_STALE_STATE] *** WRITE_GAME_STATE FAILED - TRANSPORT NOT AVAILABLE ***")
         return false
     end
     
-    print("[DEBUG_STALE_STATE] Creating message structure")
+    -- Create message structure in main thread (where we have access to all data)
     local message = self:create_message(state_data, "game_state")
     self:log("Created message structure with sequence_id: " .. message.sequence_id)
     
-    -- Encode message to JSON
-    print("[DEBUG_STALE_STATE] Encoding message to JSON")
+    -- JSON encoding MUST happen in main thread
     local encode_success, encoded_data = pcall(self.json.encode, message)
     if not encode_success then
         self:log("ERROR: JSON encoding failed: " .. tostring(encoded_data))
-        print("[DEBUG_STALE_STATE] *** JSON ENCODING FAILED ***")
         return false
     end
     
-    self:log("JSON encoding successful, data length: " .. #encoded_data)
-    print("[DEBUG_STALE_STATE] JSON encoded, calling transport:write_message")
+    local json_size = #encoded_data
+    self:log("JSON encoding successful, data length: " .. json_size)
     
-    -- Use async transport write if available (fire-and-forget for game state)
+    -- Pass pre-encoded JSON to async transport (no re-encoding in worker thread)
     if self.transport.async_enabled then
-        print("[DEBUG_STALE_STATE] Using async write for game state")
+        self:log("Using async write for pre-encoded JSON (size: " .. json_size .. ")")
         local write_success = self.transport:write_message(encoded_data, "game_state", function(success)
             if success then
-                print("[DEBUG_STALE_STATE] Async game state write completed successfully")
-                -- Async verification
+                self:log("Async game state write completed successfully")
+                -- Async verification with pre-encoded data
                 self.transport:verify_message(encoded_data, "game_state", function(verify_success)
                     if verify_success then
-                        print("[DEBUG_STALE_STATE] Async game state verification completed successfully")
+                        self:log("Async game state verification completed successfully")
                     else
-                        print("[DEBUG_STALE_STATE] *** ASYNC GAME STATE VERIFICATION FAILED ***")
+                        self:log("ERROR: Async game state verification failed")
                     end
                 end)
             else
-                print("[DEBUG_STALE_STATE] *** ASYNC GAME STATE WRITE FAILED ***")
+                self:log("ERROR: Async game state write failed")
             end
         end)
         
-        print("[DEBUG_STALE_STATE] Async write operation submitted: " .. tostring(write_success))
         return write_success
     else
-        -- Fallback to synchronous operation
-        print("[DEBUG_STALE_STATE] Using synchronous write for game state")
+        -- Synchronous fallback with pre-encoded data
+        self:log("Using synchronous write for pre-encoded JSON (size: " .. json_size .. ")")
         local write_success = self.transport:write_message(encoded_data, "game_state")
-        
-        print("[DEBUG_STALE_STATE] Transport write_message result: " .. tostring(write_success))
         
         if not write_success then
             self:log("ERROR: Transport write failed")
-            print("[DEBUG_STALE_STATE] *** TRANSPORT WRITE FAILED ***")
             return false
         end
         
-        print("[DEBUG_STALE_STATE] Transport write successful, performing verification")
-        
-        -- Verify through transport
+        -- Verify with pre-encoded data
         local verify_success = self.transport:verify_message(encoded_data, "game_state")
         if not verify_success then
             self:log("ERROR: Message verification failed")
-            print("[DEBUG_STALE_STATE] *** MESSAGE VERIFICATION FAILED ***")
             return false
         end
         
         self:log("Game state written and verified successfully")
-        print("[DEBUG_STALE_STATE] *** WRITE_GAME_STATE COMPLETED SUCCESSFULLY ***")
         return true
     end
 end

@@ -21,7 +21,8 @@
       "Bash(gh issue close:*)",
       "Bash(ls:*)",
       "Bash(git pull:*)",
-      "Bash(git stash push:*)"
+      "Bash(git stash push:*)",
+      "Bash(rg:*)"
     ],
     "deny": []
   },
