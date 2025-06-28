@@ -228,6 +228,7 @@ For specific insights from code reviews and implementation patterns, see:
 - [ActionExecutor Review Lessons](./ACTION_EXECUTOR_REVIEW_LESSONS.md) - Patterns for action implementation and validation
 - [MessageManager Review Lessons](./MESSAGE_MANAGER_REVIEW_LESSONS.md) - Patterns for message export and integration layer reviews
 - [Code Review Response Lessons](./CODE_REVIEW_RESPONSE_LESSONS.md) - Patterns for addressing critical review feedback effectively
+- [Test Suite Recovery Lessons](./TEST_SUITE_RECOVERY_LESSONS.md) - Patterns for debugging and fixing test suite degradation
 
 ## Important Lessons Learned
 
