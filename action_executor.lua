@@ -1,6 +1,12 @@
 -- Action execution module for Balatro MCP mod
 -- Handles execution of actions requested by the MCP server
 
+-- Load validation framework components
+local ActionValidator = assert(SMODS.load_file("action_executor/validators/action_validator.lua"))()
+local BlindValidator = assert(SMODS.load_file("action_executor/validators/blind_validator.lua"))()
+local RerollValidator = assert(SMODS.load_file("action_executor/validators/reroll_validator.lua"))()
+local StateExtractorUtils = assert(SMODS.load_file("state_extractor/utils/state_extractor_utils.lua"))()
+
 local ActionExecutor = {}
 ActionExecutor.__index = ActionExecutor
 
@@ -8,7 +14,63 @@ function ActionExecutor.new(state_extractor, joker_manager)
     local self = setmetatable({}, ActionExecutor)
     self.state_extractor = state_extractor
     self.joker_manager = joker_manager
+    
+    -- Validate that dependencies are available before framework initialization
+    if not state_extractor then
+        print("BalatroMCP: Warning - ActionExecutor created without state_extractor dependency")
+    end
+    
+    if not joker_manager then
+        print("BalatroMCP: Warning - ActionExecutor created without joker_manager dependency")
+    end
+    
+    -- Defer validator initialization to ensure extractors are ready
+    self.validator = nil
+    self.reroll_tracker = nil
+    self._validators_initialized = false
+    
+    print("BalatroMCP: ActionExecutor created, validation framework will be initialized on first use")
     return self
+end
+
+-- Lazy initialization of validation framework to avoid dependency issues
+function ActionExecutor:ensure_validators_initialized()
+    if self._validators_initialized then
+        return true
+    end
+    
+    -- Validate that state_extractor is ready before proceeding
+    if not self.state_extractor then
+        print("BalatroMCP: Warning - Cannot initialize validators without state_extractor")
+        return false
+    end
+    
+    -- Initialize validation framework
+    self.validator = ActionValidator.new()
+    
+    -- Register validators for specific action types
+    local blind_validator = BlindValidator.new()
+    local reroll_validator = RerollValidator.new()
+    
+    self.validator:register_validator(blind_validator)
+    self.validator:register_validator(reroll_validator)
+    
+    -- Store reroll tracker reference for cost deduction and tracking
+    self.reroll_tracker = reroll_validator:get_reroll_tracker()
+    
+    -- Initialize the validation framework
+    local init_success = pcall(function()
+        self.validator:initialize()
+    end)
+    
+    if init_success then
+        self._validators_initialized = true
+        print("BalatroMCP: Validation framework initialized successfully")
+        return true
+    else
+        print("BalatroMCP: Warning - Failed to initialize validation framework")
+        return false
+    end
 end
 
 -- Centralized validation methods to eliminate code duplication
@@ -47,6 +109,71 @@ function ActionExecutor:execute_action(action_data)
     
     print("BalatroMCP: Executing action: " .. action_type)
     
+    -- Ensure validators are initialized before proceeding
+    if not self:ensure_validators_initialized() then
+        return {
+            success = false,
+            error = "Validation framework not available - dependencies not ready"
+        }
+    end
+    
+    -- NEW: Validate action before execution
+    local game_state = self.validator:get_current_game_state()
+    
+    -- Add voucher information to game state for validation
+    if self.state_extractor then
+        -- Specific error checking for each step instead of broad pcall
+        local VoucherAnteExtractor = SMODS.load_file("state_extractor/extractors/voucher_ante_extractor.lua")
+        if VoucherAnteExtractor then
+            local success, extractor_module = pcall(VoucherAnteExtractor)
+            if success and extractor_module then
+                local extractor = extractor_module.new()
+                if extractor and type(extractor.extract) == "function" then
+                    local extract_success, result = pcall(extractor.extract, extractor)
+                    if extract_success and result and type(result) == "table" then
+                        local voucher_data = result.vouchers_ante
+                        if voucher_data and type(voucher_data) == "table" then
+                            -- Validate that owned_vouchers is an array/table before assignment
+                            local owned_vouchers = voucher_data.owned_vouchers
+                            if owned_vouchers and type(owned_vouchers) == "table" then
+                                game_state.owned_vouchers = owned_vouchers
+                            else
+                                game_state.owned_vouchers = {}
+                                print("BalatroMCP: Warning - voucher_data.owned_vouchers is not a valid table, using empty array")
+                            end
+                        else
+                            game_state.owned_vouchers = {}
+                            print("BalatroMCP: Warning - voucher extraction returned invalid vouchers_ante data")
+                        end
+                    else
+                        game_state.owned_vouchers = {}
+                        print("BalatroMCP: Warning - voucher extraction failed during extract() call")
+                    end
+                else
+                    game_state.owned_vouchers = {}
+                    print("BalatroMCP: Warning - voucher extractor missing or invalid extract method")
+                end
+            else
+                game_state.owned_vouchers = {}
+                print("BalatroMCP: Warning - failed to load VoucherAnteExtractor module")
+            end
+        else
+            game_state.owned_vouchers = {}
+            print("BalatroMCP: Warning - VoucherAnteExtractor file not found")
+        end
+    end
+    
+    local validation_result = self.validator:validate_action(action_type, action_data, game_state)
+    
+    if not validation_result.is_valid then
+        print("BalatroMCP: Action validation failed: " .. validation_result.error_message)
+        return false, validation_result.error_message
+    end
+    
+    print("BalatroMCP: Action validation passed: " .. validation_result.success_message)
+    
+    -- Continue with existing execution logic
+    -- action_data may be modified by validation (e.g., blind_type override)
     local success = false
     local error_message = nil
     local new_state = nil
@@ -545,9 +672,27 @@ function ActionExecutor:execute_select_pack_offer(action_data)
 end
 
 function ActionExecutor:execute_reroll_boss(action_data)
+    -- Validation already completed by ActionValidator, safe to execute
+    local current_ante = StateExtractorUtils.safe_get_nested_value(G, {"GAME", "round_resets", "ante"}, 1)
+    
     if G.FUNCS and G.FUNCS.reroll_boss then
-        G.FUNCS.reroll_boss()
-        return true, nil
+        -- Track usage for Director's Cut limitation (per ante)
+        local success, track_msg = self.reroll_tracker:increment_reroll_usage(current_ante)
+        if not success then
+            print("BalatroMCP: Warning - Failed to track reroll usage: " .. tostring(track_msg))
+        end
+        
+        -- Execute the reroll (game handles cost deduction automatically)
+        local success, error_result = pcall(function()
+            G.FUNCS.reroll_boss()
+        end)
+        
+        if success then
+            print("BalatroMCP: Boss reroll successful (ante " .. current_ante .. ", cost handled by game)")
+            return true, nil
+        else
+            return false, "Boss reroll failed: " .. tostring(error_result)
+        end
     else
         return false, "Boss reroll not available"
     end

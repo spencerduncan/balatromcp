@@ -8,6 +8,9 @@ local VoucherAnteExtractor = {}
 VoucherAnteExtractor.__index = VoucherAnteExtractor
 setmetatable(VoucherAnteExtractor, {__index = IExtractor})
 
+-- Module-level cache for successful path discovery optimization
+local _successful_voucher_path = nil
+
 function VoucherAnteExtractor.new()
     local self = setmetatable({}, VoucherAnteExtractor)
     return self
@@ -63,19 +66,53 @@ function VoucherAnteExtractor:extract_owned_vouchers()
     -- Extract vouchers that the player owns/has used
     local owned_vouchers = {}
     
-    -- Try multiple potential locations for owned vouchers
+    -- Optimized path checking with caching and early returns
     local potential_paths = {
+        {"GAME", "owned_vouchers"},    -- Most likely path first
         {"GAME", "vouchers"},
-        {"GAME", "used_vouchers"},
-        {"GAME", "owned_vouchers"}
+        {"GAME", "used_vouchers"}
     }
     
+    -- If we have a cached successful path, try it first
+    if _successful_voucher_path and StateExtractorUtils.safe_check_path(G, _successful_voucher_path) then
+        local voucher_data = StateExtractorUtils.safe_get_nested_value(G, _successful_voucher_path, {})
+        
+        if type(voucher_data) == "table" and next(voucher_data) then
+            -- Process vouchers from cached path
+            for voucher_name, voucher_info in pairs(voucher_data) do
+                if type(voucher_info) == "table" then
+                    local safe_voucher = {
+                        name = StateExtractorUtils.safe_primitive_value(voucher_info, "name", voucher_name),
+                        effect = StateExtractorUtils.safe_primitive_value(voucher_info, "effect", ""),
+                        description = StateExtractorUtils.safe_primitive_value(voucher_info, "description", ""),
+                        active = StateExtractorUtils.safe_primitive_value(voucher_info, "active", true)
+                    }
+                    table.insert(owned_vouchers, safe_voucher)
+                else
+                    -- Simple case: voucher name as key, boolean as value
+                    local safe_voucher = {
+                        name = voucher_name,
+                        effect = "",
+                        description = "",
+                        active = voucher_info == true
+                    }
+                    table.insert(owned_vouchers, safe_voucher)
+                end
+            end
+            return owned_vouchers -- Early return when cached path successful
+        end
+    end
+    
+    -- Fallback: try all paths and cache the successful one
     for _, path in ipairs(potential_paths) do
         if StateExtractorUtils.safe_check_path(G, path) then
             local voucher_data = StateExtractorUtils.safe_get_nested_value(G, path, {})
             
             -- If it's a table of vouchers, extract each one
-            if type(voucher_data) == "table" then
+            if type(voucher_data) == "table" and next(voucher_data) then
+                -- Cache this successful path for future calls
+                _successful_voucher_path = path
+                
                 for voucher_name, voucher_info in pairs(voucher_data) do
                     if type(voucher_info) == "table" then
                         local safe_voucher = {
