@@ -15,6 +15,36 @@ function ActionExecutor.new(state_extractor, joker_manager)
     self.state_extractor = state_extractor
     self.joker_manager = joker_manager
     
+    -- Validate that dependencies are available before framework initialization
+    if not state_extractor then
+        print("BalatroMCP: Warning - ActionExecutor created without state_extractor dependency")
+    end
+    
+    if not joker_manager then
+        print("BalatroMCP: Warning - ActionExecutor created without joker_manager dependency")
+    end
+    
+    -- Defer validator initialization to ensure extractors are ready
+    self.validator = nil
+    self.reroll_tracker = nil
+    self._validators_initialized = false
+    
+    print("BalatroMCP: ActionExecutor created, validation framework will be initialized on first use")
+    return self
+end
+
+-- Lazy initialization of validation framework to avoid dependency issues
+function ActionExecutor:ensure_validators_initialized()
+    if self._validators_initialized then
+        return true
+    end
+    
+    -- Validate that state_extractor is ready before proceeding
+    if not self.state_extractor then
+        print("BalatroMCP: Warning - Cannot initialize validators without state_extractor")
+        return false
+    end
+    
     -- Initialize validation framework
     self.validator = ActionValidator.new()
     
@@ -29,10 +59,18 @@ function ActionExecutor.new(state_extractor, joker_manager)
     self.reroll_tracker = reroll_validator:get_reroll_tracker()
     
     -- Initialize the validation framework
-    self.validator:initialize()
+    local init_success = pcall(function()
+        self.validator:initialize()
+    end)
     
-    print("BalatroMCP: ActionExecutor initialized with validation framework")
-    return self
+    if init_success then
+        self._validators_initialized = true
+        print("BalatroMCP: Validation framework initialized successfully")
+        return true
+    else
+        print("BalatroMCP: Warning - Failed to initialize validation framework")
+        return false
+    end
 end
 
 -- Centralized validation methods to eliminate code duplication
@@ -71,19 +109,57 @@ function ActionExecutor:execute_action(action_data)
     
     print("BalatroMCP: Executing action: " .. action_type)
     
+    -- Ensure validators are initialized before proceeding
+    if not self:ensure_validators_initialized() then
+        return {
+            success = false,
+            error = "Validation framework not available - dependencies not ready"
+        }
+    end
+    
     -- NEW: Validate action before execution
     local game_state = self.validator:get_current_game_state()
     
     -- Add voucher information to game state for validation
     if self.state_extractor then
-        local success, voucher_data = pcall(function()
-            local VoucherAnteExtractor = assert(SMODS.load_file("state_extractor/extractors/voucher_ante_extractor.lua"))()
-            local extractor = VoucherAnteExtractor.new()
-            local result = extractor:extract()
-            return result.vouchers_ante or {}
-        end)
-        if success and voucher_data then
-            game_state.owned_vouchers = voucher_data.owned_vouchers or {}
+        -- Specific error checking for each step instead of broad pcall
+        local VoucherAnteExtractor = SMODS.load_file("state_extractor/extractors/voucher_ante_extractor.lua")
+        if VoucherAnteExtractor then
+            local success, extractor_module = pcall(VoucherAnteExtractor)
+            if success and extractor_module then
+                local extractor = extractor_module.new()
+                if extractor and type(extractor.extract) == "function" then
+                    local extract_success, result = pcall(extractor.extract, extractor)
+                    if extract_success and result and type(result) == "table" then
+                        local voucher_data = result.vouchers_ante
+                        if voucher_data and type(voucher_data) == "table" then
+                            -- Validate that owned_vouchers is an array/table before assignment
+                            local owned_vouchers = voucher_data.owned_vouchers
+                            if owned_vouchers and type(owned_vouchers) == "table" then
+                                game_state.owned_vouchers = owned_vouchers
+                            else
+                                game_state.owned_vouchers = {}
+                                print("BalatroMCP: Warning - voucher_data.owned_vouchers is not a valid table, using empty array")
+                            end
+                        else
+                            game_state.owned_vouchers = {}
+                            print("BalatroMCP: Warning - voucher extraction returned invalid vouchers_ante data")
+                        end
+                    else
+                        game_state.owned_vouchers = {}
+                        print("BalatroMCP: Warning - voucher extraction failed during extract() call")
+                    end
+                else
+                    game_state.owned_vouchers = {}
+                    print("BalatroMCP: Warning - voucher extractor missing or invalid extract method")
+                end
+            else
+                game_state.owned_vouchers = {}
+                print("BalatroMCP: Warning - failed to load VoucherAnteExtractor module")
+            end
+        else
+            game_state.owned_vouchers = {}
+            print("BalatroMCP: Warning - VoucherAnteExtractor file not found")
         end
     end
     

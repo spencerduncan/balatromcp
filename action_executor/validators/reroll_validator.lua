@@ -5,6 +5,17 @@ local IActionValidator = assert(SMODS.load_file("action_executor/validators/i_ac
 local ValidationResult = assert(SMODS.load_file("action_executor/validators/validation_result.lua"))()
 local RerollTracker = assert(SMODS.load_file("action_executor/utils/reroll_tracker.lua"))()
 
+-- Voucher name constants to avoid typos and enable easy maintenance
+local VOUCHER_NAMES = {
+    DIRECTORS_CUT = "director's cut",
+    DIRECTORS_CUT_ALT1 = "directors cut", 
+    DIRECTORS_CUT_ALT2 = "director cut",
+    RETCON = "retcon"
+}
+
+-- Cost constants for validation
+local REROLL_COST = 10
+
 local RerollValidator = {}
 RerollValidator.__index = RerollValidator
 setmetatable(RerollValidator, {__index = IActionValidator})
@@ -35,8 +46,8 @@ function RerollValidator:validate(action_data, game_state)
         return ValidationResult.error("Boss reroll requires 'Director's Cut' or 'Retcon' voucher")
     end
     
-    -- Validate cost availability ($10 for boss reroll)
-    local reroll_cost = 10
+    -- Validate cost availability using defined constant
+    local reroll_cost = REROLL_COST
     if not self:can_afford_reroll(game_state, reroll_cost) then
         local available_funds = (game_state.dollars or 0) - (game_state.bankrupt_at or 0)
         return ValidationResult.error("Insufficient funds for boss reroll ($" .. reroll_cost .. " required, $" .. available_funds .. " available)")
@@ -93,19 +104,36 @@ function RerollValidator:get_reroll_vouchers(game_state)
         end
     end
     
-    -- Check each owned voucher for reroll permissions
+    -- Check each owned voucher for reroll permissions with input validation
     for _, voucher in ipairs(owned_vouchers) do
-        if voucher and voucher.name then
+        -- Validate voucher structure before accessing properties
+        if voucher and type(voucher) == "table" and voucher.name and type(voucher.name) == "string" then
             local voucher_name = string.lower(voucher.name)
             
-            -- Check for Director's Cut voucher (case-insensitive)
-            if voucher_name == "director's cut" or voucher_name == "directors cut" or voucher_name == "director cut" then
-                vouchers.directors_cut = voucher.active ~= false -- Default to true if active field missing
+            -- Check for Director's Cut voucher using constants (case-insensitive)
+            if voucher_name == VOUCHER_NAMES.DIRECTORS_CUT or 
+               voucher_name == VOUCHER_NAMES.DIRECTORS_CUT_ALT1 or 
+               voucher_name == VOUCHER_NAMES.DIRECTORS_CUT_ALT2 then
+                -- Validate active field exists and is not explicitly false
+                local is_active = voucher.active
+                if is_active == nil then
+                    is_active = true  -- Default to true if field missing
+                elseif type(is_active) ~= "boolean" then
+                    is_active = (is_active == true or is_active == 1 or is_active == "true")
+                end
+                vouchers.directors_cut = is_active
             end
             
-            -- Check for Retcon voucher (case-insensitive)
-            if voucher_name == "retcon" then
-                vouchers.retcon = voucher.active ~= false -- Default to true if active field missing
+            -- Check for Retcon voucher using constants (case-insensitive)
+            if voucher_name == VOUCHER_NAMES.RETCON then
+                -- Validate active field exists and is not explicitly false
+                local is_active = voucher.active
+                if is_active == nil then
+                    is_active = true  -- Default to true if field missing
+                elseif type(is_active) ~= "boolean" then
+                    is_active = (is_active == true or is_active == 1 or is_active == "true")
+                end
+                vouchers.retcon = is_active
             end
         end
     end
@@ -188,8 +216,8 @@ function RerollValidator:get_reroll_summary(game_state)
         has_retcon = vouchers.retcon,
         rerolls_used_this_ante = rerolls_used,
         can_reroll = vouchers.retcon or (vouchers.directors_cut and rerolls_used < 1),
-        cost_required = 10,
-        can_afford = self:can_afford_reroll(game_state, 10)
+        cost_required = REROLL_COST,
+        can_afford = self:can_afford_reroll(game_state, REROLL_COST)
     }
 end
 

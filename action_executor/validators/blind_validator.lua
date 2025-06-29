@@ -38,16 +38,30 @@ function BlindValidator:validate(action_data, game_state)
         return ValidationResult.error("Blind selection options not available")
     end
     
-    local blind_option = game_state.blind_select_opts[string.lower(required_blind)]
+    -- Normalize both required blind and available blind keys for case-insensitive comparison
+    local normalized_required = string.lower(required_blind)
+    local blind_option = nil
+    local available_blinds = {}
+    
+    -- Find matching blind with case-insensitive comparison
+    for key, option in pairs(game_state.blind_select_opts) do
+        local normalized_key = string.lower(key)
+        available_blinds[normalized_key] = key  -- Store original key for error reporting
+        if normalized_key == normalized_required then
+            blind_option = option
+            break
+        end
+    end
+    
     if not blind_option then
-        -- Get list of available blinds for error message
-        local available_blinds = {}
-        for key, _ in pairs(game_state.blind_select_opts) do
-            table.insert(available_blinds, key)
+        -- Get list of available blinds for error message (use original case)
+        local available_list = {}
+        for _, original_key in pairs(available_blinds) do
+            table.insert(available_list, original_key)
         end
         
-        local available_list = #available_blinds > 0 and table.concat(available_blinds, ", ") or "none"
-        return ValidationResult.error("Required blind '" .. required_blind .. "' not available. Available: " .. available_list)
+        local available_str = #available_list > 0 and table.concat(available_list, ", ") or "none"
+        return ValidationResult.error("Required blind '" .. required_blind .. "' not available. Available: " .. available_str)
     end
     
     -- CRITICAL: Override agent selection with game progression requirement
