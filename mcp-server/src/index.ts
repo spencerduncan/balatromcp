@@ -23,18 +23,10 @@ class BalatroMCPServer {
 
   constructor(sharedDir?: string) {
     this.fileInterface = new BalatroMCPFileInterface(sharedDir);
-    this.server = new Server(
-      {
-        name: 'balatromcp-server',
-        version: '1.0.0',
-      },
-      {
-        capabilities: {
-          resources: {},
-          tools: {},
-        },
-      }
-    );
+    this.server = new Server({
+      name: 'balatromcp-server',
+      version: '1.0.0',
+    });
 
     this.setupHandlers();
   }

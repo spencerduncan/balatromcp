@@ -6,7 +6,8 @@ export interface BalatroMCPMessage {
   timestamp: string;
   sequence_id: number;
   message_type: string;
-  data: any;
+  data?: any;
+  state?: any; // For comprehensive_state_update messages
 }
 
 export interface ActionData {

@@ -76,9 +76,14 @@ export class BalatroMCPFileInterface {
    * Write action to actions.json in BalatroMCP format
    */
   async writeAction(actionData: ActionData): Promise<void> {
+    // Ensure sequence_id is set in action data
+    if (actionData.sequence_id == null) {
+      actionData.sequence_id = this.getNextSequenceId();
+    }
+
     const message: BalatroMCPMessage = {
       timestamp: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
-      sequence_id: actionData.sequence_id || this.getNextSequenceId(),
+      sequence_id: actionData.sequence_id,
       message_type: 'action',
       data: actionData
     };

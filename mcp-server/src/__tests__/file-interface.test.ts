@@ -55,9 +55,9 @@ describe('BalatroMCPFileInterface', () => {
     });
 
     test('should auto-generate sequence ID if not provided', async () => {
-      const actionData: ActionData = {
-        action_type: 'skip_blind',
-        sequence_id: 0 // Will be overridden
+      const actionData: any = {
+        action_type: 'skip_blind'
+        // sequence_id not provided
       };
 
       await fileInterface.writeAction(actionData);
