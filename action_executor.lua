@@ -1,6 +1,12 @@
 -- Action execution module for Balatro MCP mod
 -- Handles execution of actions requested by the MCP server
 
+-- Load validation framework components
+local ActionValidator = assert(SMODS.load_file("action_executor/validators/action_validator.lua"))()
+local BlindValidator = assert(SMODS.load_file("action_executor/validators/blind_validator.lua"))()
+local RerollValidator = assert(SMODS.load_file("action_executor/validators/reroll_validator.lua"))()
+local StateExtractorUtils = assert(SMODS.load_file("state_extractor/utils/state_extractor_utils.lua"))()
+
 local ActionExecutor = {}
 ActionExecutor.__index = ActionExecutor
 
@@ -8,6 +14,24 @@ function ActionExecutor.new(state_extractor, joker_manager)
     local self = setmetatable({}, ActionExecutor)
     self.state_extractor = state_extractor
     self.joker_manager = joker_manager
+    
+    -- Initialize validation framework
+    self.validator = ActionValidator.new()
+    
+    -- Register validators for specific action types
+    local blind_validator = BlindValidator.new()
+    local reroll_validator = RerollValidator.new()
+    
+    self.validator:register_validator(blind_validator)
+    self.validator:register_validator(reroll_validator)
+    
+    -- Store reroll tracker reference for cost deduction and tracking
+    self.reroll_tracker = reroll_validator:get_reroll_tracker()
+    
+    -- Initialize the validation framework
+    self.validator:initialize()
+    
+    print("BalatroMCP: ActionExecutor initialized with validation framework")
     return self
 end
 
@@ -47,6 +71,33 @@ function ActionExecutor:execute_action(action_data)
     
     print("BalatroMCP: Executing action: " .. action_type)
     
+    -- NEW: Validate action before execution
+    local game_state = self.validator:get_current_game_state()
+    
+    -- Add voucher information to game state for validation
+    if self.state_extractor then
+        local success, voucher_data = pcall(function()
+            local VoucherAnteExtractor = assert(SMODS.load_file("state_extractor/extractors/voucher_ante_extractor.lua"))()
+            local extractor = VoucherAnteExtractor.new()
+            local result = extractor:extract()
+            return result.vouchers_ante or {}
+        end)
+        if success and voucher_data then
+            game_state.owned_vouchers = voucher_data.owned_vouchers or {}
+        end
+    end
+    
+    local validation_result = self.validator:validate_action(action_type, action_data, game_state)
+    
+    if not validation_result.is_valid then
+        print("BalatroMCP: Action validation failed: " .. validation_result.error_message)
+        return false, validation_result.error_message
+    end
+    
+    print("BalatroMCP: Action validation passed: " .. validation_result.success_message)
+    
+    -- Continue with existing execution logic
+    -- action_data may be modified by validation (e.g., blind_type override)
     local success = false
     local error_message = nil
     local new_state = nil
@@ -545,9 +596,27 @@ function ActionExecutor:execute_select_pack_offer(action_data)
 end
 
 function ActionExecutor:execute_reroll_boss(action_data)
+    -- Validation already completed by ActionValidator, safe to execute
+    local current_ante = StateExtractorUtils.safe_get_nested_value(G, {"GAME", "round_resets", "ante"}, 1)
+    
     if G.FUNCS and G.FUNCS.reroll_boss then
-        G.FUNCS.reroll_boss()
-        return true, nil
+        -- Track usage for Director's Cut limitation (per ante)
+        local success, track_msg = self.reroll_tracker:increment_reroll_usage(current_ante)
+        if not success then
+            print("BalatroMCP: Warning - Failed to track reroll usage: " .. tostring(track_msg))
+        end
+        
+        -- Execute the reroll (game handles cost deduction automatically)
+        local success, error_result = pcall(function()
+            G.FUNCS.reroll_boss()
+        end)
+        
+        if success then
+            print("BalatroMCP: Boss reroll successful (ante " .. current_ante .. ", cost handled by game)")
+            return true, nil
+        else
+            return false, "Boss reroll failed: " .. tostring(error_result)
+        end
     else
         return false, "Boss reroll not available"
     end
