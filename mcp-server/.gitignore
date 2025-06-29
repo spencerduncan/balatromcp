@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.log
+.env
+test-shared/
+coverage/
+.nyc_output/
+.DS_Store
