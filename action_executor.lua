@@ -194,10 +194,6 @@ function ActionExecutor:execute_action(action_data)
         success, error_message = self:execute_skip_blind(action_data)
     elseif action_type == "go_next" then
         success, error_message = self:execute_go_next(action_data)
-    elseif action_type == "diagnose_blind_progression" then
-        success, error_message = self:execute_diagnose_blind_progression(action_data)
-    elseif action_type == "diagnose_blind_activation" then
-        success, error_message = self:execute_diagnose_blind_activation(action_data)
     else
         success = false
         error_message = "Unknown action type: " .. action_type
@@ -752,29 +748,6 @@ function ActionExecutor:execute_use_consumable(action_data)
     end
 end
 
-function ActionExecutor:execute_diagnose_blind_progression(action_data)
-    print("BalatroMCP: Running blind progression diagnostics...")
-    
-    local BlindProgressionDiagnostics = SMODS.load_file('blind_progression_diagnostics.lua', 'balatro_mcp')()
-    local diagnostics = BlindProgressionDiagnostics.new()
-    
-    diagnostics:diagnose_blind_state()
-    diagnostics:log_hand_result_processing()
-    
-    return true, nil
-end
-
-function ActionExecutor:execute_diagnose_blind_activation(action_data)
-    print("BalatroMCP: Running blind activation diagnostics...")
-    
-    local BlindActivationDiagnostics = SMODS.load_file('blind_activation_diagnostics.lua', 'balatro_mcp')()
-    local diagnostics = BlindActivationDiagnostics.new()
-    
-    diagnostics:diagnose_blind_activation_state()
-    diagnostics:check_blind_database()
-    
-    return true, nil
-end
 
 function ActionExecutor:execute_move_playing_card(action_data)
     local from_index = action_data.from_index
