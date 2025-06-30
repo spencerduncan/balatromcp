@@ -122,45 +122,25 @@ function ActionExecutor:execute_action(action_data)
     
     -- Add voucher information to game state for validation
     if self.state_extractor then
-        -- Specific error checking for each step instead of broad pcall
-        local VoucherAnteExtractor = SMODS.load_file("state_extractor/extractors/voucher_ante_extractor.lua")
-        if VoucherAnteExtractor then
-            local success, extractor_module = pcall(VoucherAnteExtractor)
-            if success and extractor_module then
-                local extractor = extractor_module.new()
-                if extractor and type(extractor.extract) == "function" then
-                    local extract_success, result = pcall(extractor.extract, extractor)
-                    if extract_success and result and type(result) == "table" then
-                        local voucher_data = result.vouchers_ante
-                        if voucher_data and type(voucher_data) == "table" then
-                            -- Validate that owned_vouchers is an array/table before assignment
-                            local owned_vouchers = voucher_data.owned_vouchers
-                            if owned_vouchers and type(owned_vouchers) == "table" then
-                                game_state.owned_vouchers = owned_vouchers
-                            else
-                                game_state.owned_vouchers = {}
-                                print("BalatroMCP: Warning - voucher_data.owned_vouchers is not a valid table, using empty array")
-                            end
-                        else
-                            game_state.owned_vouchers = {}
-                            print("BalatroMCP: Warning - voucher extraction returned invalid vouchers_ante data")
-                        end
-                    else
-                        game_state.owned_vouchers = {}
-                        print("BalatroMCP: Warning - voucher extraction failed during extract() call")
-                    end
-                else
-                    game_state.owned_vouchers = {}
-                    print("BalatroMCP: Warning - voucher extractor missing or invalid extract method")
-                end
+        local success, voucher_data = pcall(function()
+            local VoucherAnteExtractor = assert(SMODS.load_file("state_extractor/extractors/voucher_ante_extractor.lua"))()
+            local extractor = VoucherAnteExtractor.new()
+            local result = extractor:extract()
+            return result and result.vouchers_ante
+        end)
+        
+        if success and voucher_data and type(voucher_data) == "table" then
+            local owned_vouchers = voucher_data.owned_vouchers
+            if owned_vouchers and type(owned_vouchers) == "table" then
+                game_state.owned_vouchers = owned_vouchers
             else
                 game_state.owned_vouchers = {}
-                print("BalatroMCP: Warning - failed to load VoucherAnteExtractor module")
             end
         else
             game_state.owned_vouchers = {}
-            print("BalatroMCP: Warning - VoucherAnteExtractor file not found")
         end
+    else
+        game_state.owned_vouchers = {}
     end
     
     local validation_result = self.validator:validate_action(action_type, action_data, game_state)
