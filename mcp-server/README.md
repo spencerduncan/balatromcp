@@ -20,10 +20,52 @@ npm run build
 
 ## Usage
 
-### As MCP Server
+### 🚀 Quick Start with Startup Scripts
 
-Start the server:
+**Linux/macOS (Recommended):**
 ```bash
+# Full startup with tests and integration checks
+./start-mcp-server.sh
+
+# Quick start without tests
+./start-mcp-server.sh --no-tests
+
+# Show all options
+./start-mcp-server.sh --help
+```
+
+**Windows (PowerShell):**
+```powershell
+# Full startup with tests
+.\start-mcp-server.ps1
+
+# Quick start without tests  
+.\start-mcp-server.ps1 -NoTests
+
+# Show help
+.\start-mcp-server.ps1 -Help
+```
+
+**Windows (Double-click):**
+```
+Double-click: start-mcp-server.bat
+```
+
+**npm Scripts:**
+```bash
+# Linux/macOS
+npm run startup
+
+# Windows  
+npm run startup-win
+```
+
+### Manual Startup
+
+If you prefer manual control:
+```bash
+npm install
+npm run build
 npm start
 ```
 

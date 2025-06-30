@@ -6,3 +6,4 @@ test-shared/
 coverage/
 .nyc_output/
 .DS_Store
+shared/
