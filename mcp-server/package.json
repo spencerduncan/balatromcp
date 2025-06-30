@@ -8,7 +8,9 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
-    "test": "jest"
+    "test": "jest",
+    "startup": "bash start-mcp-server.sh",
+    "startup-win": "powershell -ExecutionPolicy Bypass -File start-mcp-server.ps1"
   },
   "keywords": [
     "mcp",
