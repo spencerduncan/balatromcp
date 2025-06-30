@@ -23,6 +23,7 @@ $IncludeFiles = @(
 )
 
 $IncludeDirectories = @(
+    "action_executor",
     "compatibility",
     "interfaces", 
     "state_extractor",
