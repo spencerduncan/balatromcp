@@ -50,8 +50,7 @@ class BalatroMCPServer {
                     'go_to_shop', 'buy_item', 'sell_joker', 'sell_consumable',
                     'use_consumable', 'reorder_jokers', 'reroll_boss', 'reroll_shop',
                     'sort_hand_by_rank', 'sort_hand_by_suit', 'move_playing_card',
-                    'select_pack_offer', 'go_next', 'diagnose_blind_progression',
-                    'diagnose_blind_activation'
+                    'select_pack_offer', 'go_next'
                   ]
                 },
                 parameters: {

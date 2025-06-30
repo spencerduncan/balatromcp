@@ -77,6 +77,4 @@ export type SupportedActionType =
   | "sort_hand_by_suit"
   | "move_playing_card"
   | "select_pack_offer"
-  | "go_next"
-  | "diagnose_blind_progression"
-  | "diagnose_blind_activation";
+  | "go_next";
