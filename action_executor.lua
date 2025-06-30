@@ -113,7 +113,8 @@ function ActionExecutor:execute_action(action_data)
     if not self:ensure_validators_initialized() then
         return {
             success = false,
-            error = "Validation framework not available - dependencies not ready"
+            error_message = "Validation framework not available - dependencies not ready",
+            new_state = nil
         }
     end
     
@@ -147,7 +148,11 @@ function ActionExecutor:execute_action(action_data)
     
     if not validation_result.is_valid then
         print("BalatroMCP: Action validation failed: " .. validation_result.error_message)
-        return false, validation_result.error_message
+        return {
+            success = false,
+            error_message = validation_result.error_message,
+            new_state = nil
+        }
     end
     
     print("BalatroMCP: Action validation passed: " .. validation_result.success_message)
